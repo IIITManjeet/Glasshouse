@@ -1,0 +1,29 @@
+{
+  "name": "glasshouse",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Taker priority by sealed competitive bid — a SwapVM instruction for 1inch Aqua",
+  "license": "MIT",
+  "scripts": {
+    "build": "npx hardhat compile",
+    "test": "npx hardhat test",
+    "test:solidity": "npx hardhat test solidity",
+    "size": "npx hardhat compile && node scripts/size-check.mjs"
+  },
+  "dependencies": {
+    "@1inch/aqua": "github:1inch/aqua#v1.0.0",
+    "@1inch/solidity-utils": "6.9.10",
+    "@1inch/swap-vm": "github:1inch/swap-vm#08089a1",
+    "@openzeppelin/contracts": "5.4.0",
+    "forge-std": "github:foundry-rs/forge-std#v1.11.0"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-ignition": "^3.1.6",
+    "@nomicfoundation/hardhat-keystore": "^3.0.11",
+    "@nomicfoundation/hardhat-node-test-runner": "^3.0.17",
+    "@nomicfoundation/hardhat-verify": "^3.0.0",
+    "hardhat": "^3.8.0",
+    "hardhat-ignore-warnings": "0.3.0"
+  },
+  "type": "module"
+}

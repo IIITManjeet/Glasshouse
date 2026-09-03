@@ -1,0 +1,9 @@
+node_modules/
+artifacts/
+cache/
+types/
+coverage/
+.env
+.env.*
+deployments/localhost/
+*.log
