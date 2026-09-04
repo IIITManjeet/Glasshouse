@@ -888,6 +888,27 @@ by family: `src/instructions/Whitelist.sol`, `DutchAuction.sol`, `Balances.sol`,
   `postTransferInTarget = Book`: `swap()` records the filler, `quote()` does not touch it.
   Confirms F-127's workaround for the instruction being unable to emit under STATICCALL.
 
+### 3.6n Base mainnet verified on-chain (2026-09-05)
+Read directly from a public Base RPC (`https://mainnet.base.org`, `eth_getCode`), which
+upgrades two claims that until now rested on research notes rather than the chain.
+
+- **F-139** ✅ **Aqua IS live on Base at the deterministic address.**
+  `0x1111113ccf1426a8e30e2bff5e005d929bf6a90a` holds **5,619 B** of code on chain 8453.
+  This was the single load-bearing assumption behind deploying to Base rather than a
+  testnet (F-74, F-113), and it had never been checked against the chain — the npm
+  package ships no broadcast files or address constants.
+- **F-140** ✅ **The official `AquaSwapVMRouter` is live at
+  `0x111111338c5091e8440b67b168bae16a668ac0de`, 20,541 B.**
+  ⚠️ Note the discrepancy: our local compile of `AquaSwapVMRouter` measures **20,376 B**
+  (F-108), so the deployed bytecode is **165 B larger**. Compiler settings or version
+  drift. It does not affect our own budget — `GlasshouseRouter` is measured at 21,108 B
+  from our own artifact — but **do not quote 20,376 as the size of the deployed router**.
+  It also means Path B (`Extruction` against the official router) has a live target.
+- **F-141** ✅ **`scripts/preflight.mjs` added** so this is checked on every deploy rather
+  than once. It verifies the RPC is on the chain you think it is, that `owner` is set and
+  funded, that WETH and Aqua have code, and that the router is under EIP-170. `owner` is
+  deliberately left as the zero address in the parameter file so preflight fails closed.
+
 ### 3.6l Defects found by testing (2026-09-05)
 - **F-134** 🔴 **Two real defects in `GlasshouseBook`, both found by writing tests, neither
   caught by three rounds of design review.**
