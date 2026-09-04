@@ -265,7 +265,20 @@ contract GlasshouseBookTest is Test {
         book.reveal(MAKER, ORDER, MAX_BPS + 1, "s");
     }
 
-    function test_Reveal_EscrowsBond() public {
+    /// @dev The bond is taken at COMMIT, not at reveal. If it were taken at reveal,
+    ///      staying silent would be free, and staying silent is the cheapest attack on a
+    ///      second-price auction.
+    function test_Commit_EscrowsBond() public {
+        _open();
+        address a = _bidder(1);
+
+        uint256 before = token.balanceOf(a);
+        _commit(a, 100, "s");
+        assertEq(before - token.balanceOf(a), BOND, "bond not taken at commit");
+        assertEq(token.balanceOf(address(book)), BOND, "bond not escrowed");
+    }
+
+    function test_Reveal_TakesNoFurtherBond() public {
         (uint40 commitEnd,) = _open();
         address a = _bidder(1);
         _commit(a, 100, "s");
@@ -273,8 +286,8 @@ contract GlasshouseBookTest is Test {
 
         uint256 before = token.balanceOf(a);
         _reveal(a, 100, "s");
-        assertEq(before - token.balanceOf(a), BOND, "bond not taken");
-        assertEq(token.balanceOf(address(book)), BOND, "bond not escrowed");
+        assertEq(token.balanceOf(a), before, "reveal must not charge again");
+        assertEq(token.balanceOf(address(book)), BOND, "escrow unchanged");
     }
 
     // --- phases ----------------------------------------------------------------
@@ -552,14 +565,71 @@ contract GlasshouseBookTest is Test {
         assertEq(token.balanceOf(b) - beforeB, BOND, "loser bond");
     }
 
-    /// @dev A winner who bought exclusivity and then did not fill denied the maker a
-    ///      fill it had earned. That is precisely what the bond is for.
-    function test_Settle_WinnerNoShow_ForfeitsToMaker() public {
+    /// @dev THE BOND-THEFT VECTOR, CLOSED.
+    ///
+    /// `filledBy` is written only by the maker hook, which fires only if the maker's
+    /// SIGNED ORDER points at this Book and `a.router` is the router that filled. The
+    /// Book never sees the order and cannot check either. So a maker who omits the hook,
+    /// or names the wrong router, guarantees `filledBy == address(0)` -- and if that
+    /// counted as a no-show, every honest winner would forfeit and the maker would
+    /// collect. The winner would have paid the improved price AND lost the bond.
+    ///
+    /// Forfeiture therefore requires positive evidence that someone else filled.
+    function test_Settle_NoFillRecorded_DoesNotForfeitTheWinner() public {
         (address a, address b, uint40 revealEnd) = _runToSettlement(300, 200);
 
         vm.roll(revealEnd + EXCLUSIVE_BLOCKS + 1);
         book.settle(MAKER, ORDER);
-        assertTrue(book.auctions(MAKER, ORDER).winnerForfeited, "no-show must forfeit");
+        assertFalse(book.auctions(MAKER, ORDER).winnerForfeited, "silence is not evidence");
+
+        vm.prank(MAKER);
+        vm.expectRevert(GlasshouseBook.NothingToClaim.selector);
+        book.claimForfeit(ORDER);
+
+        uint256 beforeA = token.balanceOf(a);
+        vm.prank(a);
+        book.claimBond(MAKER, ORDER);
+        assertEq(token.balanceOf(a) - beforeA, BOND, "winner keeps its bond");
+
+        uint256 beforeB = token.balanceOf(b);
+        vm.prank(b);
+        book.claimBond(MAKER, ORDER);
+        assertEq(token.balanceOf(b) - beforeB, BOND, "loser keeps its bond");
+    }
+
+    /// @dev A maker cannot manufacture a forfeit by pointing `router` somewhere the hook
+    ///      will never come from.
+    function test_Settle_MakerCannotForgeAForfeitByMisconfiguringTheRouter() public {
+        vm.prank(MAKER);
+        book.open(ORDER, address(0xDEAD), address(token), COMMIT_BLOCKS, REVEAL_BLOCKS, EXCLUSIVE_BLOCKS, RESERVE_BPS, MAX_BPS, BOND);
+        GlasshouseBook.Auction memory cfg = book.auctions(MAKER, ORDER);
+
+        address a = _bidder(1);
+        _commit(a, 300, "s");
+        vm.roll(cfg.commitEnd + 1);
+        _reveal(a, 300, "s");
+        vm.roll(cfg.revealEnd + EXCLUSIVE_BLOCKS + 1);
+
+        book.settle(MAKER, ORDER);
+        assertFalse(book.auctions(MAKER, ORDER).winnerForfeited, "misconfiguration is not a no-show");
+
+        uint256 beforeA = token.balanceOf(a);
+        vm.prank(a);
+        book.claimBond(MAKER, ORDER);
+        assertEq(token.balanceOf(a) - beforeA, BOND, "bidder made whole");
+    }
+
+    /// @dev The legitimate forfeit: someone else demonstrably filled while the winner held
+    ///      exclusivity and did nothing.
+    function test_Settle_SomeoneElseFilled_WinnerForfeitsToMaker() public {
+        (address a, address b, uint40 revealEnd) = _runToSettlement(300, 200);
+
+        vm.prank(ROUTER);
+        book.postTransferIn(MAKER, b, address(0), address(0), 1, 1, 0, ORDER, "", "");
+
+        vm.roll(revealEnd + EXCLUSIVE_BLOCKS + 1);
+        book.settle(MAKER, ORDER);
+        assertTrue(book.auctions(MAKER, ORDER).winnerForfeited, "evidenced no-show must forfeit");
 
         vm.prank(a);
         vm.expectRevert(GlasshouseBook.NothingToClaim.selector);
@@ -570,11 +640,49 @@ contract GlasshouseBookTest is Test {
         book.claimForfeit(ORDER);
         assertEq(token.balanceOf(MAKER) - beforeMaker, BOND, "forfeit to maker");
 
-        // The honest loser is untouched by the winner's failure.
         uint256 beforeB = token.balanceOf(b);
         vm.prank(b);
         book.claimBond(MAKER, ORDER);
-        assertEq(token.balanceOf(b) - beforeB, BOND, "loser still whole");
+        assertEq(token.balanceOf(b) - beforeB, BOND, "honest bidder still whole");
+    }
+
+    /// @dev Withholding a reveal costs the bond. Without this, a runner-up could stay
+    ///      silent for free, dropping the clearing price to the reserve and handing the
+    ///      winner a near-free fill.
+    function test_ClaimUnrevealed_SilenceCostsTheBond() public {
+        (uint40 commitEnd, uint40 revealEnd) = _open();
+        address a = _bidder(1);
+        address b = _bidder(2);
+        _commit(a, 300, "s");
+        _commit(b, 250, "s");
+
+        vm.roll(commitEnd + 1);
+        _reveal(a, 300, "s"); // b stays silent
+        vm.roll(revealEnd + 1);
+
+        assertEq(book.outcome(MAKER, ORDER).clearingBps, RESERVE_BPS, "silence drops the price");
+
+        vm.roll(revealEnd + EXCLUSIVE_BLOCKS + 1);
+        book.settle(MAKER, ORDER);
+
+        uint256 beforeMaker = token.balanceOf(MAKER);
+        vm.prank(MAKER);
+        book.claimUnrevealed(ORDER, b);
+        assertEq(token.balanceOf(MAKER) - beforeMaker, BOND, "silent bidder forfeits");
+
+        vm.prank(b);
+        vm.expectRevert(GlasshouseBook.NothingToClaim.selector);
+        book.claimBond(MAKER, ORDER);
+    }
+
+    function test_ClaimUnrevealed_DoesNotTouchAnHonestBidder() public {
+        (address a,, uint40 revealEnd) = _runToSettlement(300, 200);
+        vm.roll(revealEnd + EXCLUSIVE_BLOCKS + 1);
+        book.settle(MAKER, ORDER);
+
+        vm.prank(MAKER);
+        vm.expectRevert(GlasshouseBook.NothingToClaim.selector);
+        book.claimUnrevealed(ORDER, a);
     }
 
     /// @dev An outsider filling during the window does not excuse the winner. The
@@ -638,11 +746,14 @@ contract GlasshouseBookTest is Test {
         (address a, address b, uint40 revealEnd) = _runToSettlement(300, 200);
         assertEq(token.balanceOf(address(book)), 2 * BOND, "two bonds escrowed");
 
+        vm.prank(ROUTER);
+        book.postTransferIn(MAKER, b, address(0), address(0), 1, 1, 0, ORDER, "", "");
+
         vm.roll(revealEnd + EXCLUSIVE_BLOCKS + 1);
         book.settle(MAKER, ORDER);
 
         vm.prank(MAKER);
-        book.claimForfeit(ORDER); // winner a no-showed
+        book.claimForfeit(ORDER); // a won, b filled: a forfeits
         vm.prank(b);
         book.claimBond(MAKER, ORDER);
 

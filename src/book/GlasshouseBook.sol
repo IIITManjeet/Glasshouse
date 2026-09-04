@@ -43,7 +43,10 @@ contract GlasshouseBook is IGlasshouseBook, IMakerHooks {
         address best;
         uint24 bestBps;
         uint40 bestCommitIdx;
-        address second;
+        // Only the runner-up PRICE is kept, deliberately. Which address held it is
+        // reveal-order dependent when two runners-up tie, and exposing a value that
+        // depends on transaction ordering would contradict the property the whole
+        // mechanism is built on. `secondBps` itself is order-independent.
         uint24 secondBps;
         uint40 commitCount;
         // --- written only by the hook / sweep(); never read by outcome() ---
@@ -80,6 +83,7 @@ contract GlasshouseBook is IGlasshouseBook, IMakerHooks {
     event AuctionSettled(address indexed maker, bytes32 indexed orderHash, address winner, uint24 clearingBps, bool winnerForfeited);
     event BondClaimed(address indexed maker, bytes32 indexed orderHash, address indexed bidder, uint128 amount);
     event ForfeitClaimed(address indexed maker, bytes32 indexed orderHash, uint128 amount);
+    event UnrevealedForfeited(address indexed maker, bytes32 indexed orderHash, address indexed bidder, uint128 amount);
 
     error AlreadyOpened();
     error NotOpened();
@@ -158,6 +162,15 @@ contract GlasshouseBook is IGlasshouseBook, IMakerHooks {
         b.commitIdx = a.commitCount;
         unchecked { a.commitCount = a.commitCount + 1; }
 
+        // THE BOND IS TAKEN HERE, NOT AT REVEAL. If it were taken at reveal, refusing
+        // to reveal would be free -- and refusing to reveal is the cheapest attack on a
+        // second-price auction: a runner-up who withholds drops `secondBps` to the
+        // reserve and hands the winner a near-free fill. That is the ring behaviour the
+        // bond is supposed to bound, so the bond has to be at risk from the moment a
+        // bidder takes a slot.
+        uint128 bond = a.bond;
+        if (bond > 0) IERC20(a.tokenIn).safeTransferFrom(msg.sender, address(this), bond);
+
         emit BidCommitted(maker, orderHash, msg.sender, b.commitIdx);
     }
 
@@ -181,9 +194,6 @@ contract GlasshouseBook is IGlasshouseBook, IMakerHooks {
 
         b.revealed = true;
 
-        uint128 bond = a.bond;
-        if (bond > 0) IERC20(a.tokenIn).safeTransferFrom(msg.sender, address(this), bond);
-
         // O(1) top-2 maintenance. Strictly-greater keeps the earliest commit on ties.
         //
         // The `a.best == address(0)` arm has to come first: a maker may set
@@ -192,17 +202,15 @@ contract GlasshouseBook is IGlasshouseBook, IMakerHooks {
         // would silently fail to become the winner. Seeding on the empty book fixes
         // that; the assignments below are no-ops in that case.
         if (a.best == address(0) || bps > a.bestBps || (bps == a.bestBps && b.commitIdx < a.bestCommitIdx)) {
-            a.second = a.best;
             a.secondBps = a.bestBps;
             a.best = msg.sender;
             a.bestBps = bps;
             a.bestCommitIdx = b.commitIdx;
         } else if (bps > a.secondBps) {
-            a.second = msg.sender;
             a.secondBps = bps;
         }
 
-        emit BidRevealed(maker, orderHash, msg.sender, bps, bond);
+        emit BidRevealed(maker, orderHash, msg.sender, bps, a.bond);
     }
 
     /// @inheritdoc IGlasshouseBook
@@ -265,9 +273,22 @@ contract GlasshouseBook is IGlasshouseBook, IMakerHooks {
         require(block.number > a.revealEnd + a.exclusiveBlocks, WindowNotElapsed());
 
         a.settled = true;
-        // A winner who bought exclusivity and then did not fill denied the maker a
-        // fill they had earned. That is what the bond is for.
-        a.winnerForfeited = a.best != address(0) && a.filledBy != a.best;
+        // FORFEITURE REQUIRES POSITIVE EVIDENCE, and the missing `filledBy != address(0)`
+        // was a bond-theft vector.
+        //
+        // `filledBy` is written only by {postTransferIn}, which fires only if the maker's
+        // SIGNED ORDER sets the post-transfer-in hook at this Book and `a.router` is the
+        // router that actually filled. The Book never sees the order, so it cannot check
+        // either. A maker who points `router` at the wrong address, or simply omits the
+        // hook, guarantees `filledBy == address(0)` -- and under the old rule every
+        // honest winner then forfeited, with the maker collecting through {claimForfeit}.
+        // The winner paid the improved price AND lost the bond.
+        //
+        // So: forfeit only when someone else demonstrably filled. If nothing filled at
+        // all, the Book cannot distinguish a winner who did not show from a maker who
+        // broke the hook, and it declines to punish the party that could not have
+        // verified the configuration. The residual is stated plainly in {claimForfeit}.
+        a.winnerForfeited = a.best != address(0) && a.filledBy != address(0) && a.filledBy != a.best;
 
         uint24 clearingBps = a.secondBps > a.reserveBps ? a.secondBps : a.reserveBps;
         emit AuctionSettled(maker, orderHash, a.best, a.best == address(0) ? 0 : clearingBps, a.winnerForfeited);
@@ -290,11 +311,18 @@ contract GlasshouseBook is IGlasshouseBook, IMakerHooks {
         emit BondClaimed(maker, orderHash, msg.sender, bond);
     }
 
-    /// @notice Maker collects a forfeited bond.
+    /// @notice Maker collects the winner's forfeited bond.
     /// @dev Forfeiture goes to the maker because the maker is the only party harmed.
-    ///      Sizing `bond >= maxBps * notional / BPS` makes both winner-no-show and
-    ///      reveal-withholding unprofitable. This bounds, but does not solve,
-    ///      bidder-ring collusion — see ARCHITECTURE.md §3.4.
+    ///      Sizing `bond >= maxBps * notional / BPS` makes winner-no-show unprofitable;
+    ///      reveal-withholding is covered separately by {claimUnrevealed}, since the bond
+    ///      is escrowed at commit. This bounds, but does not solve, bidder-ring
+    ///      collusion — see ARCHITECTURE.md §3.4.
+    ///
+    /// @dev KNOWN RESIDUAL, stated rather than hidden: this only fires when someone ELSE
+    ///      filled. A winner who does not show, where nobody else fills either, keeps its
+    ///      bond. That is deliberate — see {settle}. Punishing the silent case would mean
+    ///      trusting the maker to have wired a hook the Book cannot verify, which turns
+    ///      the bond into something the maker can take at will.
     function claimForfeit(bytes32 orderHash) external {
         bytes32 k = key(msg.sender, orderHash);
         Auction storage a = _auctions[k];
@@ -309,6 +337,33 @@ contract GlasshouseBook is IGlasshouseBook, IMakerHooks {
         if (bond > 0) IERC20(a.tokenIn).safeTransfer(msg.sender, bond);
 
         emit ForfeitClaimed(msg.sender, orderHash, bond);
+    }
+
+    /// @notice Maker collects the bond of a bidder who committed and never revealed.
+    /// @dev This is the half of the bond's job that {claimForfeit} does not do, and it
+    ///      needs no hook and no trust in the maker's configuration: whether a commitment
+    ///      was revealed is something the Book observed directly.
+    ///
+    ///      Withholding a reveal is the cheapest attack on a second-price auction. A
+    ///      runner-up who stays silent drops `secondBps` to the reserve and hands the
+    ///      winner a near-free fill, which is exactly the ring behaviour bonds exist to
+    ///      make expensive. Taking the bond at commit and forfeiting it here is what
+    ///      makes staying silent cost something.
+    /// @param orderHash The maker's order.
+    /// @param bidder    The bidder who committed without revealing.
+    function claimUnrevealed(bytes32 orderHash, address bidder) external {
+        bytes32 k = key(msg.sender, orderHash);
+        Auction storage a = _auctions[k];
+        require(a.settled, NotSettled());
+
+        Bid storage b = _bids[k][bidder];
+        require(b.commitment != bytes32(0) && !b.revealed && !b.bondClaimed, NothingToClaim());
+        b.bondClaimed = true;
+
+        uint128 bond = a.bond;
+        if (bond > 0) IERC20(a.tokenIn).safeTransfer(msg.sender, bond);
+
+        emit UnrevealedForfeited(msg.sender, orderHash, bidder, bond);
     }
 
     function auctions(address maker, bytes32 orderHash) external view returns (Auction memory) {
