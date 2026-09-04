@@ -148,6 +148,7 @@ status line at the top, and are updated at release boundaries.
 | Version | Milestone |
 |---|---|
 | `v0.1.0` | Mechanism executes inside a real SwapVM program; `quote() == swap()` demonstrated |
+| `v0.2.0` | Three-way comparison: identity, clock and bid on the same order |
 
 ## Licence
 

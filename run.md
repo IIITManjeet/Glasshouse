@@ -1310,7 +1310,7 @@ Sep 10 freeze real rather than optimistic.
 | Day | Date | Deliverable | Gate |
 |---|---|---|---|
 | ✅ | Fri 05 | D2 Book suite · D3 first VM execution — **57 tests green** | done |
-| 🎯 | **Fri 05 (cont.)** | **`ComparisonTest.t.sol`** — one order, three ways: `0x2d` cartel ladder · `0x94` Dutch clock · `0x2e` sealed bid | **G1 — the submission exists** |
+| ✅ | **Fri 05** | **`Comparison.t.sol` DONE — 67 tests green.** identity 10000 · clock 10618 · **bid 9756** (bps of base; lower is better for the maker). Winner values 100/100/**400** bps. | ✅ **G1 — the submission exists** |
 | | Sat 06 | **Base mainnet:** Ignition module, deploy Book + Router, one real auction with dust. Invariant harness cloned from `DutchAuctionLimitSwapInvariants`. | **G2 — 1inch qualified** |
 | | Sun 07 | **The Graph:** Messari-conformant subgraph over the Base deployment + Subgraph MCP | **G3 — Graph viable or cut** |
 | | Mon 08 | **Explanation page** — the problem, the mechanism, the comparison. Standalone, shareable, no build step. | Testers could read it |
