@@ -20,14 +20,14 @@
 |---|---|
 | Event | ETHGlobal ETHOnline 2026 |
 | Hacking window | **2026-09-04 → 2026-09-16** |
-| Submission deadline | **2026-09-13, 12:00 EDT** ⚠️ ~10 days |
-| Today | 2026-09-03 (pre-event) |
-| Phase | **P1 — Strategy locked, idea being narrowed** |
-| Repo | `D:\ethonline` (git, no commits yet — **and none allowed until Sep 4**, F-38) |
+| Submission deadline | **2026-09-13, 12:00 EDT** (= 21:30 IST) ⚠️ **8 days left** |
+| Today | **2026-09-05 — day 2 of 10** |
+| Phase | **P3 — Building. Contracts drafted, Book unproven.** Roadmap in §9. |
+| Repo | **https://github.com/IIITManjeet/Glasshouse** — own repo, 7 incremental commits, ⚠️ **still PRIVATE** |
 | **Name** | **Glasshouse** ✅ *(user, 2026-09-03)* |
 | Category | **DeFi + Infrastructure** — market microstructure, not a consumer app |
 | Strategy | ✅ **Prize-aligned pivot, novel mechanism, infra-deep** (D-001) |
-| Thesis | 🔵 **"No MEV auction is verifiable"** — D-002, pending Consensus-2 |
+| Thesis | ✅ **"Taker priority is allocated by identity or by clock, never by bid"** — D-004 |
 | Target tracks | 1inch $7K · The Graph $15K · Chainlink $2.5K *(max 3, F-42)* |
 | Dropped | ❌ EigenLayer ❌ Sui/Move — no sponsor, no prize path (F-4) |
 
@@ -1244,3 +1244,69 @@ before any logic (silent byte-offset bugs, F-110).
 - [ ] Measure router bytecode **every commit**; CI fail above 24,576 (F-108)
 - [ ] Reserve: human-narrated video 3–5 h (F-43), `AI-DISCLOSURE.md` (F-44), licence
       hygiene — **never vendor 1inch source** (F-117)
+
+---
+
+## 9. Roadmap — 2026-09-05 → 2026-09-13
+
+> Written day 2. Ordered by the **cut order** in D-004, not by what is fun to build.
+> Every day ends in something demonstrable. Gates are hard: a failed gate reallocates
+> the remaining days, it does not get "caught up later".
+
+### Where we actually are (verified today, not assumed)
+
+| | State |
+|---|---|
+| ✅ | 7 commits, own repo, incremental history (F-40 satisfied) |
+| ✅ | `GlasshouseRouter` **21,108 B**, 3,468 under EIP-170. Opcode + re-added `WhitelistSequential` = **732 B**. Path B (`Extruction`) is now a *bonus*, not a fallback. |
+| ✅ | 7/7 tests green, incl. 256-run fuzz on arg encoding (R-4 closed) |
+| ✅ | Node 22.20.0, Foundry 1.8.1, Base networks in `hardhat.config.ts` |
+| 🔴 | **`GlasshouseBook` — 316 lines, 9 external functions, ZERO tests.** Largest risk in the repo. |
+| 🔴 | **Nothing has ever run through the VM.** `applyOutcome` is untested against a real `Context`. |
+| 🔴 | **quote/swap consistency — the invariant the whole design rests on — is unproven.** |
+| 🔴 | No deployment, no subgraph, no UI, no video, no `FEEDBACK.md` |
+
+### The plan
+
+| Day | Date | Deliverable | Ends with |
+|---|---|---|---|
+| **D2** | Fri 05 | **Book test suite.** commit/reveal, phase boundaries, second-price + reserve, tie→earliest commit, bond forfeit/claim, `postTransferIn` auth. Fuzz the running top-2. | Book trustworthy |
+| **D3** | Sat 06 | **First execution through the VM.** Deploy `GlasshouseRouter` in-test, run a real program with `0x2e`. Prove **`quote() == swap()`**. Exclusive window enforced; fall-through after expiry. | Mechanism works end-to-end |
+| **D4** | Sun 07 | 🎯 **`ComparisonTest.t.sol`** — one order, three ways: `0x2d` outsider reverts · `0x94` one price per block, first-in-block wins · `0x2e` highest bidder wins, pays second price. Latency-differentiated bidders. | **G1 — the submission exists** |
+| **D5** | Mon 08 | **Base mainnet.** Ignition module, deploy Book + Router, `ship()` a strategy through real Aqua, run one real auction with dust. Clone `DutchAuctionLimitSwapInvariants` harness (F-122). | **G2 — 1inch track qualified** |
+| **D6** | Tue 09 | **The Graph.** Messari-conformant subgraph over the Base deployment + Subgraph MCP (both halves of F-81's either/or). | **G3 — Graph viable or cut** |
+| **D7** | Wed 10 | 🚨 **HARD GATE.** Everything above green, or cut per F-116 and spend the rest polishing what survives. | Scope frozen |
+| **D8** | Thu 11 | **UI** per `DESIGN.md` §7: comparison screen first, then live wiring, then auction view. | Demo-able |
+| **D9** | Fri 12 | UI finish · Uniswap API price benchmark + `FEEDBACK.md` + feedback form · **record the video (3–5 h, human-narrated)** | **G4 — video in hand** |
+| **D10** | Sat 13 | Repo public · README final · submit by **21:30 IST**. Buffer only — nothing new gets built. | Submitted |
+
+### Gates
+
+- **G1 (end D4) — non-negotiable.** If the three-way comparison is not green, everything
+  from D5 on is cancelled and D5–D9 go into making it green. It *is* the submission (F-115).
+- **G2 (end D5).** Base deployment is what turns "a test passes" into *"this is running on
+  Base mainnet right now"*, and it satisfies 1inch's on-chain-execution requirement (F-68).
+- **G3 (end D6).** If the subgraph is not indexing live data by end of D7, **cut The Graph
+  entirely** (F-116 rank 3) and move D8–D9 forward a day. A half-landed Graph integration
+  scores zero and costs two days.
+- **G4 (D9).** Video is mandatory and human-narrated; AI voiceover is an auto-reject (F-43).
+  It does not slip to D10.
+
+### Needed from the user (blocking, flagged early on purpose)
+
+| # | What | Needed by | Why |
+|---|---|---|---|
+| U-a | **ETH on Base** (~$5 is plenty) | **D5, Mon 08** | Deploy Book + Router; blocks G2 |
+| U-b | ETH on **Arbitrum One** | D6, Tue 09 | Subgraph *publishing* is an on-chain tx (F-83). Only if we publish rather than staying on the Studio dev endpoint. |
+| U-c | **Human narration** for the video | D9, Fri 12 | F-43 — TTS is an auto-reject |
+| U-d | **Make the repo public** | D10, Sat 13 | Judges must read it; new work must be open source |
+
+### Standing rules for every day
+
+- `npm run size` on every commit; CI fails above 24,576 (F-108).
+- The instruction stays **`view`**. Any state write breaks quote/swap consistency (F-112).
+- Never vendor 1inch source — dependencies only (F-117).
+- Commit incrementally with real messages (F-40).
+- Never pitch this as an auction-managed AMM or a fee auction — that won 1st place on this
+  exact track already (F-102).
+
