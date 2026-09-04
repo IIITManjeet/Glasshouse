@@ -11,9 +11,53 @@ each one is in [`run.md`](./run.md).
 ## [Unreleased]
 
 ### Planned
-- Base mainnet deployment of `GlasshouseBook` and `GlasshouseRouter`
+- Base mainnet deployment of `GlasshouseBook` and `GlasshouseRouter` (module and preflight
+  are ready; needs ETH and a deployer address)
 - Messari-conformant subgraph over the Base deployment, read through the Subgraph MCP
 - Explanation page and comparison UI
+
+---
+
+## [0.3.0] - 2026-09-05
+
+Two defects in the bond mechanism, both found while writing the LLD, both fixed before
+deployment because `GlasshouseBook` has no upgrade path.
+
+### Fixed
+- **Bond theft.** `filledBy` is written only by `postTransferIn`, which fires only if the
+  maker's *signed order* sets the post-transfer-in hook at this Book and `a.router` is
+  the router that filled. The Book never sees the order and cannot check either
+  condition, so a maker who omitted the hook or named the wrong router guaranteed
+  `filledBy == address(0)` - and the old rule read that as a no-show. Every honest winner
+  forfeited and the maker collected: the winner paid the improved price and lost the bond
+  as well. Forfeiture now requires positive evidence that someone else filled.
+- **Free silence.** The bond escrowed at `reveal()`, so refusing to reveal cost nothing -
+  and refusing to reveal is the cheapest attack on a second-price auction, since a
+  runner-up who stays silent drops the clearing price to the reserve and hands the winner
+  a near-free fill. The bond is now taken at `commit()`.
+
+### Added
+- `claimUnrevealed(orderHash, bidder)` - forfeits the bond of a bidder who committed and
+  never revealed. Unlike `claimForfeit` this needs no hook and no trust in the maker's
+  configuration: whether a commitment was revealed is something the Book observed.
+- `UnrevealedForfeited` event.
+- Ignition deployment module, `scripts/preflight.mjs`, and `DEPLOY.md`.
+- `docs/design/HLD.md` (790 lines) and `docs/design/LLD.md` (1,436 lines).
+
+### Changed
+- **Breaking:** `Auction.second` removed. Which address held the runner-up price is
+  reveal-order dependent on ties, and exposing an order-dependent value would contradict
+  the property the mechanism is built on. `secondBps` is order-independent and is what
+  the clearing rule reads.
+- Source comments trimmed from 877 to 567 lines with no behaviour change.
+- `AI-DISCLOSURE.md` now names specific files, as the event rules require.
+
+### Verified
+- Aqua is live on Base at `0x1111113ccf1426a8e30e2bff5e005d929bf6a90a` (5,619 B), and the
+  official `AquaSwapVMRouter` at `0x111111338c5091e8440b67b168bae16a668ac0de` (20,541 B).
+  Both were assumptions carried from research notes until now. Note the deployed router is
+  165 B larger than a local compile of the same contract.
+- 72 tests. `GlasshouseBook` 5,936 B, `GlasshouseRouter` 21,108 B.
 
 ---
 
@@ -91,6 +135,7 @@ invariant the design rests on is demonstrated rather than argued.
 - Fills record through `IMakerHooks.postTransferIn`, which `swap()` calls and `quote()`
   does not - the instruction itself cannot emit, since `LOG` reverts under `STATICCALL`.
 
-[Unreleased]: https://github.com/IIITManjeet/Glasshouse/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/IIITManjeet/Glasshouse/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/IIITManjeet/Glasshouse/releases/tag/v0.3.0
 [0.2.0]: https://github.com/IIITManjeet/Glasshouse/releases/tag/v0.2.0
 [0.1.0]: https://github.com/IIITManjeet/Glasshouse/releases/tag/v0.1.0
