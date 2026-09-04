@@ -1224,6 +1224,47 @@ sealed bids. **Never cut:** the two-run comparison + the opcode + a deployed rou
 
 ---
 
+### D-005 - Live auction parameters
+**Date** 2026-09-05 - **Status** PARTIALLY LOCKED (user)
+
+**Decided by the user:**
+
+| | Choice | Reasoning |
+|---|---|---|
+| Total lockup | **~150 s** = 30 commit + 30 reveal + 15 exclusive blocks | Half the 300 s lockup of the `WhitelistSequential` ladder the project attacks, and workable for human bidders |
+| Bidders in the live Base auction | **Invite 3-5 real people** | Removes the toy-market problem (F-114): a subgraph indexing wallets we control makes any competition metric meaningless |
+| Exclusive window | **Do not guess - simulate it** | User: *"we should perform some mathematic simulation around this idea to get to the one probabilistically acceptable window"* |
+| Reserve price | **Do not pick one - test the range** | User: *"we can show all these cases and cover a lot more broader scope as well and can also test our logics and mechanisms are working fine or not"* |
+
+**Simulation result -> `exclusiveBlocks = 15`.** Full analysis in
+[`docs/design/window-sizing.md`](./docs/design/window-sizing.md); reproduce with
+`node scripts/simulate-window.mjs`.
+
+The window turned out not to be execution time. It is a **free American call granted to
+the winner**, so a longer window raises bids and simultaneously lets the winner exercise
+only when the market has moved against the maker. On a volatile pair, moving from a 2 s
+window to a 300 s one raises the clearing price 79 -> 124 bps, which looks 57% better,
+while the maker's net *falls* 75.7 -> 67.2 bps. The long end is ruled out; the short end is
+economically indifferent (under 1 bp between W=5 and W=15), so the choice was settled by
+what a human winner needs in order to sign a transaction.
+
+⚠️ **This corrected a prediction.** The first model showed maker net *rising* with W. That
+was a modelling error, not a finding: bidders were priced as if they would wait, while the
+exercise rule made them fill immediately, so they paid for an option they never used. Both
+exercise rules are now reported as bounds. Recorded because the wrong version was run
+first and the correction is the useful part.
+
+**Still open, tracked to the reserve matrix:** `reserveBps`. Per the user's answer this is
+not a pick but a test across `r x bidder count`, which also covers the thin cases the suite
+currently misses (zero bidders, one bidder).
+
+⚠️ **Interaction flagged to the user, not yet resolved:** 60 s reveal windows plus real
+human bidders is tight, and since the bond now escrows at commit (0.3.0), an honest bidder
+who misses the reveal **forfeits it**. Either pre-stage bidders on a countdown, or run the
+human demo with longer windows than the benchmark configuration.
+
+---
+
 ## 5. Architecture
 
 ✅ **Written: [`ARCHITECTURE.md`](./ARCHITECTURE.md)** (2026-09-03).
