@@ -134,7 +134,7 @@ Requires **Node ≥ 22.13.0** (Hardhat 3) and [Foundry](https://getfoundry.sh).
 ```bash
 npm install
 npx hardhat compile     # ~14s incremental
-forge test              # instruction + encoding tests
+npx hardhat test solidity   # the full suite
 node scripts/size-check.mjs
 ```
 
