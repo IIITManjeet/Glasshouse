@@ -1291,67 +1291,75 @@ before any logic (silent byte-offset bugs, F-110).
       hygiene — **never vendor 1inch source** (F-117)
 
 ---
+## 9. Roadmap — **feature freeze Wed 2026-09-10**
 
-## 9. Roadmap — 2026-09-05 → 2026-09-13
+> **REPLANNED 2026-09-05 (user).** The deadline is Sep 13, but the *build* ends
+> **Wed Sep 10**. Thu 11 → Sat 13 are reserved for the user to study the work, put it
+> in front of real testers, and act on what comes back. Nothing new is built after the
+> freeze; only what testing finds gets fixed.
+>
+> **Two consequences.** The **explanation web page is now a required deliverable**, not
+> a stretch — it is what testers are handed, so it has to stand alone. And the schedule
+> loses its slack, so the cut order in F-116 is live from day one rather than in reserve.
 
-> Written day 2. Ordered by the **cut order** in D-004, not by what is fun to build.
-> Every day ends in something demonstrable. Gates are hard: a failed gate reallocates
-> the remaining days, it does not get "caught up later".
+### Why the freeze is affordable
 
-### Where we actually are (verified today, not assumed)
+D3 landed a day early (05 Sep, planned for 06). That bought the slack day that makes a
+Sep 10 freeze real rather than optimistic.
 
-| | State |
-|---|---|
-| ✅ | 7 commits, own repo, incremental history (F-40 satisfied) |
-| ✅ | `GlasshouseRouter` **21,108 B**, 3,468 under EIP-170. Opcode + re-added `WhitelistSequential` = **732 B**. Path B (`Extruction`) is now a *bonus*, not a fallback. |
-| ✅ | 7/7 tests green, incl. 256-run fuzz on arg encoding (R-4 closed) |
-| ✅ | Node 22.20.0, Foundry 1.8.1, Base networks in `hardhat.config.ts` |
-| 🔴 | **`GlasshouseBook` — 316 lines, 9 external functions, ZERO tests.** Largest risk in the repo. |
-| 🔴 | **Nothing has ever run through the VM.** `applyOutcome` is untested against a real `Context`. |
-| 🔴 | **quote/swap consistency — the invariant the whole design rests on — is unproven.** |
-| 🔴 | No deployment, no subgraph, no UI, no video, no `FEEDBACK.md` |
-
-### The plan
-
-| Day | Date | Deliverable | Ends with |
+| Day | Date | Deliverable | Gate |
 |---|---|---|---|
-| ✅ **D2** | Fri 05 | **DONE — 48 tests green.** Book test suite. commit/reveal, phase boundaries, second-price + reserve, tie→earliest commit, bond forfeit/claim, `postTransferIn` auth. Fuzz the running top-2. | Book trustworthy |
-| ✅ **D3** | Sat 06 | **DONE 05 Sep — 57 tests green.** First execution through the VM. Deploy `GlasshouseRouter` in-test, run a real program with `0x2e`. Prove **`quote() == swap()`**. Exclusive window enforced; fall-through after expiry. | Mechanism works end-to-end |
-| **D4** | Sun 07 | 🎯 **`ComparisonTest.t.sol`** — one order, three ways: `0x2d` outsider reverts · `0x94` one price per block, first-in-block wins · `0x2e` highest bidder wins, pays second price. Latency-differentiated bidders. | **G1 — the submission exists** |
-| **D5** | Mon 08 | **Base mainnet.** Ignition module, deploy Book + Router, `ship()` a strategy through real Aqua, run one real auction with dust. Clone `DutchAuctionLimitSwapInvariants` harness (F-122). | **G2 — 1inch track qualified** |
-| **D6** | Tue 09 | **The Graph.** Messari-conformant subgraph over the Base deployment + Subgraph MCP (both halves of F-81's either/or). | **G3 — Graph viable or cut** |
-| **D7** | Wed 10 | 🚨 **HARD GATE.** Everything above green, or cut per F-116 and spend the rest polishing what survives. | Scope frozen |
-| **D8** | Thu 11 | **UI** per `DESIGN.md` §7: comparison screen first, then live wiring, then auction view. | Demo-able |
-| **D9** | Fri 12 | UI finish · Uniswap API price benchmark + `FEEDBACK.md` + feedback form · **record the video (3–5 h, human-narrated)** | **G4 — video in hand** |
-| **D10** | Sat 13 | Repo public · README final · submit by **21:30 IST**. Buffer only — nothing new gets built. | Submitted |
+| ✅ | Fri 05 | D2 Book suite · D3 first VM execution — **57 tests green** | done |
+| 🎯 | **Fri 05 (cont.)** | **`ComparisonTest.t.sol`** — one order, three ways: `0x2d` cartel ladder · `0x94` Dutch clock · `0x2e` sealed bid | **G1 — the submission exists** |
+| | Sat 06 | **Base mainnet:** Ignition module, deploy Book + Router, one real auction with dust. Invariant harness cloned from `DutchAuctionLimitSwapInvariants`. | **G2 — 1inch qualified** |
+| | Sun 07 | **The Graph:** Messari-conformant subgraph over the Base deployment + Subgraph MCP | **G3 — Graph viable or cut** |
+| | Mon 08 | **Explanation page** — the problem, the mechanism, the comparison. Standalone, shareable, no build step. | Testers could read it |
+| | Tue 09 | **Comparison + auction UI** wired to real data | Demo-able |
+| | **Wed 10** | Uniswap API benchmark · `FEEDBACK.md` · polish · **FREEZE** | **G5 — build complete** |
+| | Thu 11 – Sat 13 | User study · **testing with real people** · fixes from feedback · human-narrated video · submit by 21:30 IST | Submitted |
 
-### Gates
+### What the freeze changes about priorities
 
-- **G1 (end D4) — non-negotiable.** If the three-way comparison is not green, everything
-  from D5 on is cancelled and D5–D9 go into making it green. It *is* the submission (F-115).
-- **G2 (end D5).** Base deployment is what turns "a test passes" into *"this is running on
-  Base mainnet right now"*, and it satisfies 1inch's on-chain-execution requirement (F-68).
-- **G3 (end D6).** If the subgraph is not indexing live data by end of D7, **cut The Graph
-  entirely** (F-116 rank 3) and move D8–D9 forward a day. A half-landed Graph integration
-  scores zero and costs two days.
-- **G4 (D9).** Video is mandatory and human-narrated; AI voiceover is an auto-reject (F-43).
-  It does not slip to D10.
+The explanation page is no longer downstream of the UI — it **is** the primary
+artifact a tester sees, and it carries four jobs at once (`DESIGN.md` §1):
 
-### Needed from the user (blocking, flagged early on purpose)
+1. It is what testers are handed on Thu 11.
+2. It is the Usability score, our weakest axis at ~3/10, scored in both rounds (F-100).
+3. It is the demo video, so recording on Fri 12 is reading a page that already exists.
+4. It is the consumer that makes the Subgraph MCP a second Graph product (F-93).
+
+**Stack decision (resolves `DESIGN.md` U-3/U-4):** a **single static page, no framework,
+no build step.** It deploys anywhere, survives deadline day, and can be handed to a
+tester as a URL in seconds — which is exactly what the Sep 10 freeze is for. A build
+pipeline buys nothing here and can fail at the worst moment.
+
+### If a day slips — decide by end of Sun 07, not later
+
+Cut in this order (F-116), and **cut early rather than half-landing something**:
+
+1. Uniswap benchmark + `FEEDBACK.md` (~half a day, opportunistic anyway)
+2. **The Graph subgraph** — a half-landed Graph integration scores zero and costs two
+   days. Cutting it also removes the MCP job above, so the page then explains the
+   mechanism without live indexed data.
+3. Live wiring on the UI — fall back to a recorded run from the Base auction.
+4. ❌ **Never cut:** the comparison test, the opcode, the deployed router, the
+   explanation page.
+
+### Needed from the user — dates moved EARLIER by the freeze
 
 | # | What | Needed by | Why |
 |---|---|---|---|
-| U-a | **ETH on Base** (~$5 is plenty) | **D5, Mon 08** | Deploy Book + Router; blocks G2 |
-| U-b | ETH on **Arbitrum One** | D6, Tue 09 | Subgraph *publishing* is an on-chain tx (F-83). Only if we publish rather than staying on the Studio dev endpoint. |
-| U-c | **Human narration** for the video | D9, Fri 12 | F-43 — TTS is an auto-reject |
-| U-d | **Make the repo public** | D10, Sat 13 | Judges must read it; new work must be open source |
+| U-a | **ETH on Base** (~$5) | 🔴 **Sat 06** (was Mon 08) | Deploy Book + Router; blocks G2 and everything downstream of a live address |
+| U-b | ETH on **Arbitrum One** | Sun 07 | Only if we publish the subgraph rather than staying on the Studio dev endpoint (F-83) |
+| U-c | **Testers lined up** | Thu 11 | The whole reason for the freeze |
+| U-d | **Human narration** | Fri 12 | F-43 — TTS is an auto-reject |
+| U-e | **Repo public** | Sat 13 | Judges must read it; new work must be open source |
 
-### Standing rules for every day
+### Standing rules
 
-- `npm run size` on every commit; CI fails above 24,576 (F-108).
-- The instruction stays **`view`**. Any state write breaks quote/swap consistency (F-112).
-- Never vendor 1inch source — dependencies only (F-117).
-- Commit incrementally with real messages (F-40).
-- Never pitch this as an auction-managed AMM or a fee auction — that won 1st place on this
-  exact track already (F-102).
-
+- `npm run size` on every commit; fail above 24,576 (F-108).
+- The instruction stays **`view`** (F-112). Proven by `test_QuoteEqualsSwap`, and it
+  stays proven.
+- Never vendor 1inch source (F-117). Commit incrementally (F-40).
+- Never pitch this as an auction-managed AMM or a fee auction — that won 1st place on
+  this exact track already (F-102).
