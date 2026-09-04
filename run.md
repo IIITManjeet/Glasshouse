@@ -864,6 +864,30 @@ by family: `src/instructions/Whitelist.sol`, `DutchAuction.sol`, `Balances.sol`,
   full resync) · **HHI in AssemblyScript has no floats** (compute components in the
   mapping, divide in the frontend) · the human-narrated video is **3–5 h**.
 
+### 3.6m Execution facts (2026-09-05, D3)
+- **F-135** ✅ **The comparison harness exists and the route to it is confirmed.**
+  `AquaOpcodes` really is 16 arms and contains **neither `LimitSwap` nor
+  `StaticBalances` nor `DutchAuctionBalanceIn` nor `WhitelistSequential`** (read at
+  source, confirming F-124). So the deployed `GlasshouseRouter` **cannot** host the
+  three-way comparison — but the full `Opcodes` set contains all of them, and F-125
+  holds: the test EVM does not enforce EIP-170. `GlasshouseTestRouter`
+  (`Simulator, SwapVM, Opcodes + 0x2e`) is therefore the comparison harness, and
+  `scripts/size-check.mjs` already exempts it by name.
+  **→ Two routers, deliberately: `GlasshouseTestRouter` proves the argument,
+  `GlasshouseRouter` is what ships.**
+- **F-136** ✅ **The upstream idiom for driving the VM, confirmed by running it.**
+  `MakerTraitsLib.build(Args{...})` → `Order`; `router.hash(order)` → the orderHash the
+  Book keys on; `vm.sign(makerPK, orderHash)` → `abi.encodePacked(r,s,v)` into
+  `TakerTraitsLib.Args.signature`; then `quote()` / `swap()`. `StaticBalances.build(a, b)`
+  is **sorted by token address**, not by in/out: `tokenIn < tokenOut ? (in, out) : (out, in)`.
+  Programs need no Aqua at all in signature mode — the router takes `aqua = address(0)`.
+- **F-137** ✅ **`quote() == swap()` is now demonstrated, not argued.** Same order, same
+  taker, same block: identical `amountIn`/`amountOut`, and the transferred balances match
+  the quote. This is the invariant every downstream claim depends on (F-112).
+- **F-138** ✅ **The maker-hook fill path works.** `hasPostTransferInHook` +
+  `postTransferInTarget = Book`: `swap()` records the filler, `quote()` does not touch it.
+  Confirms F-127's workaround for the instruction being unable to emit under STATICCALL.
+
 ### 3.6l Defects found by testing (2026-09-05)
 - **F-134** 🔴 **Two real defects in `GlasshouseBook`, both found by writing tests, neither
   caught by three rounds of design review.**
@@ -1205,6 +1229,7 @@ before any logic (silent byte-offset bugs, F-110).
 | 2026-09-04 | Own repo established at **github.com/IIITManjeet/Glasshouse**; 7 incremental commits; README, `DESIGN.md`, `AI-DISCLOSURE.md` written | `git log`, F-40/F-44 |
 | 2026-09-05 | **§9 roadmap** written; status reconciled against the tree | direct inspection |
 | 2026-09-05 | **D2 — Book test suite: 41 tests, 48 total green.** Fuzz checks the O(1) top-2 against a reference scan under rotated reveal orders. **Two defects found and fixed** (see F-134). | `npx hardhat test solidity` |
+| 2026-09-05 | **D3 (a day early) — first execution through the VM: 57 tests green.** `quote() == swap()` proven; maker-hook fill recording works end-to-end with real transfers. `GlasshouseTestRouter` (full opcode set, never deployed) established as the comparison harness — see F-135. | `npx hardhat test solidity` |
 
 ---
 
@@ -1291,7 +1316,7 @@ before any logic (silent byte-offset bugs, F-110).
 | Day | Date | Deliverable | Ends with |
 |---|---|---|---|
 | ✅ **D2** | Fri 05 | **DONE — 48 tests green.** Book test suite. commit/reveal, phase boundaries, second-price + reserve, tie→earliest commit, bond forfeit/claim, `postTransferIn` auth. Fuzz the running top-2. | Book trustworthy |
-| **D3** | Sat 06 | **First execution through the VM.** Deploy `GlasshouseRouter` in-test, run a real program with `0x2e`. Prove **`quote() == swap()`**. Exclusive window enforced; fall-through after expiry. | Mechanism works end-to-end |
+| ✅ **D3** | Sat 06 | **DONE 05 Sep — 57 tests green.** First execution through the VM. Deploy `GlasshouseRouter` in-test, run a real program with `0x2e`. Prove **`quote() == swap()`**. Exclusive window enforced; fall-through after expiry. | Mechanism works end-to-end |
 | **D4** | Sun 07 | 🎯 **`ComparisonTest.t.sol`** — one order, three ways: `0x2d` outsider reverts · `0x94` one price per block, first-in-block wins · `0x2e` highest bidder wins, pays second price. Latency-differentiated bidders. | **G1 — the submission exists** |
 | **D5** | Mon 08 | **Base mainnet.** Ignition module, deploy Book + Router, `ship()` a strategy through real Aqua, run one real auction with dust. Clone `DutchAuctionLimitSwapInvariants` harness (F-122). | **G2 — 1inch track qualified** |
 | **D6** | Tue 09 | **The Graph.** Messari-conformant subgraph over the Base deployment + Subgraph MCP (both halves of F-81's either/or). | **G3 — Graph viable or cut** |
