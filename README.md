@@ -86,9 +86,18 @@ src/routers/GlasshouseRouter.sol      AquaSwapVMRouter + our opcode
 scripts/size-check.mjs                EIP-170 guard, runs on every build
 ```
 
-Full design rationale: [`ARCHITECTURE.md`](./ARCHITECTURE.md).
-Research dossier and decision log: [`run.md`](./run.md).
-UI and product design: [`DESIGN.md`](./DESIGN.md).
+### Documentation
+
+| | |
+|---|---|
+| [`docs/design/HLD.md`](./docs/design/HLD.md) | High-level design: context, components, trust boundaries, lifecycle flows |
+| [`docs/design/LLD.md`](./docs/design/LLD.md) | Low-level design: storage layout, function contracts, encoding, error and event catalogues |
+| [`ARCHITECTURE.md`](./ARCHITECTURE.md) | The design as reviewed, with the alternatives rejected |
+| [`run.md`](./run.md) | Decision log: every fact with its source, every decision with its options |
+| [`DESIGN.md`](./DESIGN.md) | UI and product design |
+| [`CHANGELOG.md`](./CHANGELOG.md) | Release history |
+
+Index: [`docs/`](./docs/README.md).
 
 ### The EIP-170 constraint that shapes everything
 
@@ -128,6 +137,17 @@ npx hardhat compile     # ~14s incremental
 forge test              # instruction + encoding tests
 node scripts/size-check.mjs
 ```
+
+## Versioning
+
+Semantic versioning, with releases cut at the project's own milestones rather than on a
+calendar. Each release is tagged, and [`CHANGELOG.md`](./CHANGELOG.md) records what
+changed and what was verified. Design documents carry the version they describe in a
+status line at the top, and are updated at release boundaries.
+
+| Version | Milestone |
+|---|---|
+| `v0.1.0` | Mechanism executes inside a real SwapVM program; `quote() == swap()` demonstrated |
 
 ## Licence
 
