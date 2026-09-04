@@ -1,0 +1,29 @@
+{
+    "advocated": {
+        "description": "The parameter set Glasshouse argues for. 150s total lockup against the 300s WhitelistSequential ladder.",
+        "commitBlocks": 30,
+        "revealBlocks": 30,
+        "exclusiveBlocks": 15,
+        "reserveBps": 50,
+        "maxBps": 500
+    },
+    "humanDemo": {
+        "description": "Same mechanism, longer bidding windows because people need time for two wallet signatures. Only the windows differ.",
+        "commitBlocks": 60,
+        "revealBlocks": 60,
+        "exclusiveBlocks": 15,
+        "reserveBps": 50,
+        "maxBps": 500
+    },
+    "bond": {
+        "rule": "bond >= maxBps * notional / 10000",
+        "bondedRun": "sized by the rule above, our own accounts only",
+        "headlineRun": 0
+    },
+    "basis": {
+        "exclusiveBlocks": "docs/design/window-sizing.md - simulated, not chosen",
+        "reserveBps": "covers 44 bps of staleness risk over the lockup at 200% annual volatility",
+        "maxBps": "10x the reserve, leaving room for real competition",
+        "blockSeconds": 2
+    }
+}

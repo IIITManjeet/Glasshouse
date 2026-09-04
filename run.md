@@ -1225,7 +1225,7 @@ sealed bids. **Never cut:** the two-run comparison + the opcode + a deployed rou
 ---
 
 ### D-005 - Live auction parameters
-**Date** 2026-09-05 - **Status** PARTIALLY LOCKED (user)
+**Date** 2026-09-05 - **Status** LOCKED
 
 **Decided by the user:**
 
@@ -1254,14 +1254,50 @@ exercise rule made them fill immediately, so they paid for an option they never 
 exercise rules are now reported as bounds. Recorded because the wrong version was run
 first and the correction is the useful part.
 
-**Still open, tracked to the reserve matrix:** `reserveBps`. Per the user's answer this is
-not a pick but a test across `r x bidder count`, which also covers the thin cases the suite
-currently misses (zero bidders, one bidder).
+**Reserve matrix result -> `reserveBps = 50`.** `test/ReserveMatrix.t.sol` sweeps
+`r x bidder count` and shows the reserve is only a floor once competition exists (clearing
+is 250 bps at every tested reserve with five bidders) but is the *only* protection when
+competition is thin (400/30/20 bps ladder: r=0 gives the maker 30, r=50 gives 50).
 
-⚠️ **Interaction flagged to the user, not yet resolved:** 60 s reveal windows plus real
-human bidders is tight, and since the bond now escrows at commit (0.3.0), an honest bidder
-who misses the reveal **forfeits it**. Either pre-stage bidders on a countdown, or run the
-human demo with longer windows than the benchmark configuration.
+The value is **derived rather than picked**, which matters because the tempting reason to
+choose it was that it flatters the demo. Running an auction costs the maker price risk
+across the frozen order: at 2 s blocks the mid moves ~13 bps over the 150 s lockup at 60%
+annual volatility, and ~44 bps at 200%. **A reserve below that makes running the auction
+worse than posting a limit order.** 50 bps covers both. The matrix confirms it excludes
+only the 30 and 20 bps bids, which sit below the maker's walk-away point, which is what a
+reserve is for.
+
+**Bond and the human-bidder interaction, resolved: two runs.**
+- **Run A - bonded, our own accounts.** Proves `claimForfeit` and `claimUnrevealed`
+  on-chain with real value moving. `advocated` windows (30/30/15).
+- **Run B - unbonded, invited bidders.** The headline auction. `bond = 0` so nobody needs
+  an approval and nobody can lose funds by being slow with a wallet, and longer windows
+  (60/60/15) because two wallet signatures in 60 s is not realistic for a person.
+
+  This exists because the bond now escrows at **commit** (0.3.0), so under the advocated
+  windows an invited friend who is slow to reveal would forfeit real money. That is an
+  unacceptable failure mode for someone doing us a favour.
+
+**Final parameter set** - canonical copy in `config/auction.json`:
+
+| | advocated | human demo | basis |
+|---|---|---|---|
+| `commitBlocks` | 30 (60 s) | 60 (120 s) | user's 150 s lockup budget |
+| `revealBlocks` | 30 (60 s) | 60 (120 s) | same; generous because a missed reveal forfeits the bond |
+| `exclusiveBlocks` | 15 (30 s) | 15 (30 s) | simulated - `docs/design/window-sizing.md` |
+| `reserveBps` | 50 | 50 | covers 44 bps of staleness risk at 200% vol |
+| `maxBps` | 500 | 500 | 10x the reserve, room for real competition |
+| `bond` | `maxBps x notional / BPS` | 0 | run A proves it; run B removes the footgun |
+
+- **F-144** ✅ **`commitmentFor(bidder, bps, salt)` added to the Book.** Hand-packing the
+  commitment wrong produces one that can never be revealed, and since the bond escrows at
+  commit the bidder then loses it. A fuzz test pins the helper against the packing
+  `reveal()` checks. Book 6,149 B.
+
+⚠️ **Open, flagged not resolved:** the user said *"we'll do with our own accounts"*, which
+confirms run A but leaves run B's invited bidders ambiguous. **The UI must label bidder
+provenance either way** - if the headline auction ends up being our own wallets, presenting
+it as a market would be exactly the F-114 error. Build the labelling regardless.
 
 ---
 

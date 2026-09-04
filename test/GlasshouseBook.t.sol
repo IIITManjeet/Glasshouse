@@ -70,6 +70,28 @@ contract GlasshouseBookTest is Test {
         return keccak256(abi.encodePacked(who, bps, salt));
     }
 
+    /// @dev The on-chain helper must agree with the packing `reveal()` checks against.
+    ///      A bidder who hand-packs this wrong can never reveal, and since the bond
+    ///      escrows at commit, they lose it.
+    function testFuzz_CommitmentForMatchesWhatRevealChecks(address who, uint24 bps, bytes32 salt) public view {
+        assertEq(book.commitmentFor(who, bps, salt), _commitment(who, bps, salt), "helper disagrees with reveal");
+    }
+
+    function test_CommitmentFor_IsAcceptedByReveal() public {
+        (uint40 commitEnd,) = _open();
+        address a = _bidder(1);
+
+        bytes32 commitment = book.commitmentFor(a, 123, bytes32("salt"));
+        vm.prank(a);
+        book.commit(MAKER, ORDER, commitment);
+
+        vm.roll(commitEnd + 1);
+        vm.prank(a);
+        book.reveal(MAKER, ORDER, 123, bytes32("salt"));
+
+        assertTrue(book.bids(MAKER, ORDER, a).revealed, "helper-built commitment must reveal");
+    }
+
     function _commit(address who, uint24 bps, bytes32 salt) internal {
         vm.prank(who);
         book.commit(MAKER, ORDER, _commitment(who, bps, salt));

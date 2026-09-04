@@ -77,14 +77,63 @@ npx hardhat verify --network base <book>
 Verified source is not optional here. The whole argument is that anyone can read what the
 gate does; an unverified contract undercuts it.
 
-## 5. First live auction
+## 5. Auction parameters
 
-1. Ship a small strategy through the real Aqua, with a program of
-   `GlasshouseAuction(book, maxBps)` before the swap curve.
-2. `book.open(orderHash, router, tokenIn, ...)` from the maker.
-3. Two or three bidders `commit`, then `reveal` after `commitEnd`.
-4. The winner fills inside the exclusive window.
-5. `settle`, then bond claims.
+Canonical set in [`config/auction.json`](./config/auction.json). None of these are guesses:
+
+| Parameter | Value | Why |
+|---|---|---|
+| `commitBlocks` | 30 (60 s) | Total lockup budget of 150 s, against the 300 s ladder we attack |
+| `revealBlocks` | 30 (60 s) | Same budget. Must be generous: the bond escrows at commit, so a bidder who misses the reveal forfeits it |
+| `exclusiveBlocks` | 15 (30 s) | Simulated, see [`docs/design/window-sizing.md`](./docs/design/window-sizing.md). The window is a free option; the long end costs the maker and the short end is indifferent, so 30 s is what a human winner needs to sign |
+| `reserveBps` | 50 | Covers the 44 bps of staleness risk the maker carries over the lockup on a volatile pair. Below that, running the auction is worse than posting a limit order |
+| `maxBps` | 500 | The cap the maker signs. 10x the reserve leaves room for real competition |
+| `bond` | `>= maxBps * notional / 10000` | Makes a winner no-show unprofitable |
+
+## 6. Two live runs, in this order
+
+**Run A - bonded, our own accounts.** Proves the parts that involve money changing hands:
+`claimForfeit` after an evidenced no-show, and `claimUnrevealed` after a withheld reveal.
+Use the `advocated` windows and a non-zero bond. Nobody outside the team can lose funds.
+
+**Run B - unbonded, invited bidders.** The headline auction, with `bond = 0` and the
+`humanDemo` windows. No approvals to sign, and nobody can lose money by being slow with a
+wallet. State on the page that the advocated configuration is the shorter one.
+
+For each run:
+
+1. Ship a small strategy through the real Aqua, with `GlasshouseAuction(book, maxBps)`
+   before the swap curve.
+2. Open the auction from the maker:
+
+   ```bash
+   cast send $BOOK "open(bytes32,address,address,uint40,uint40,uint40,uint24,uint24,uint128)" $ORDER_HASH $ROUTER $TOKEN_IN 30 30 15 50 500 $BOND --rpc-url $BASE_RPC_URL --private-key $MAKER_KEY
+   ```
+
+3. Each bidder takes their commitment **from the contract**, never by hand-packing it. A
+   wrongly packed commitment can never be revealed, and with a bond posted that loses it:
+
+   ```bash
+   COMMITMENT=$(cast call $BOOK "commitmentFor(address,uint24,bytes32)(bytes32)" $BIDDER $BPS $SALT --rpc-url $BASE_RPC_URL)
+   cast send $BOOK "commit(address,bytes32,bytes32)" $MAKER $ORDER_HASH $COMMITMENT --rpc-url $BASE_RPC_URL --private-key $BIDDER_KEY
+   ```
+
+   With a bond, approve `tokenIn` to the Book first - `commit` pulls it.
+
+4. After `commitEnd`, each bidder reveals with the same `bps` and `salt`:
+
+   ```bash
+   cast send $BOOK "reveal(address,bytes32,uint24,bytes32)" $MAKER $ORDER_HASH $BPS $SALT --rpc-url $BASE_RPC_URL --private-key $BIDDER_KEY
+   ```
+
+5. After `revealEnd`, read the result and fill as the winner:
+
+   ```bash
+   cast call $BOOK "outcome(address,bytes32)((uint8,address,uint24,uint40))" $MAKER $ORDER_HASH --rpc-url $BASE_RPC_URL
+   ```
+
+6. After the exclusive window, `settle`, then `claimBond` per bidder, and
+   `claimForfeit` / `claimUnrevealed` where they apply.
 
 Use dust amounts. The point is real events at a real address, not volume.
 

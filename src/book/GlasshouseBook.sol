@@ -103,6 +103,15 @@ contract GlasshouseBook is IGlasshouseBook, IMakerHooks {
         return keccak256(abi.encodePacked(maker, orderHash));
     }
 
+    /// @notice Compute the commitment for a sealed bid.
+    /// @dev A convenience, but not only that: hand-packing this wrong produces a
+    ///      commitment that can never be revealed, and since the bond escrows at
+    ///      {commit} the bidder then loses it. A bidder should always take the
+    ///      commitment from here rather than construct it themselves.
+    function commitmentFor(address bidder, uint24 bps, bytes32 salt) public pure returns (bytes32) {
+        return keccak256(abi.encodePacked(bidder, bps, salt));
+    }
+
     /// @notice Open an auction for one of your own orders.
     /// @dev `msg.sender` is the maker and namespaces the key, so an auction cannot be
     ///      squatted on someone else's order.
