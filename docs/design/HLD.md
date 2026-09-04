@@ -262,7 +262,7 @@ fixed at `open()`.
 Because hooks live outside the program, writing here cannot affect quote/swap
 consistency. This is precisely what the hook mechanism was built for.
 
-`test/GlasshouseVM.t.sol:388-404` asserts the split directly: after a `quote()` the
+`test/GlasshouseVM.t.sol:354-371` asserts the split directly: after a `quote()` the
 Book's `filledBy` is still `address(0)`; after a `swap()` it is the winner.
 
 ---
@@ -299,7 +299,7 @@ require(o.clearingBps <= maxBps, GlasshouseImprovementExceedsCap(o.clearingBps, 
 
 `src/lib/GlasshouseAuctionLib.sol:85`. Whatever the Book claims, the price cannot move
 further than the maker authorised in the program they signed.
-`test/GlasshouseVM.t.sol:322-335` exercises this with a Book returning a clearing price
+`test/GlasshouseVM.t.sol:288-301` exercises this with a Book returning a clearing price
 above the cap; the swap reverts rather than overcharging the taker.
 
 This matters because the Book address is an *argument* to the instruction, not a
@@ -408,7 +408,7 @@ sequenceDiagram
 ```
 
 The two shaded blocks are identical above the transfer line. That identity is asserted as
-a test rather than argued: `test_QuoteEqualsSwap` at `test/GlasshouseVM.t.sol:342-364`
+a test rather than argued: `test_QuoteEqualsSwap` at `test/GlasshouseVM.t.sol:308-330`
 checks that `amountIn` and `amountOut` match between the two calls **and** that the token
 balances actually moved by the quoted amounts.
 
@@ -419,16 +419,16 @@ whole reason the fill can be recorded at all without breaking the gate's `view`-
 
 ```mermaid
 flowchart TD
-  start["0x2e executes<br/>STATICCALL outcome()"] --> st{"status"}
+  start["0x2e executes<br/>STATICCALL outcome"] --> st{"status"}
   st -->|"None"| pass1["return registers unchanged<br/>plain limit order - liveness"]
   st -->|"Bidding"| rev1["revert GlasshouseAuctionInProgress<br/>no winner exists yet"]
-  st -->|"Closed"| win{"block.number<br/>&lt;= exclusiveUntil ?"}
+  st -->|"Closed"| win{"still inside<br/>the exclusive window?"}
   win -->|"no"| pass2["return unchanged<br/>open to everyone at base price"]
-  win -->|"yes"| who{"taker == winner ?"}
+  win -->|"yes"| who{"taker is the winner?"}
   who -->|"no"| rev2["revert GlasshouseExclusiveWindow"]
-  who -->|"yes"| cap{"clearingBps &lt;= maxBps ?"}
+  who -->|"yes"| cap{"clearingBps within<br/>the maker's cap?"}
   cap -->|"no"| rev3["revert GlasshouseImprovementExceedsCap"]
-  cap -->|"yes"| adj["balanceIn = ceilDiv(balanceIn * (BPS + clearingBps), BPS)"]
+  cap -->|"yes"| adj["balanceIn = ceilDiv of balanceIn x (BPS + clearingBps) / BPS"]
 ```
 
 Source: `src/lib/GlasshouseAuctionLib.sol:62-94`.
@@ -438,12 +438,12 @@ Three properties of this shape are load-bearing.
 **`None` passes through.** A maker may ship a strategy and never open an auction. The
 order must still be fillable as an ordinary limit order, otherwise the instruction is a
 liveness hazard (`src/lib/GlasshouseAuctionLib.sol:65`;
-`test/GlasshouseVM.t.sol:230-237`).
+`test/GlasshouseVM.t.sol:196-203`).
 
 **`Bidding` reverts for everyone, including the eventual winner.** If outsiders could
 fill at the base price while bids were still arriving, the auction would resolve over an
 order that had already been taken (`src/lib/GlasshouseAuctionLib.sol:69`;
-`test/GlasshouseVM.t.sol:242-265`).
+`test/GlasshouseVM.t.sol:208-231`).
 
 **The exclusive window is the reason bids are worth placing.** Without it, a non-winner
 fills at the unimproved base price in the same block, which is strictly cheaper than the
@@ -465,7 +465,7 @@ maker, matching `LimitSwap`'s own convention.
 
 This also fixes the program layout: the gate must run **after** balances are set and
 **before** the swap curve. In signature mode that is
-`StaticBalances -> GlasshouseAuction -> LimitSwap` (`test/GlasshouseVM.t.sol:109-115`);
+`StaticBalances -> GlasshouseAuction -> LimitSwap` (`test/GlasshouseVM.t.sol:75-81`);
 in Aqua mode balances are loaded by the core before `runLoop`, so `StaticBalances` is
 unnecessary.
 
@@ -478,19 +478,18 @@ depends on `block.timestamp`, on `blockhash`, or on any randomness.
 
 ```mermaid
 stateDiagram-v2
+    state "None. No auction. Order fills at base price" as None
+    state "Committing. Up to and including commitEnd" as Committing
+    state "Revealing. After commitEnd, up to and including revealEnd" as Revealing
+    state "Exclusive. After revealEnd, for exclusiveBlocks blocks" as Exclusive
+    state "Open. After the window. Base price for anyone" as Open
+    state "Settled. Bonds claimable" as Settled
+
     [*] --> None
     None --> Committing : open sets commitEnd and revealEnd
-
-    state "None - no auction, order fills at base price" as None
-    state "Committing - block.number &lt;= commitEnd" as Committing
-    state "Revealing - commitEnd &lt; block.number &lt;= revealEnd" as Revealing
-    state "Exclusive - revealEnd &lt; block.number &lt;= revealEnd + exclusiveBlocks" as Exclusive
-    state "Open - block.number &gt; revealEnd + exclusiveBlocks" as Open
-    state "Settled - settle() called, bonds claimable" as Settled
-
-    Committing --> Revealing : block.number &gt; commitEnd
-    Revealing --> Exclusive : block.number &gt; revealEnd, a winner revealed
-    Revealing --> Open : block.number &gt; revealEnd, nobody revealed
+    Committing --> Revealing : block passes commitEnd
+    Revealing --> Exclusive : block passes revealEnd, a winner revealed
+    Revealing --> Open : block passes revealEnd, nobody revealed
     Exclusive --> Open : window elapses
     Open --> Settled : settle
     Settled --> [*]
@@ -530,7 +529,7 @@ deployed; there is no public Aqua testnet.
 
 | Router | Opcode set | Size | Deployed |
 |---|---|---|---|
-| `GlasshouseTestRouter` (`test/GlasshouseVM.t.sol:39-51`) | full `Opcodes` + `0x2e` | over EIP-170 | **never** |
+| `GlasshouseTestRouter` (`test/helpers/GlasshouseTestRouter.sol:29`) | full `Opcodes` + `0x2e` | over EIP-170 | **never** |
 | `GlasshouseRouter` (`src/routers/GlasshouseRouter.sol:47`) | `AquaOpcodes` + `0x2e` + `WhitelistSequential` | **21,108 B** | yes |
 
 The reason there are two is not convenience. `AquaOpcodes` dispatches sixteen arms
@@ -548,6 +547,17 @@ tests deploy it in-test, because **the test EVM does not enforce EIP-170**.
 contracts (`scripts/size-check.mjs:22`).
 
 So: **`GlasshouseTestRouter` proves the comparison; `GlasshouseRouter` is what ships.**
+
+The comparison itself lives in `test/Comparison.t.sol`: one order, one
+latency-differentiated bidder set, and three programs that differ only in the gate
+(`test/Comparison.t.sol:22-43`). The bidder set is deliberately arranged so that the
+participant who values the fill *least* is the fastest one, because that is the whole
+argument. It asserts that the identity gate excludes the highest valuation outright as a
+revert (`test/Comparison.t.sol:260`), that the clock gate gives every bidder in a block
+an identical price and hands the fill to the fastest regardless of valuation
+(`test/Comparison.t.sol:302,317`), and that only the bid gate allocates to the highest
+valuation and pays the maker the second-highest bid
+(`test/Comparison.t.sol:352,363`).
 
 ### 9.2 The bytecode budget
 
@@ -573,8 +583,8 @@ which is the second reason the mechanism lives in a Book rather than in the inst
 takes `(aqua, weth, owner, name, version)` and passes them straight to the `SwapVM`
 constructor (`src/routers/GlasshouseRouter.sol:48-54`). Signature mode needs no Aqua at
 all - the router accepts `aqua = address(0)`, which is how the test suite runs
-(`test/GlasshouseVM.t.sol:87`), because `useAquaInsteadOfSignature` is a MakerTraits bit
-handled in the SwapVM core rather than an opcode (`src/SwapVM.sol:166,219`).
+(`test/GlasshouseVM.t.sol:53`), because `useAquaInsteadOfSignature` is a MakerTraits bit
+handled in the SwapVM core rather than an opcode (`src/SwapVM.sol:167,221`).
 
 **Not yet done.** `ignition/modules/` is empty and no address has been deployed. The
 roadmap places the Base deployment on Sat 06 Sep (`run.md` §9, gate G2).
@@ -759,13 +769,12 @@ Stated explicitly rather than smoothed over.
   same `Opcodes` set plus our arm, so it is necessarily larger and likewise over
   EIP-170, but no artifact for it appears in `artifacts/` and `scripts/size-check.mjs`
   did not report one. §9.1 says "over EIP-170" rather than giving a number.
-- **The 57-passing-tests figure comes from `run.md`'s change log** (2026-09-05 entry),
-  not from a test run performed while writing this document. The tree contains three
-  test files: `GlasshouseArgs.t.sol`, `GlasshouseBook.t.sol`, `GlasshouseVM.t.sol`.
-- **`ComparisonTest.t.sol` does not exist in the tree.** The three-way comparison against
-  `WhitelistSequential` and `DutchAuctionBalanceIn` is designed, and
-  `GlasshouseTestRouter` exists to host it, but it has not been written. §9.1 describes
-  what the test router is *for*, not a test that has run.
+- **No test run was performed while writing this document.** The 57-test figure recorded
+  for v0.1.0 comes from `CHANGELOG.md` and `run.md`'s change log; `test/Comparison.t.sol`
+  has been added since and the current total is not restated here. The assertions
+  attributed to the comparison in §9.1 are read from the test source, not from its
+  output, and the bps figures it produced are recorded in `CHANGELOG.md` under
+  `[0.2.0]` rather than repeated here.
 - **`GlasshouseExtruction` (Path B) does not exist in the tree.** `ARCHITECTURE.md` §5.3
   specifies it; `src/` contains no `extruction/` directory. The "wrapped twice" property
   of `GlasshouseAuctionLib` is currently a property of its *interface* (it takes no
