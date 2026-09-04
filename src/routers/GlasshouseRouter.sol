@@ -12,17 +12,12 @@ import { WhitelistSequential } from "@1inch/swap-vm/src/instructions/Whitelist.s
 import { GlasshouseAuction } from "../instructions/GlasshouseAuction.sol";
 
 /// @title GlasshouseOpcodes
-/// @notice Extends the deployed Aqua opcode set with the Glasshouse auction gate.
-///
-/// @dev Extension follows the upstream pattern exactly (see `AquaOpcodesDebug`):
-///      override `_runOpcode`, handle the new opcodes, delegate the rest to `super`.
-///      NOTE: the older `_opcodes()` array API that some prior hackathon projects
-///      extended no longer exists in swap-vm HEAD.
-///
-/// @dev `WhitelistSequential` (0x2d) is re-added deliberately. It is NOT in
-///      `AquaOpcodes` — the deployed Aqua router omits it — but our headline
-///      comparison runs the same order under the cartel ladder and under the
-///      auction, so the deployed router must be able to execute both.
+/// @notice The deployed Aqua opcode set plus the Glasshouse auction gate.
+/// @dev Extension follows upstream's own `AquaOpcodesDebug`: override `_runOpcode`,
+///      handle the new opcodes, delegate the rest to `super`. The older `_opcodes()`
+///      array API no longer exists at HEAD.
+/// @dev `WhitelistSequential` (0x2d) is re-added deliberately. `AquaOpcodes` omits it,
+///      and the comparison runs the same order under the ladder and under the auction.
 contract GlasshouseOpcodes is AquaOpcodes {
     using OpcodeOps for Opcode;
 
@@ -36,14 +31,10 @@ contract GlasshouseOpcodes is AquaOpcodes {
 /// @title GlasshouseRouter
 /// @notice `AquaSwapVMRouter` plus the Glasshouse auction opcode (Path A).
 ///
-/// @dev WHY WE EXTEND THE AQUA ROUTER AND NOT `SwapVMRouter`: the full-opcode
-///      `SwapVMRouter` compiles to ~29,130 bytes and EXCEEDS the EIP-170 limit of
-///      24,576 — it is not deployable at all. `AquaSwapVMRouter` is ~20,376 bytes,
-///      leaving ~4,200 bytes of headroom, which is the budget this contract lives in.
-///      Run `npm run size` after every change.
-///
-/// @dev The 1inch track explicitly permits this: "Official Aqua/SwapVM contracts must
-///      be used (redeployments of a modified SwapVM contract is allowed)".
+/// @dev Built on `AquaSwapVMRouter`, not `SwapVMRouter`: the full-opcode router is
+///      ~29,159 bytes and exceeds the EIP-170 limit of 24,576, so it cannot be
+///      deployed at all. This contract lives in the Aqua router's ~4,200 bytes of
+///      headroom. Run `npm run size` after every change.
 contract GlasshouseRouter is Simulator, SwapVM, GlasshouseOpcodes {
     constructor(
         address aqua,

@@ -9,28 +9,12 @@ import { InstructionArgs } from "@1inch/swap-vm/src/libs/InstructionArgs.sol";
 
 import { GlasshouseAuctionLib } from "../lib/GlasshouseAuctionLib.sol";
 
-/// @notice GlasshouseAuction opcode. Allocates taker priority by sealed competitive
-///         bid instead of by identity (`WhitelistSequential`, 0x2d) or by clock
-///         (`DutchAuctionBalanceIn`, 0x94).
-///
-/// @dev Encoding: [address book, uint24 maxImprovementBps]  (23 bytes)
-///
-/// @dev Slot choice: `OpcodeList` reserves 0x20-0x3f for "Conditions & access guards"
-///      and instructs new instructions to take the next free `_Ix` slot of their
-///      family bank. This instruction is a taker gate, and `_2e` is the next free
-///      slot after `WhitelistSequential` (0x2d) — the opcode immediately after the
-///      cartel ladder it replaces. All 256 enum members already exist upstream, so
-///      NO 1inch file is modified or vendored.
-///
-/// @dev Why no `nextPC`: the whitelist opcodes jump because they grant a *shortcut*
-///      past subsequent gates. Glasshouse instead adjusts a register and either
-///      reverts or falls through — the adjustment IS the branch, so a jump target
-///      would be dead weight in both bytecode and args.
-///
-/// @dev Why no `auctionId` in args: it is `ctx.query.orderHash`, which binds exactly
-///      one auction to exactly one order for free. The Book namespaces by
-///      `ctx.query.maker` as well, so nobody can open an auction against someone
-///      else's order.
+/// @notice Allocates taker priority by sealed competitive bid, rather than by identity
+///         (`WhitelistSequential`, 0x2d) or by clock (`DutchAuctionBalanceIn`, 0x94).
+/// @dev Encoding: [address book, uint24 maxImprovementBps], 23 bytes.
+///      Slot `_2e` is the next free slot after `WhitelistSequential` in the conditions
+///      and access-guards bank. The auction is keyed by `ctx.query.orderHash` and
+///      `ctx.query.maker`, so neither needs to be an argument.
 library GlasshouseAuction {
     using InstructionArgs for bytes;
     using InstructionArgs for bytes32;

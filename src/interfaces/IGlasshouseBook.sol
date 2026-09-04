@@ -5,15 +5,12 @@ pragma solidity 0.8.30;
 /// @dev The instruction only ever *reads* this. All transitions are driven by
 ///      `block.number` crossing fixed, immutable boundaries set at `open()`.
 enum AuctionStatus {
-    /// @dev No auction was ever opened for this (maker, orderHash). The order
-    ///      behaves as a plain limit order. This keeps a shipped strategy fillable
-    ///      if the maker never opens an auction (liveness).
+    /// @dev No auction for this (maker, orderHash); the order fills as a plain limit
+    ///      order. Keeps a shipped strategy live if the maker never opens one.
     None,
-    /// @dev `block.number <= revealEnd`. Bids may still arrive, so no winner exists
-    ///      yet and the order must not be fillable.
+    /// @dev `block.number <= revealEnd`. Bids may still arrive, so nothing may fill.
     Bidding,
-    /// @dev `block.number > revealEnd`. The top-2 is frozen forever; `outcome()` is
-    ///      a pure function of frozen storage.
+    /// @dev `block.number > revealEnd`. The top-2 is frozen.
     Closed
 }
 
@@ -31,17 +28,14 @@ struct Outcome {
 }
 
 /// @title IGlasshouseBook
-/// @notice The read side of the auction book, consumed by the SwapVM instruction
-///         via STATICCALL.
-/// @dev CRITICAL: `outcome` MUST be `view`. The instruction runs inside both
-///      `quote()` (static context) and `swap()`; any state write here would make the
-///      two diverge and break quote/swap consistency.
+/// @notice The read side of the auction book, consumed by the instruction via STATICCALL.
+/// @dev `outcome` MUST be `view`: the instruction runs inside both `quote()` and
+///      `swap()`, and a state write here would make the two diverge.
 interface IGlasshouseBook {
-    /// @notice Resolve an auction to its (frozen) result.
-    /// @dev Must be O(1) — this runs inside a swap and shares the taker's gas budget.
-    ///      Must depend only on frozen storage and `block.number`.
-    /// @param maker     Maker who opened the auction (the key's namespace, so nobody
-    ///                  can squat an auction on someone else's order).
-    /// @param orderHash The strategy/position identifier from `ctx.query.orderHash`.
+    /// @notice Resolve an auction to its frozen result.
+    /// @dev Must be O(1) and depend only on frozen storage and `block.number`; it runs
+    ///      inside a swap, on the taker's gas budget.
+    /// @param maker     Maker who opened the auction, and the key's namespace.
+    /// @param orderHash Position identifier, from `ctx.query.orderHash`.
     function outcome(address maker, bytes32 orderHash) external view returns (Outcome memory);
 }

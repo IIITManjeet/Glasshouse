@@ -11,19 +11,18 @@ import { IGlasshouseBook, Outcome, AuctionStatus } from "../interfaces/IGlasshou
 /// @title GlasshouseBook
 /// @notice Sealed-bid, second-price auction for the right to fill a SwapVM order.
 ///
-/// @dev This is the ONLY stateful contract in Glasshouse. The VM instruction reads it
-///      through {outcome} under STATICCALL and never writes.
+/// @dev The only stateful contract in Glasshouse. The instruction reads {outcome}
+///      under STATICCALL and never writes.
 ///
-/// @dev NO OWNER, NO UPGRADE PATH, NO ADMIN. Auction parameters are immutable after
-///      {open}. If asked "who can change what `outcome()` returns?", the answer is
-///      "nobody" — which is what makes the quote/swap consistency argument airtight.
+/// @dev No owner, no upgrade path, no admin; parameters are immutable after {open}.
+///      Nothing can change what `outcome()` returns.
 ///
-/// @dev PHASES ARE DISJOINT IN BLOCK SPACE, which is the core safety property:
-///        commit : block.number <= commitEnd
-///        reveal : commitEnd < block.number <= revealEnd
-///        fill   : block.number > revealEnd            (instruction runs here)
-///      No block can contain both a reveal and a fill, so the top-2 that `outcome()`
-///      reads is frozen before any fill can observe it.
+/// @dev Phases are disjoint in block space, which is the core safety property:
+///        commit  block.number <= commitEnd
+///        reveal  commitEnd < block.number <= revealEnd
+///        fill    block.number > revealEnd
+///      No block holds both a reveal and a fill, so the top-2 is frozen before any
+///      fill can observe it.
 contract GlasshouseBook is IGlasshouseBook, IMakerHooks {
     using SafeERC20 for IERC20;
 
@@ -43,10 +42,8 @@ contract GlasshouseBook is IGlasshouseBook, IMakerHooks {
         address best;
         uint24 bestBps;
         uint40 bestCommitIdx;
-        // Only the runner-up PRICE is kept, deliberately. Which address held it is
-        // reveal-order dependent when two runners-up tie, and exposing a value that
-        // depends on transaction ordering would contradict the property the whole
-        // mechanism is built on. `secondBps` itself is order-independent.
+        // Only the runner-up PRICE is kept. Which address held it is reveal-order
+        // dependent on ties; `secondBps` is not.
         uint24 secondBps;
         uint40 commitCount;
         // --- written only by the hook / sweep(); never read by outcome() ---
@@ -123,10 +120,8 @@ contract GlasshouseBook is IGlasshouseBook, IMakerHooks {
         bytes32 k = key(msg.sender, orderHash);
         Auction storage a = _auctions[k];
         require(a.commitEnd == 0, AlreadyOpened());
-        // `exclusiveBlocks > 0` is not cosmetic. With a zero-length window the winner's
-        // improved price is available to nobody exclusively, so an outsider fills at the
-        // base price in the same block and bidding is strictly dominated by not bidding
-        // (see ARCHITECTURE.md and F-120). An auction with no exclusivity has no bidders.
+        // A zero-length exclusive window lets an outsider fill at the base price in the
+        // same block, which makes bidding strictly dominated by not bidding.
         require(commitBlocks > 0 && revealBlocks > 0 && exclusiveBlocks > 0, BadWindow());
         require(reserveBps <= maxBps && maxBps < BPS, BadWindow());
 
@@ -146,9 +141,8 @@ contract GlasshouseBook is IGlasshouseBook, IMakerHooks {
     }
 
     /// @notice Commit to a sealed bid. `commitment = keccak256(bidder, bps, salt)`.
-    /// @dev Sealed bids exist here for SHILL RESISTANCE, not anti-sniping: in an open
-    ///      second-price auction the maker could watch the top bid and insert a shill
-    ///      just beneath it, extracting near-first-price and destroying truthfulness.
+    /// @dev Sealed for shill resistance, not anti-sniping: in an open second-price
+    ///      auction the maker could insert a bid just under the top.
     function commit(address maker, bytes32 orderHash, bytes32 commitment) external {
         bytes32 k = key(maker, orderHash);
         Auction storage a = _auctions[k];
@@ -162,23 +156,19 @@ contract GlasshouseBook is IGlasshouseBook, IMakerHooks {
         b.commitIdx = a.commitCount;
         unchecked { a.commitCount = a.commitCount + 1; }
 
-        // THE BOND IS TAKEN HERE, NOT AT REVEAL. If it were taken at reveal, refusing
-        // to reveal would be free -- and refusing to reveal is the cheapest attack on a
-        // second-price auction: a runner-up who withholds drops `secondBps` to the
-        // reserve and hands the winner a near-free fill. That is the ring behaviour the
-        // bond is supposed to bound, so the bond has to be at risk from the moment a
-        // bidder takes a slot.
+        // The bond is taken here, not at reveal. Taken at reveal, staying silent would
+        // be free -- and a runner-up who stays silent drops `secondBps` to the reserve
+        // and hands the winner a near-free fill. See {claimUnrevealed}.
         uint128 bond = a.bond;
         if (bond > 0) IERC20(a.tokenIn).safeTransferFrom(msg.sender, address(this), bond);
 
         emit BidCommitted(maker, orderHash, msg.sender, b.commitIdx);
     }
 
-    /// @notice Reveal a committed bid and post the bond.
-    /// @dev Maintains the top-2 in O(1), so {outcome} needs no loop and cannot blow
-    ///      the taker's gas budget. Reveal ORDER is irrelevant to the result: max is
-    ///      order-independent, and ties break on commit index — fixed before anyone
-    ///      knew they were tying, so no latency race is reintroduced.
+    /// @notice Reveal a committed bid.
+    /// @dev Maintains the top-2 in O(1), so {outcome} needs no loop on the taker's gas
+    ///      budget. Reveal order does not change the result: max is order-independent,
+    ///      and ties break on commit index, fixed before anyone knew they were tying.
     function reveal(address maker, bytes32 orderHash, uint24 bps, bytes32 salt) external {
         bytes32 k = key(maker, orderHash);
         Auction storage a = _auctions[k];
@@ -194,13 +184,9 @@ contract GlasshouseBook is IGlasshouseBook, IMakerHooks {
 
         b.revealed = true;
 
-        // O(1) top-2 maintenance. Strictly-greater keeps the earliest commit on ties.
-        //
-        // The `a.best == address(0)` arm has to come first: a maker may set
-        // `reserveBps = 0`, and then a valid `bps == 0` bid would satisfy neither
-        // `bps > a.bestBps` (0 > 0) nor `bps > a.secondBps`, so a revealed bidder
-        // would silently fail to become the winner. Seeding on the empty book fixes
-        // that; the assignments below are no-ops in that case.
+        // The `a.best == address(0)` arm must come first: with `reserveBps == 0` a
+        // valid `bps == 0` bid satisfies neither `bps > a.bestBps` nor
+        // `bps > a.secondBps`, so the only revealed bidder would fail to win.
         if (a.best == address(0) || bps > a.bestBps || (bps == a.bestBps && b.commitIdx < a.bestCommitIdx)) {
             a.secondBps = a.bestBps;
             a.best = msg.sender;
@@ -229,18 +215,16 @@ contract GlasshouseBook is IGlasshouseBook, IMakerHooks {
             return Outcome(AuctionStatus.Closed, address(0), 0, a.revealEnd);
         }
 
-        // Second price with reserve. With exactly one reveal `secondBps` is 0, so this
-        // collapses to the maker's reserve — textbook Vickrey-with-reserve, and the
-        // clearing price is well defined for any bidder count.
+        // Second price with reserve. One reveal leaves `secondBps` at 0, so this
+        // collapses to the reserve and the price is defined at any bidder count.
         uint24 clearingBps = a.secondBps > a.reserveBps ? a.secondBps : a.reserveBps;
 
         return Outcome(AuctionStatus.Closed, a.best, clearingBps, a.revealEnd + a.exclusiveBlocks);
     }
 
-    /// @notice Records who actually filled the order.
-    /// @dev `swap()` calls maker hooks; `quote()` never does (it has no transfer
-    ///      phase). Hooks live OUTSIDE the program, so writing here cannot affect
-    ///      quote/swap consistency — this is exactly what 1inch built hooks for.
+    /// @notice Records who filled the order.
+    /// @dev `swap()` calls maker hooks and `quote()` does not. Hooks run outside the
+    ///      program, so writing here cannot affect quote/swap consistency.
     function postTransferIn(
         address maker,
         address taker,
@@ -264,8 +248,8 @@ contract GlasshouseBook is IGlasshouseBook, IMakerHooks {
     }
 
     /// @notice Close out an auction once the exclusive window has elapsed.
-    /// @dev Permissionless. Decides only whether the winner forfeits; bonds are then
-    ///      claimed individually (pull, not push) so there is no unbounded loop.
+    /// @dev Permissionless. Decides only whether the winner forfeits; bonds are claimed
+    ///      individually, so there is no unbounded loop.
     function settle(address maker, bytes32 orderHash) external {
         Auction storage a = _auctions[key(maker, orderHash)];
         require(a.commitEnd != 0, NotOpened());
@@ -273,21 +257,14 @@ contract GlasshouseBook is IGlasshouseBook, IMakerHooks {
         require(block.number > a.revealEnd + a.exclusiveBlocks, WindowNotElapsed());
 
         a.settled = true;
-        // FORFEITURE REQUIRES POSITIVE EVIDENCE, and the missing `filledBy != address(0)`
-        // was a bond-theft vector.
+        // Forfeiture requires positive evidence that someone else filled.
         //
         // `filledBy` is written only by {postTransferIn}, which fires only if the maker's
-        // SIGNED ORDER sets the post-transfer-in hook at this Book and `a.router` is the
-        // router that actually filled. The Book never sees the order, so it cannot check
-        // either. A maker who points `router` at the wrong address, or simply omits the
-        // hook, guarantees `filledBy == address(0)` -- and under the old rule every
-        // honest winner then forfeited, with the maker collecting through {claimForfeit}.
-        // The winner paid the improved price AND lost the bond.
-        //
-        // So: forfeit only when someone else demonstrably filled. If nothing filled at
-        // all, the Book cannot distinguish a winner who did not show from a maker who
-        // broke the hook, and it declines to punish the party that could not have
-        // verified the configuration. The residual is stated plainly in {claimForfeit}.
+        // signed order sets the hook at this Book and `a.router` is the router that
+        // filled. The Book sees neither, so a maker who omits the hook or names the wrong
+        // router could otherwise force every honest winner to forfeit and collect the
+        // bond. Where nothing filled at all the Book cannot tell a no-show from a broken
+        // configuration, so it does not punish. Residual noted in {claimForfeit}.
         a.winnerForfeited = a.best != address(0) && a.filledBy != address(0) && a.filledBy != a.best;
 
         uint24 clearingBps = a.secondBps > a.reserveBps ? a.secondBps : a.reserveBps;
@@ -312,17 +289,11 @@ contract GlasshouseBook is IGlasshouseBook, IMakerHooks {
     }
 
     /// @notice Maker collects the winner's forfeited bond.
-    /// @dev Forfeiture goes to the maker because the maker is the only party harmed.
-    ///      Sizing `bond >= maxBps * notional / BPS` makes winner-no-show unprofitable;
-    ///      reveal-withholding is covered separately by {claimUnrevealed}, since the bond
-    ///      is escrowed at commit. This bounds, but does not solve, bidder-ring
-    ///      collusion — see ARCHITECTURE.md §3.4.
-    ///
-    /// @dev KNOWN RESIDUAL, stated rather than hidden: this only fires when someone ELSE
-    ///      filled. A winner who does not show, where nobody else fills either, keeps its
-    ///      bond. That is deliberate — see {settle}. Punishing the silent case would mean
-    ///      trusting the maker to have wired a hook the Book cannot verify, which turns
-    ///      the bond into something the maker can take at will.
+    /// @dev Sizing `bond >= maxBps * notional / BPS` makes a winner no-show unprofitable.
+    ///      Withholding a reveal is covered by {claimUnrevealed}. This bounds, but does
+    ///      not solve, bidder-ring collusion.
+    /// @dev Residual: this fires only when someone else filled. A no-show that nobody
+    ///      else fills behind keeps its bond, deliberately -- see {settle}.
     function claimForfeit(bytes32 orderHash) external {
         bytes32 k = key(msg.sender, orderHash);
         Auction storage a = _auctions[k];
@@ -340,15 +311,10 @@ contract GlasshouseBook is IGlasshouseBook, IMakerHooks {
     }
 
     /// @notice Maker collects the bond of a bidder who committed and never revealed.
-    /// @dev This is the half of the bond's job that {claimForfeit} does not do, and it
-    ///      needs no hook and no trust in the maker's configuration: whether a commitment
-    ///      was revealed is something the Book observed directly.
-    ///
-    ///      Withholding a reveal is the cheapest attack on a second-price auction. A
-    ///      runner-up who stays silent drops `secondBps` to the reserve and hands the
-    ///      winner a near-free fill, which is exactly the ring behaviour bonds exist to
-    ///      make expensive. Taking the bond at commit and forfeiting it here is what
-    ///      makes staying silent cost something.
+    /// @dev Needs no hook and no trust in the maker's configuration: whether a commitment
+    ///      was revealed is something the Book observed. Withholding is otherwise the
+    ///      cheapest attack on a second-price auction, since a silent runner-up drops the
+    ///      clearing price to the reserve.
     /// @param orderHash The maker's order.
     /// @param bidder    The bidder who committed without revealing.
     function claimUnrevealed(bytes32 orderHash, address bidder) external {

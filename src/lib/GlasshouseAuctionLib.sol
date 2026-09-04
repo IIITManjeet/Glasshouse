@@ -8,11 +8,9 @@ import { SwapQuery, SwapRegisters } from "@1inch/swap-vm/src/libs/VM.sol";
 import { IGlasshouseBook, Outcome, AuctionStatus } from "../interfaces/IGlasshouseBook.sol";
 
 /// @title GlasshouseAuctionLib
-/// @notice The auction mechanism, expressed without any dependency on SwapVM's
-///         `Context`. Written once, wrapped twice: by the opcode (Path A) and by the
-///         Extruction target (Path B).
-/// @dev Every function here is `view` at most. This is the property the whole design
-///      rests on — see {applyOutcome}.
+/// @notice The auction mechanism, with no dependency on SwapVM's `Context` so that it
+///         can be wrapped by an opcode or by an `Extruction` target.
+/// @dev Every function here is `view` at most. See {applyOutcome}.
 library GlasshouseAuctionLib {
     uint256 internal constant BPS = 10_000;
 
@@ -25,34 +23,25 @@ library GlasshouseAuctionLib {
 
     /// @notice Apply the auction result to the swap registers.
     ///
-    /// @dev THE CENTRAL INVARIANT: this function is `view`. It writes no state and
-    ///      emits no events (a LOG under STATICCALL reverts, so the instruction
-    ///      *cannot* emit even if we wanted it to — all events come from the Book).
-    ///      Therefore `quote()` and `swap()` observe identical behaviour for a given
-    ///      (order, taker, amount, block).
+    /// @dev MUST STAY `view`. `quote()` and `swap()` run the same program in different
+    ///      static contexts, so any state write here makes the two diverge.
     ///
-    /// @dev THE SURPLUS MECHANISM: `LimitSwap` prices every branch off the ratio
-    ///      `balanceIn / balanceOut`:
-    ///        exact-in : amountOut = amountIn * balanceOut / balanceIn
-    ///        exact-out: amountIn  = ceil(amountOut * balanceIn / balanceOut)
-    ///        full fill: amountIn  = balanceIn for amountOut = balanceOut
-    ///      Scaling `balanceIn` up by (1 + b) therefore raises the taker's price by
-    ///      exactly `b` in all four branches. The improvement reaches the maker
-    ///      through ordinary settlement — no escrow, no payout path, no reentrancy
-    ///      surface. This is the mirror image of `DutchAuctionBalanceIn`, which
-    ///      scales `balanceIn` *down* over time.
+    /// @dev `LimitSwap` prices every branch off `balanceIn / balanceOut`, so scaling
+    ///      `balanceIn` up by (1 + b) raises the taker's price by exactly `b` in all
+    ///      four branches and ordinary settlement delivers it to the maker. This is the
+    ///      mirror of `DutchAuctionBalanceIn`, which scales `balanceIn` down over time.
     ///
-    /// @dev ORDERING (security-critical): must run AFTER balances are set and BEFORE
-    ///      the swap-curve instruction. Aqua mode: [Glasshouse -> LimitSwap].
-    ///      Signature mode: [StaticBalances -> Glasshouse -> LimitSwap].
+    /// @dev ORDERING IS SECURITY-CRITICAL: after balances are set, before the swap
+    ///      curve. Aqua mode [Glasshouse -> LimitSwap]; signature mode
+    ///      [StaticBalances -> Glasshouse -> LimitSwap].
     ///
-    /// @param query  Read-only swap info; supplies `maker`, `orderHash`, `taker`.
-    /// @param swap   Current registers. Only `balanceIn` is ever touched.
+    /// @param query  Supplies `maker`, `orderHash` and `taker`.
+    /// @param swap   Current registers. Only `balanceIn` is touched.
     /// @param book   Address of the auction book.
-    /// @param maxBps Maker's cap on price movement, from the signed program. Defends
-    ///               against a malicious or buggy Book: whatever `outcome()` claims,
-    ///               the price cannot move more than the maker authorised.
-    /// @return updated Registers with `balanceIn` adjusted (or unchanged).
+    /// @param maxBps Maker's signed cap on price movement. The Book is untrusted: the
+    ///               price cannot move further than the maker authorised, whatever
+    ///               `outcome()` returns.
+    /// @return updated Registers with `balanceIn` adjusted, or unchanged.
     function applyOutcome(
         SwapQuery memory query,
         SwapRegisters memory swap,
@@ -64,23 +53,16 @@ library GlasshouseAuctionLib {
         // No auction for this order: behave as a plain limit order.
         if (o.status == AuctionStatus.None) return swap;
 
-        // Bidding still open: nobody may fill yet, or the winner could be front-run
-        // by a fill at the base price before the auction resolves.
+        // Bidding still open: a fill now would front-run the auction at the base price.
         require(o.status != AuctionStatus.Bidding, GlasshouseAuctionInProgress());
 
         // Closed. Two regimes, split by the exclusive window.
         if (block.number <= o.exclusiveUntil) {
-            // Inside the window the winner has an exclusive right to fill.
-            //
-            // WHY THE WINDOW EXISTS: without it, a non-winner could fill at the
-            // unimproved base price in the same block, which is strictly cheaper
-            // than the winner's improved price. Bidding would then be dominated by
-            // not bidding and the auction would attract no bidders at all. The
-            // window is what makes a bid worth placing.
-            //
-            // This is the same gate `WhitelistSequential` applies to non-listed
-            // takers today — the difference is that membership is earned by bid
-            // rather than hardcoded by the maker, and it expires.
+            // Without an exclusive window a non-winner fills at the unimproved base
+            // price in the same block, which is strictly cheaper than the winner's
+            // improved price -- so bidding would be dominated by not bidding. The same
+            // gate `WhitelistSequential` applies, except membership is earned by bid
+            // and expires.
             require(query.taker == o.winner, GlasshouseExclusiveWindow(o.winner, o.exclusiveUntil));
             require(o.clearingBps <= maxBps, GlasshouseImprovementExceedsCap(o.clearingBps, maxBps));
 
@@ -89,8 +71,7 @@ library GlasshouseAuctionLib {
             return swap;
         }
 
-        // Window elapsed, or there was no winner at all: open to everyone at the
-        // base price. Permissionless by default; exclusivity is bounded and earned.
+        // Window elapsed, or no winner: open to everyone at the base price.
         return swap;
     }
 }
