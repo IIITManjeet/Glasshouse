@@ -1,20 +1,21 @@
 # DESIGN.md — Glasshouse UI & product design
 
-> **Status:** 🟡 Scaffold. Written 2026-09-04 so that design decisions have a home before
-> the build starts. **Nothing here is locked.** Sections marked ⬜ are open.
+> **Status:** 🟢 **Required deliverable.** Replanned 2026-09-05: the build freezes
+> **Wed 10 Sep** and the explanation page is what real testers are handed on Thu 11.
+> It is no longer downstream of anything.
 >
-> **Do not start the UI until the day-7 gate in `run.md` §D-004 has passed.** The
-> submission is the mechanism and the comparison test; the UI is what makes it legible.
-> Building it first is the classic way to lose this track.
+> **Build window: Mon 08 (page) → Tue 09 (comparison + auction UI) → Wed 09 polish.**
+> Earlier if the Base deploy and subgraph land ahead of schedule.
 
 ---
 
 ## 1. Why this UI exists
 
-It has to do three jobs at once. If a screen serves none of them, cut it.
+It has to do four jobs at once. If a screen serves none of them, cut it.
 
 | # | Job | Source |
 |---|---|---|
+| 0 | **Be what a tester is handed.** The Sep 10 freeze exists so real people can use this for three days. A page that needs a walkthrough from the author has failed job 0. It must stand alone. | user, 2026-09-05 |
 | 1 | **Lift the Usability score.** It is our weakest axis at ~3/10, and it is scored in *both* judging rounds. ~1.5 days of dashboard buys 3 → ~7. | `run.md` F-100 |
 | 2 | **Be the demo video.** A human-narrated 2–4 min video is mandatory; AI voiceover is an auto-reject. A screen recording of `forge test` is a weak 4 minutes. This UI replaces it. | F-43, F-100 |
 | 3 | **Be the second Graph product on the runtime path.** *"Simply querying one Subgraph with no composition or standardization does not qualify."* The dashboard consuming a Messari-conformant subgraph **through the Subgraph MCP** is what satisfies the either/or. | F-81, F-93 |
@@ -87,36 +88,58 @@ Not decided. Direction, not a decision:
 ⬜ Open: light or dark as primary; type stack; whether we ship a landing section above
 the tool or go straight to the instrument.
 
-## 6. Stack ⬜
+## 6. Stack — DECIDED
 
-Constraints, then the choice:
+**A single static page. No framework, no build step, no bundler.**
 
-- Must consume the subgraph **via the Subgraph MCP** (§1, job 3).
-- Must run offline for the video if the network fails on the day.
-- Must be buildable in ~1.5 days by one person, including the recording.
+Why this and not Vite + React:
 
-Leaning **Vite + React + TypeScript**, static-deployable, no backend of its own. HHI and
-any ratio maths happen **in the frontend, not the subgraph mapping** — AssemblyScript has
-no floats, so the mapping emits components and the client divides.
+- **It can be handed to a tester as a URL in seconds.** That is the entire point of
+  freezing on Sep 10, and a build pipeline is friction between finishing and sharing.
+- **It cannot break on deadline day.** No install, no lockfile, no node version, no
+  toolchain that decides to fail at 3am. The failure modes of a `.html` file are
+  understood.
+- **It deploys anywhere** — static host, GitHub Pages, or straight into the repo for a
+  judge to open locally.
+- Nothing on the page needs a virtual DOM. It is a document with a few interactive
+  panels; hand-written DOM updates are less code here than the framework that would
+  manage them.
 
-⬜ Charting library undecided.
+Constraints that still hold:
 
-## 7. Build order (when the gate opens)
+- Consumes the subgraph **via the Subgraph MCP** (§1, job 3). ⚠️ `U-5` decides whether
+  that call is client-side or baked to static JSON at build time.
+- Must render correctly with the network unavailable, for the video and for a judge
+  opening it cold.
+- HHI and any ratio maths happen **client-side** — AssemblyScript has no floats, so the
+  subgraph mapping emits components and the page divides.
 
-1. Comparison screen against recorded data — proves the layout carries the story.
-2. Wire it to live execution.
-3. Auction view.
-4. Outcome/receipt.
-5. Latency lens **only if** ≥1 day remains.
-6. Record the video against the finished UI. Reserve **3–5 hours**; it is human-narrated
-   and it is not optional.
+Charts: hand-rolled inline SVG. The chart count here is small and specific; a charting
+library is more weight than the two or three figures actually need.
+
+## 7. Build order
+
+**Mon 08 — the page itself.** The argument, told to someone who has never seen SwapVM:
+identity gate → clock gate → why neither prices the order → what a sealed second-price
+bid changes. Static, complete, shareable at the end of the day. **This alone satisfies
+job 0.**
+
+**Tue 09 — the comparison panel**, wired to real data from the Base auction, then the
+auction view (phases, commitments appearing, reveals resolving into a clearing price).
+
+**Wed 10 — polish and freeze.** Outcome/receipt panel if it fits. Latency lens only if
+everything else is done, per §4.2.
+
+**Fri 12 — record the video against the finished page.** Reserve 3–5 hours; it is
+human-narrated and it is not optional (F-43).
 
 ## 8. Open questions
 
-| ID | Question | Blocks |
+| ID | Question | Status |
 |---|---|---|
-| U-1 | Live execution or recorded replay on the comparison screen? | §3, day 6 |
-| U-2 | How do we *show* latency-vs-valuation without faking a market? | §4.2 |
-| U-3 | Light or dark primary; type stack | §5 |
-| U-4 | Charting library | §6 |
-| U-5 | Does the Subgraph MCP call happen client-side, or at build time into a static JSON? Client-side is a stronger Graph claim; build-time is safer for the demo. | §1 job 3 |
+| U-1 | Live execution or recorded replay on the comparison panel? | ⏳ Decide Tue 09. Leaning **live against the Base deployment, recorded run behind a flag** as the fallback. |
+| U-2 | How do we *show* latency-vs-valuation without faking a market? | ⏳ Open. Highest-value unbuilt idea; also the easiest to get wrong. Needs a sketch before code. |
+| U-3 | Light or dark primary; type stack | ✅ Resolved with §6: theme-aware, both supported, system default. |
+| U-4 | Charting library | ✅ Resolved: none. Inline SVG. |
+| U-5 | Subgraph MCP client-side or baked to static JSON? | ⏳ Decide Sun 07 with the subgraph. Client-side is the stronger Graph claim; baked is safer for the video. |
+| U-6 | Where does the page live — repo only, or also a hosted URL for testers? | ⏳ Decide Mon 08. Job 0 implies a URL. |
