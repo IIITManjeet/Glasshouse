@@ -18,6 +18,36 @@ each one is in [`run.md`](./run.md).
 
 ---
 
+## [0.4.0] - 2026-09-05
+
+Parameters stop being guesses.
+
+### Added
+- `scripts/simulate-window.mjs` - Monte Carlo sizing of the exclusive window, seeded and
+  dependency-free. The window is a free American call granted to the winner, so a longer
+  one raises bids and simultaneously lets the winner exercise only when the market has
+  moved against the maker. On a volatile pair, 2s to 300s raises the clearing price from
+  79 to 124 bps while the maker's net falls from 75.7 to 67.2. Analysis in
+  `docs/design/window-sizing.md`.
+- `test/ReserveMatrix.t.sol` - sweeps reserve against bidder count, including the
+  degenerate cases the suite had no coverage for: zero bidders must leave no winner and
+  open the order immediately, and one bidder means the reserve is the price.
+- `GlasshouseBook.commitmentFor(bidder, bps, salt)` - hand-packing the commitment wrong
+  produces one that can never be revealed, and since the bond escrows at commit that loses
+  it. Fuzzed against the packing `reveal()` checks.
+- `config/auction.json`, and a two-run deployment plan in `DEPLOY.md`.
+
+### Changed
+- `exclusiveBlocks = 15` (30s), from the simulation rather than by choice.
+- `reserveBps = 50`, derived: the mid moves ~44 bps over the 150s lockup at 200% annual
+  volatility, and a reserve below the staleness cost makes running the auction worse than
+  posting a limit order.
+
+### Verified
+- 82 tests. `GlasshouseBook` 6,149 B, `GlasshouseRouter` 21,108 B.
+
+---
+
 ## [0.3.0] - 2026-09-05
 
 Two defects in the bond mechanism, both found while writing the LLD, both fixed before
@@ -135,7 +165,8 @@ invariant the design rests on is demonstrated rather than argued.
 - Fills record through `IMakerHooks.postTransferIn`, which `swap()` calls and `quote()`
   does not - the instruction itself cannot emit, since `LOG` reverts under `STATICCALL`.
 
-[Unreleased]: https://github.com/IIITManjeet/Glasshouse/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/IIITManjeet/Glasshouse/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/IIITManjeet/Glasshouse/releases/tag/v0.4.0
 [0.3.0]: https://github.com/IIITManjeet/Glasshouse/releases/tag/v0.3.0
 [0.2.0]: https://github.com/IIITManjeet/Glasshouse/releases/tag/v0.2.0
 [0.1.0]: https://github.com/IIITManjeet/Glasshouse/releases/tag/v0.1.0

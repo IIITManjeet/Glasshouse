@@ -150,6 +150,7 @@ status line at the top, and are updated at release boundaries.
 | `v0.1.0` | Mechanism executes inside a real SwapVM program; `quote() == swap()` demonstrated |
 | `v0.2.0` | Three-way comparison: identity, clock and bid on the same order |
 | `v0.3.0` | Bond mechanism hardened; deployment tooling; HLD and LLD |
+| `v0.4.0` | Auction parameters derived from simulation and a reserve sweep |
 
 ## Licence
 
