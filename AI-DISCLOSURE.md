@@ -1,54 +1,55 @@
 # AI disclosure
 
-ETHGlobal permits AI tooling and requires that its use be documented, including spec
-files and prompts. This file is that disclosure, and it is kept honest rather than
-minimal.
+ETHOnline 2026 permits AI assistance on three conditions: that its use is documented
+file by file, that the team's contribution is meaningful rather than nominal, and that
+**all spec files, prompts and planning artifacts are included in the repository**. This
+file covers the first. The second and third are covered by the documents it points at,
+which are in the repository for exactly that reason.
 
-## Tooling used
+## Tool
 
-**Claude Code** (Anthropic), interactively, throughout. Used for:
+**Claude Code** (Anthropic), used interactively throughout.
 
-- **Research.** The sponsor-track analysis, prize-eligibility rules, prior-art survey of
-  the 1inch Aqua/SwapVM hackathon corpus, and the MEV/auction landscape review. All of it
-  is recorded with sources in [`run.md`](./run.md) §3, fact by fact, with the URL each
-  claim was verified against. Claims that could not be verified at source are marked
-  `[UNVERIFIED]` or logged as open questions rather than asserted.
-- **Adversarial review.** Three independent review passes over the design — originality,
-  feasibility, track fit — recorded in `run.md` §4 as Consensus-2 with their verdicts
-  (`MAJOR REWORK` / `DESCOPE` / `QUALIFIES WITH FIXES`) and the corrections they forced.
-  Several load-bearing assumptions were falsified this way and the corrections are
-  retained inline rather than edited out.
-- **Architecture.** [`ARCHITECTURE.md`](./ARCHITECTURE.md) was drafted and then reviewed
-  against a local clone of `1inch/swap-vm@08089a1`. That review caught a mechanism flaw
-  that would have made bidding strictly dominated (F-120).
-- **Implementation.** Solidity, tests, and tooling in this repository were written with
-  AI assistance and reviewed, compiled, and tested by the author.
+## Where AI was used, by file
 
-## Spec files and prompts
+| Path | AI involvement |
+|---|---|
+| `src/**` | Written with AI assistance, then reviewed, compiled and tested by the author. Every design constraint they implement was decided first and recorded in `run.md` before the code existed. |
+| `test/**` | Written with AI assistance. Two contract defects were found this way and are recorded in `CHANGELOG.md` under 0.1.0, and two more in the bond mechanism under 0.3.0. |
+| `scripts/**` | Written with AI assistance. |
+| `ignition/**` | Written with AI assistance. |
+| `run.md` | The planning artifact. Research was carried out by AI agents against live sources; every fact carries the URL it was verified against, and superseded conclusions are marked rather than deleted. Decisions in the log were made by the author. |
+| `ARCHITECTURE.md` | Drafted with AI assistance, then reviewed against a local clone of `1inch/swap-vm@08089a1`. That review caught a mechanism flaw that would have made bidding strictly dominated. |
+| `docs/design/HLD.md`, `docs/design/LLD.md` | Written by AI agents reading the source directly. Both end with a section stating what they could not verify. The LLD's reading of the Book surfaced the bond-theft vector fixed in 0.3.0. |
+| `README.md`, `DESIGN.md`, `CHANGELOG.md`, `DEPLOY.md` | Written with AI assistance. |
+| Demo video narration | **Human.** No TTS. |
 
-The full working record is in the repository and is part of the submission, not internal
-notes:
+## Spec files, prompts and planning artifacts
 
-- [`run.md`](./run.md) — 133 numbered facts with sources, the decision log with the
-  options considered and why each was chosen, the change log, and open questions.
-- [`ARCHITECTURE.md`](./ARCHITECTURE.md) — the design, including the constraints that
-  shaped it and the alternatives rejected.
-- [`DESIGN.md`](./DESIGN.md) — UI and product design.
+These are in the repository because the rules require them, and they are the record of
+how the AI was directed rather than a summary written afterwards:
 
-Where a decision was reversed, the original reasoning is kept and marked superseded
-rather than deleted, so the trail can be audited.
+- **[`run.md`](./run.md)** — the primary artifact. 140+ numbered facts, each with the
+  source it was checked against; a decision log giving the options considered and why one
+  was chosen; adversarial review rounds with their verdicts and the corrections they
+  forced; and a change log. Where a conclusion was later falsified, the original is kept
+  and marked superseded, so the reasoning can be audited rather than taken on trust.
+- **[`ARCHITECTURE.md`](./ARCHITECTURE.md)** — the design as reviewed, with rejected
+  alternatives.
+- **[`DESIGN.md`](./DESIGN.md)** — product and UI design, including its open questions.
+- **[`docs/design/`](./docs/design/)** — HLD and LLD.
+
+## Meaningful contribution
+
+Scope, track selection, the mechanism itself, and every decision in `run.md` §4 were the
+author's. The research that informed them was AI-assisted and is cited to source
+throughout, so a judge can check any of it independently.
 
 ## Pre-existing work
 
 **None.** Glasshouse was started for ETHOnline 2026. No pre-existing project-specific
-code, designs, or assets are included.
+code, designs or assets are included.
 
-1inch Aqua and SwapVM are consumed as **external dependencies** and are not vendored into
-this repository. They are published under `LicenseRef-Degensoft-*-Source-1.1`, which is
-source-available and not open source; all code in this repository is our own and is MIT
-licensed.
-
-## Human authorship
-
-Design decisions, scope calls, track selection, and the mechanism itself were made by the
-author. The demo video is narrated by a human voice.
+1inch Aqua and SwapVM are consumed as **external dependencies** and are not vendored
+into this repository. They are published under `LicenseRef-Degensoft-*-Source-1.1`,
+which is source-available and not open source. All code here is our own and MIT licensed.

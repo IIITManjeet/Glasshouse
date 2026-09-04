@@ -888,6 +888,39 @@ by family: `src/instructions/Whitelist.sol`, `DutchAuction.sol`, `Balances.sol`,
   `postTransferInTarget = Book`: `swap()` records the filler, `quote()` does not touch it.
   Confirms F-127's workaround for the instruction being unable to emit under STATICCALL.
 
+### 3.6o The AI-usage rule, re-pulled verbatim (2026-09-05)
+Fetched from `ethglobal.com/events/ethonline2026/info/details`. This **supersedes the
+paraphrase in F-44** and settles the question of what may be removed from the repo.
+
+- **F-142** 🔴 **The rules REQUIRE the planning artifacts to be in the repo. Verbatim:**
+  > *"If you use one, you must include **all spec files, prompts, and planning artifacts
+  > in your submission repository**. Judges need to see the full picture of how you
+  > directed the AI, not just the generated output."*
+
+  > *"Clearly document in your submission where and how AI tools were used in the
+  > project. This includes **specifying which parts of the code, specific files, or
+  > assets** were generated or assisted by AI."*
+
+  > *"AI tools should be used to assist your development process, not to create the
+  > entire project. Submissions that rely entirely on AI without meaningful
+  > contributions from team members **may not be eligible for partner prizes or
+  > finalist consideration**."*
+
+  **→ `run.md`, `ARCHITECTURE.md`, `DESIGN.md` and `docs/design/` are not internal
+  scaffolding to be cleaned up before submission. They are the required artifacts, and
+  deleting them would take the submission from compliant to non-compliant.**
+
+  **→ They are also the defence against the third clause.** "Relies entirely on AI"
+  is judged on evidence of direction, and a sourced decision log with superseded
+  conclusions left visible is precisely that evidence. Removing it removes the proof
+  that the work was directed rather than generated.
+
+  ⚠️ Note the general `ethglobal.com/rules` page carries **no AI section at all** — it
+  covers conduct, IP and pre-existing work. The AI rule lives only on the event's own
+  details page, which is why it is easy to miss.
+- **F-143** ✅ **`AI-DISCLOSURE.md` rewritten to satisfy the second clause**, which asks
+  for *specific files*, not a general statement. It now carries a per-path table.
+
 ### 3.6n Base mainnet verified on-chain (2026-09-05)
 Read directly from a public Base RPC (`https://mainnet.base.org`, `eth_getCode`), which
 upgrades two claims that until now rested on research notes rather than the chain.
