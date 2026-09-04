@@ -119,7 +119,11 @@ contract GlasshouseBook is IGlasshouseBook, IMakerHooks {
         bytes32 k = key(msg.sender, orderHash);
         Auction storage a = _auctions[k];
         require(a.commitEnd == 0, AlreadyOpened());
-        require(commitBlocks > 0 && revealBlocks > 0, BadWindow());
+        // `exclusiveBlocks > 0` is not cosmetic. With a zero-length window the winner's
+        // improved price is available to nobody exclusively, so an outsider fills at the
+        // base price in the same block and bidding is strictly dominated by not bidding
+        // (see ARCHITECTURE.md and F-120). An auction with no exclusivity has no bidders.
+        require(commitBlocks > 0 && revealBlocks > 0 && exclusiveBlocks > 0, BadWindow());
         require(reserveBps <= maxBps && maxBps < BPS, BadWindow());
 
         uint40 commitEnd = uint40(block.number) + commitBlocks;
@@ -181,7 +185,13 @@ contract GlasshouseBook is IGlasshouseBook, IMakerHooks {
         if (bond > 0) IERC20(a.tokenIn).safeTransferFrom(msg.sender, address(this), bond);
 
         // O(1) top-2 maintenance. Strictly-greater keeps the earliest commit on ties.
-        if (bps > a.bestBps || (bps == a.bestBps && a.best != address(0) && b.commitIdx < a.bestCommitIdx)) {
+        //
+        // The `a.best == address(0)` arm has to come first: a maker may set
+        // `reserveBps = 0`, and then a valid `bps == 0` bid would satisfy neither
+        // `bps > a.bestBps` (0 > 0) nor `bps > a.secondBps`, so a revealed bidder
+        // would silently fail to become the winner. Seeding on the empty book fixes
+        // that; the assignments below are no-ops in that case.
+        if (a.best == address(0) || bps > a.bestBps || (bps == a.bestBps && b.commitIdx < a.bestCommitIdx)) {
             a.second = a.best;
             a.secondBps = a.bestBps;
             a.best = msg.sender;
