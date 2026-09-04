@@ -4,7 +4,7 @@
 > **Wed 10 Sep** and the explanation page is what real testers are handed on Thu 11.
 > It is no longer downstream of anything.
 >
-> **Build window: Mon 08 (page) → Tue 09 (comparison + auction UI) → Wed 09 polish.**
+> **Build window: Mon 08 (page) → Tue 09 (comparison + auction UI) → Wed 10 polish.**
 > Earlier if the Base deploy and subgraph land ahead of schedule.
 
 ---
