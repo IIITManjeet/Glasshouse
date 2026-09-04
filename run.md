@@ -864,6 +864,23 @@ by family: `src/instructions/Whitelist.sol`, `DutchAuction.sol`, `Balances.sol`,
   full resync) · **HHI in AssemblyScript has no floats** (compute components in the
   mapping, divide in the frontend) · the human-narrated video is **3–5 h**.
 
+### 3.6l Defects found by testing (2026-09-05)
+- **F-134** 🔴 **Two real defects in `GlasshouseBook`, both found by writing tests, neither
+  caught by three rounds of design review.**
+  1. **The running top-2 dropped a legitimate winner.** A maker may set `reserveBps = 0`,
+     which makes `bps = 0` a valid bid. On an empty book that satisfied neither
+     `bps > a.bestBps` (0 > 0) nor `bps > a.secondBps`, so the only revealed bidder
+     silently failed to become the winner and the auction closed with **no winner at
+     all** — the bidder's bond returns, but the maker loses the fill. Fixed by seeding
+     explicitly on `a.best == address(0)`.
+  2. **`open()` accepted `exclusiveBlocks = 0`**, which reintroduces F-120 exactly: with
+     no exclusive window an outsider fills at the base price in the same block the
+     winner would fill at the improved one, so **bidding is strictly dominated by not
+     bidding**. The mechanism now refuses the configuration.
+  **→ Lesson worth keeping: F-120 was caught by review, but the *configuration* that
+  recreates it was not. Design review checks the mechanism; only tests check the
+  parameter space around it.**
+
 ### 3.6k 🏗️ Architecture review (Fable, 2026-09-03) — source corrections
 > Read from `1inch/swap-vm@08089a1` (main, 2026-09-01), local clone. Files read in full:
 > `SwapVM.sol`, `VM.sol`, `LimitSwap.sol`, `Balances.sol`, `DutchAuction.sol`,
@@ -1185,6 +1202,9 @@ before any logic (silent byte-offset bugs, F-110).
 | 2026-09-03 | **`ARCHITECTURE.md` written** (main agent; Fable rate-limited) | §5 |
 | 2026-09-03 | **Fable architecture review → `ARCHITECTURE.md` v2** (698 lines). Caught F-120: fall-through made bidding **strictly dominated**. Dropped the randomised close; resolved R-3; inverted the deploy strategy to `Extruction`-first. | read from `1inch/swap-vm@08089a1` local clone |
 | 2026-09-03 | F-120…F-132 logged; F-70 / F-104 / F-107 marked superseded inline | Fable §13 |
+| 2026-09-04 | Own repo established at **github.com/IIITManjeet/Glasshouse**; 7 incremental commits; README, `DESIGN.md`, `AI-DISCLOSURE.md` written | `git log`, F-40/F-44 |
+| 2026-09-05 | **§9 roadmap** written; status reconciled against the tree | direct inspection |
+| 2026-09-05 | **D2 — Book test suite: 41 tests, 48 total green.** Fuzz checks the O(1) top-2 against a reference scan under rotated reveal orders. **Two defects found and fixed** (see F-134). | `npx hardhat test solidity` |
 
 ---
 
@@ -1270,7 +1290,7 @@ before any logic (silent byte-offset bugs, F-110).
 
 | Day | Date | Deliverable | Ends with |
 |---|---|---|---|
-| **D2** | Fri 05 | **Book test suite.** commit/reveal, phase boundaries, second-price + reserve, tie→earliest commit, bond forfeit/claim, `postTransferIn` auth. Fuzz the running top-2. | Book trustworthy |
+| ✅ **D2** | Fri 05 | **DONE — 48 tests green.** Book test suite. commit/reveal, phase boundaries, second-price + reserve, tie→earliest commit, bond forfeit/claim, `postTransferIn` auth. Fuzz the running top-2. | Book trustworthy |
 | **D3** | Sat 06 | **First execution through the VM.** Deploy `GlasshouseRouter` in-test, run a real program with `0x2e`. Prove **`quote() == swap()`**. Exclusive window enforced; fall-through after expiry. | Mechanism works end-to-end |
 | **D4** | Sun 07 | 🎯 **`ComparisonTest.t.sol`** — one order, three ways: `0x2d` outsider reverts · `0x94` one price per block, first-in-block wins · `0x2e` highest bidder wins, pays second price. Latency-differentiated bidders. | **G1 — the submission exists** |
 | **D5** | Mon 08 | **Base mainnet.** Ignition module, deploy Book + Router, `ship()` a strategy through real Aqua, run one real auction with dust. Clone `DutchAuctionLimitSwapInvariants` harness (F-122). | **G2 — 1inch track qualified** |
