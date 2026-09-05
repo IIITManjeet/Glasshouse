@@ -7,3 +7,6 @@ coverage/
 .env.*
 deployments/localhost/
 *.log
+
+# Local/fork deployment artifacts. Real deployments are recorded in run.md.
+ignition/deployments/chain-31337/
