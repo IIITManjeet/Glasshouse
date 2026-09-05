@@ -1,0 +1,463 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Priority By Bid</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,400;0,500;1,6..72,300&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    --ground:      #F1F4F3;
+    --raised:      #FAFCFB;
+    --sunk:        #E7ECEA;
+    --ink:         #0F1A18;
+    --ink-soft:    #4A5C58;
+    --ink-faint:   #7C8D89;
+    --rule:        #D2DCD9;
+    --glass:       #1F6F66;
+    --glass-soft:  #E0EDEA;
+    --brick:       #9C3B2C;
+    --brick-soft:  #F6E5E1;
+
+    --display: "Newsreader", Georgia, "Times New Roman", serif;
+    --body: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+    --spine: 39rem;
+    --wide: 62rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #0B1513;
+      --raised:      #121F1D;
+      --sunk:        #081110;
+      --ink:         #E5EEEB;
+      --ink-soft:    #92A6A1;
+      --ink-faint:   #6A7D79;
+      --rule:        #21332F;
+      --glass:       #5CC0B1;
+      --glass-soft:  #14302B;
+      --brick:       #DB7660;
+      --brick-soft:  #2C1714;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:      #0B1513;
+    --raised:      #121F1D;
+    --sunk:        #081110;
+    --ink:         #E5EEEB;
+    --ink-soft:    #92A6A1;
+    --ink-faint:   #6A7D79;
+    --rule:        #21332F;
+    --glass:       #5CC0B1;
+    --glass-soft:  #14302B;
+    --brick:       #DB7660;
+    --brick-soft:  #2C1714;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16.5px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: var(--wide); margin: 0 auto; padding: 0 1.5rem; }
+  .spine { max-width: var(--spine); }
+
+  /* ---- masthead ---- */
+
+  header.masthead {
+    border-bottom: 1px solid var(--rule);
+    padding: 3.5rem 0 2.75rem;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 1.75rem;
+  }
+  h1 {
+    font-family: var(--display);
+    font-weight: 300;
+    font-size: clamp(2.4rem, 6vw, 3.9rem);
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+    margin: 0 0 1.5rem;
+    max-width: 20ch;
+  }
+  h1 em { font-style: italic; color: var(--glass); }
+  .standfirst {
+    font-size: 1.12rem;
+    color: var(--ink-soft);
+    max-width: 54ch;
+    margin: 0;
+  }
+
+  /* ---- opcode strip: the three mechanisms, as the VM names them ---- */
+
+  .strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    margin: 2.75rem 0 0;
+  }
+  .strip > div { background: var(--raised); padding: 1.15rem 1.25rem; }
+  .strip .op {
+    font-family: var(--mono);
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--glass);
+  }
+  .strip .by {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    display: block;
+    margin-bottom: 0.4rem;
+  }
+  .strip .what { font-size: 0.9rem; color: var(--ink-soft); margin: 0.35rem 0 0; }
+  .strip .ours { background: var(--glass-soft); }
+
+  /* ---- sections ---- */
+
+  section { padding: 3.25rem 0; border-bottom: 1px solid var(--rule); }
+  h2 {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: clamp(1.6rem, 3.4vw, 2.15rem);
+    line-height: 1.2;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0 0 1.25rem;
+  }
+  h3 {
+    font-family: var(--body);
+    font-weight: 600;
+    font-size: 0.82rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 2.5rem 0 0.85rem;
+  }
+  p { margin: 0 0 1.1rem; }
+  p:last-child { margin-bottom: 0; }
+  a { color: var(--glass); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  code {
+    font-family: var(--mono);
+    font-size: 0.88em;
+    background: var(--sunk);
+    padding: 0.08em 0.34em;
+    border-radius: 2px;
+  }
+  strong { font-weight: 600; }
+
+  pre {
+    font-family: var(--mono);
+    font-size: 0.83rem;
+    line-height: 1.7;
+    background: var(--sunk);
+    border-left: 2px solid var(--glass);
+    padding: 1rem 1.15rem;
+    overflow-x: auto;
+    margin: 1.4rem 0;
+  }
+  pre .c { color: var(--ink-faint); }
+
+  blockquote {
+    margin: 1.5rem 0;
+    padding-left: 1.15rem;
+    border-left: 2px solid var(--rule);
+    font-family: var(--display);
+    font-size: 1.1rem;
+    font-style: italic;
+    color: var(--ink-soft);
+  }
+
+  /* ---- the measurement ---- */
+
+  .measure { overflow-x: auto; margin: 1.75rem 0 0.9rem; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.92rem;
+    font-variant-numeric: tabular-nums;
+  }
+  th, td { text-align: left; padding: 0.7rem 1rem 0.7rem 0; border-bottom: 1px solid var(--rule); }
+  thead th {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 400;
+    padding-bottom: 0.5rem;
+  }
+  td.num, th.num { text-align: right; font-family: var(--mono); padding-right: 0; }
+  tr.win td { color: var(--ink); font-weight: 500; }
+  tr.win td.num { color: var(--glass); }
+  .op-cell { font-family: var(--mono); font-size: 0.82rem; color: var(--ink-faint); }
+  .bar {
+    display: block;
+    height: 3px;
+    background: var(--glass);
+    margin-top: 0.45rem;
+  }
+  .bar.over { background: var(--brick); }
+  .bar.flat { background: var(--ink-faint); }
+  .caption { font-size: 0.85rem; color: var(--ink-faint); margin: 0.75rem 0 0; }
+
+  /* ---- phases: sequential, because they genuinely are ---- */
+
+  .phases { margin: 1.75rem 0 0; }
+  .track {
+    display: grid;
+    grid-template-columns: 2fr 2fr 1fr 1.6fr;
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    font-size: 0.85rem;
+  }
+  .track > div { background: var(--raised); padding: 0.9rem 0.85rem; }
+  .track .ph {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    display: block;
+    margin-bottom: 0.35rem;
+  }
+  .track .blocks { font-family: var(--mono); font-size: 0.78rem; color: var(--glass); display: block; margin-top: 0.3rem; }
+  .track .locked { background: var(--sunk); }
+  .track .open { background: var(--glass-soft); }
+
+  /* ---- parameters ---- */
+
+  .params { margin-top: 1.5rem; }
+  .params tbody td:first-child { font-family: var(--mono); font-size: 0.85rem; }
+
+  /* ---- honest limits ---- */
+
+  .limits { background: var(--raised); border: 1px solid var(--rule); padding: 1.5rem 1.6rem; margin-top: 1.5rem; }
+  .limits h3 { margin-top: 0; }
+  .limits ul { margin: 0; padding-left: 1.1rem; }
+  .limits li { margin-bottom: 0.7rem; color: var(--ink-soft); font-size: 0.94rem; }
+  .limits li:last-child { margin-bottom: 0; }
+
+  .revert { color: var(--brick); font-weight: 500; }
+
+  footer { padding: 3rem 0 4.5rem; font-size: 0.9rem; color: var(--ink-soft); }
+  footer .meta { font-family: var(--mono); font-size: 0.75rem; color: var(--ink-faint); margin-top: 1.25rem; line-height: 1.9; }
+
+  a:focus-visible, summary:focus-visible { outline: 2px solid var(--glass); outline-offset: 3px; }
+
+  @media (max-width: 620px) {
+    .track { grid-template-columns: 1fr; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Glasshouse &nbsp;/&nbsp; 1inch SwapVM &nbsp;/&nbsp; ETHOnline 2026</p>
+    <h1>Every auction on chain is won by the <em>fastest</em> bidder, not the highest one.</h1>
+    <p class="standfirst">SwapVM already ships two ways to decide who may fill an order. One asks who you are. The other asks what time it is. Neither asks what the fill is worth to you.</p>
+
+    <div class="strip">
+      <div>
+        <span class="by">by identity</span>
+        <span class="op">WhitelistSequential &middot; 0x2d</span>
+        <p class="what">A ladder of privileged takers, written into the order by hand. Everyone else <span class="revert">reverts</span>.</p>
+      </div>
+      <div>
+        <span class="by">by clock</span>
+        <span class="op">DutchAuctionBalanceIn &middot; 0x94</span>
+        <p class="what">A descending price. Everyone in a block sees the same number, so the tie breaks on transaction order.</p>
+      </div>
+      <div class="ours">
+        <span class="by">by bid</span>
+        <span class="op">GlasshouseAuction &middot; 0x2e</span>
+        <p class="what">A sealed second-price auction. The highest bidder wins and pays what the runner-up offered.</p>
+      </div>
+    </div>
+  </header>
+
+  <section>
+    <div class="spine">
+      <h2>The order is already spoken for</h2>
+      <p><code>WhitelistSequential</code> lets a maker name the takers who may fill, each with an exclusive window. It reads like a preference. It isn't. An unlisted taker doesn't get a worse price, it hits a <code>require</code> and reverts, and keeps reverting until the entire cumulative ladder has elapsed.</p>
+      <p>Who fills was decided somewhere off chain, for reasons the chain cannot see. And the maker is paid nothing for granting the privilege: the insider fills at the ordinary price.</p>
+
+      <h3>The other one is worse, and it is not obvious</h3>
+      <p><code>DutchAuctionBalanceIn</code> looks like a real auction. Here is the whole of it:</p>
+    </div>
+
+    <div class="spine">
+<pre><span class="c">// swap-vm/src/instructions/DutchAuction.sol</span>
+uint256 elapsed = block.timestamp - start;
+ctx.swap.balanceIn =
+    ctx.swap.balanceIn * uint256(decay).pow(elapsed, ONE) / ONE;</pre>
+
+      <p>The price is a pure function of <code>block.timestamp</code>. Every transaction in a block shares one timestamp, so <strong>every bidder in that block faces an identical number</strong>. Valuation cannot break the tie. There is nothing left to decide the winner except position in the block, and position in the block is sold to whoever pays the builder most.</p>
+      <p>So the surplus does leave the order. It just doesn't reach the maker: it is competed away into priority fees. The descending clock doesn't price the order. It runs a latency race and pays the proceeds to someone who wasn't party to the trade.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>The same order, three ways</h2>
+    <div class="spine">
+      <p>One order. Three participants with the same valuations each time. Identical balances and swap curve in all three programs, so the only variable is how taker priority is decided. The participant who values the fill least is also the fastest, and is the incumbent on the ladder, because that is the situation the mechanism is supposed to handle.</p>
+    </div>
+
+    <div class="measure">
+      <table>
+        <thead>
+          <tr>
+            <th>Gate</th>
+            <th class="num">Winner values</th>
+            <th class="num">Maker gives up</th>
+            <th>Against base</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>By identity <span class="op-cell">0x2d</span></td>
+            <td class="num">100 bps</td>
+            <td class="num">10 000</td>
+            <td>Level with no auction at all<span class="bar flat" style="width:62%"></span></td>
+          </tr>
+          <tr>
+            <td>By clock <span class="op-cell">0x94</span></td>
+            <td class="num">100 bps</td>
+            <td class="num">10 618</td>
+            <td>6.2% worse for the maker<span class="bar over" style="width:66%"></span></td>
+          </tr>
+          <tr class="win">
+            <td>By bid <span class="op-cell">0x2e</span></td>
+            <td class="num">400 bps</td>
+            <td class="num">9 756</td>
+            <td>2.4% better, and the right bidder won<span class="bar" style="width:57%"></span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="caption spine">Basis points of the base price; lower is better for the maker. Both existing gates hand the fill to the participant who values it least. The clock additionally concedes to the taker every second it runs. Reproduce with <code>npx hardhat test solidity</code>.</p>
+  </section>
+
+  <section>
+    <div class="spine">
+      <h2>What replaces them</h2>
+      <p>One instruction, at <code>0x2e</code> &mdash; the free slot immediately after the ladder it replaces. Bidders commit to sealed bids, reveal them, and the highest bidder wins the right to fill while paying <strong>what the runner-up offered</strong>, not their own bid.</p>
+      <p>The winning bid is expressed as a price improvement in basis points applied to <code>balanceIn</code>. Ordinary SwapVM settlement then delivers it to the maker. No escrow, no payout path, no custody, nothing new to trust.</p>
+      <p>Bids are sealed for a reason that survives questioning: not anti-sniping, but <strong>shill resistance</strong>. In an open second-price auction the maker can watch the top bid and insert one just underneath it.</p>
+    </div>
+
+    <h3 class="spine">Three phases, disjoint in block space</h3>
+    <div class="phases">
+      <div class="track">
+        <div class="locked">
+          <span class="ph">commit</span>
+          Sealed bids arrive. The bond is posted here, so staying silent later is not free.
+          <span class="blocks">n &le; commitEnd &middot; 30 blocks</span>
+        </div>
+        <div class="locked">
+          <span class="ph">reveal</span>
+          Bids open. The running top-two settles. Nothing may fill yet, for anyone.
+          <span class="blocks">&le; revealEnd &middot; 30 blocks</span>
+        </div>
+        <div>
+          <span class="ph">exclusive</span>
+          The winner fills at the improved price.
+          <span class="blocks">15 blocks</span>
+        </div>
+        <div class="open">
+          <span class="ph">open</span>
+          Exclusivity expires. Anyone fills, at the base price. Permissionless again.
+          <span class="blocks">unbounded</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="spine">
+      <p class="caption">Total lockup 150 seconds on Base, against the 300 seconds a single-entry <code>WhitelistSequential</code> ladder locks outsiders out for.</p>
+
+      <h3>Why the split has to exist</h3>
+      <p>SwapVM runs the same program bytes in <code>quote()</code> and in <code>swap()</code>, in different static contexts. An instruction that writes state makes the two diverge, and every downstream guarantee goes with them.</p>
+      <p>So the auction writes state in its own transactions, and the instruction only ever <code>STATICCALL</code>s the result. It is <code>view</code>. It cannot even emit an event &mdash; <code>LOG</code> reverts under <code>STATICCALL</code> &mdash; so fills are recorded through a maker hook, which lives outside the program and cannot affect either path.</p>
+      <p>The book that holds the auction has <strong>no owner, no admin and no upgrade path</strong>. Parameters are immutable once an auction opens. The answer to "who can change what the result says?" is nobody, which is what makes the consistency argument hold rather than merely sound good.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="spine">
+      <h2>&ldquo;Isn't that just a Dutch auction?&rdquo;</h2>
+      <p>A Dutch auction is strategically equivalent to a first-price sealed bid &mdash; in a frictionless model. On chain the equivalence breaks at two points, and both are visible in the source above.</p>
+      <p><code>block.timestamp</code> is quantised to the block, so the clock cannot separate two bidders who arrive in the same one. And ordering within that block is sold to the highest priority fee. So the descending clock systematically awards the fill to the <strong>lowest-latency</strong> participant, whatever they think it is worth.</p>
+      <p>The fix is not a better clock. It is to stop using one.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>The parameters are derived, not chosen</h2>
+    <div class="spine">
+      <p>The exclusive window is the interesting one, because it is not execution time. It is a free American call granted to the winner: the right, not the obligation, to fill at the improved price. A longer window raises bids &mdash; and lets the winner exercise only when the market has moved against the maker.</p>
+      <p>Monte Carlo over both exercise rules settles it. On a volatile pair, stretching the window from 2 seconds to 300 raises the clearing price from 79 to 124 basis points, which looks 57% better, while the maker's net <em>falls</em> from 75.7 to 67.2. The option premium does not cover the adverse selection it creates.</p>
+    </div>
+
+    <div class="measure">
+      <table class="params">
+        <thead>
+          <tr><th>Parameter</th><th>Value</th><th>Where the number came from</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>commitBlocks</td><td class="num">30</td><td>60 s. Half the ladder's lockup, and long enough for a person to sign.</td></tr>
+          <tr><td>revealBlocks</td><td class="num">30</td><td>60 s. Generous on purpose: a missed reveal forfeits the bond.</td></tr>
+          <tr><td>exclusiveBlocks</td><td class="num">15</td><td>30 s. The simulation rules out the long end and is indifferent across the short end, so this is what a human winner needs to sign.</td></tr>
+          <tr><td>reserveBps</td><td class="num">50</td><td>The mid moves ~44 bps across the lockup at 200% annual volatility. Below that, running the auction is worse than posting a limit order.</td></tr>
+          <tr><td>maxBps</td><td class="num">500</td><td>The cap the maker signs. Ten times the reserve, leaving room for real competition.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="spine">
+      <h2>What it costs</h2>
+      <p>Everything above has a price, and the page would be less useful if it left them out.</p>
+
+      <div class="limits">
+        <h3>Honest limits</h3>
+        <ul>
+          <li><strong>It is slower than what it replaces.</strong> A latency race resolves in one block. This takes 150 seconds, during which the maker's order is frozen and their price can go stale. That is the trade, stated plainly.</li>
+          <li><strong>The exclusive window is still a free option.</strong> At 30 seconds it is worth about 4.7 bps at normal volatility and 15.6 on a volatile pair &mdash; roughly 2% of the maker's improvement, spent on optionality rather than allocation.</li>
+          <li><strong>Forfeiture requires evidence.</strong> The book cannot verify that the maker wired the fill hook correctly, so it only penalises a winner when someone else demonstrably filled. A no-show that nobody else fills behind keeps its bond. The alternative was a mechanism the maker could use to take bonds at will.</li>
+          <li><strong>Bidder rings are bounded, not solved.</strong> Posting the bond at commit makes withholding a reveal cost something. It does not make collusion impossible.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer class="spine">
+    <p>Built on the official 1inch Aqua and SwapVM contracts, which are consumed as dependencies and not vendored. The router is a redeployment carrying one added opcode, which the track explicitly permits.</p>
+    <p class="meta">
+      88 tests &middot; GlasshouseRouter 21 108 bytes, 3 468 under the EIP-170 limit<br>
+      Aqua verified live on Base at 0x1111113ccf1426a8e30e2bff5e005d929bf6a90a<br>
+      <a href="https://github.com/IIITManjeet/Glasshouse">github.com/IIITManjeet/Glasshouse</a>
+    </p>
+  </footer>
+
+</div>

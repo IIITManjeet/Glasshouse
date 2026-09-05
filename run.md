@@ -921,6 +921,30 @@ paraphrase in F-44** and settles the question of what may be removed from the re
 - **F-143** ✅ **`AI-DISCLOSURE.md` rewritten to satisfy the second clause**, which asks
   for *specific files*, not a general statement. It now carries a per-path table.
 
+### 3.6p Deployment rehearsed on a Base fork (2026-09-06)
+
+- **F-145** ✅ **The whole deployment and the whole auction ran against real Base state**,
+  on an Anvil fork at block **50,922,409**, with no key and no funds. This is the mainnet
+  deploy minus the money.
+  - `hardhat ignition deploy` placed both contracts. **Anvil enforces EIP-170**, so the
+    router deploying at all is independent confirmation that 21,108 B is under the limit -
+    not just our own measurement of the artifact.
+  - The `cast` sequence in `DEPLOY.md` was executed verbatim: `open` -> `commitmentFor` ->
+    `commit` x2 -> `reveal` x2 -> `outcome` -> `settle`. **Every command in the runbook is
+    now one that has actually been run**, rather than one written from the ABI.
+  - Result read back from the chain: status `2` (Closed), winner the 400 bps bidder,
+    **`clearingBps = 250`** - the second price, not the winner's own bid.
+  - `outcome()` returned status `1` (Bidding) during the auction, so nothing could fill.
+- **F-146** ✅ **The bond-theft fix (0.3.0) verified on-chain, not only in unit tests.**
+  After `settle` with no fill recorded, the auction reads `settled = true,
+  winnerForfeited = false`, and the maker's `claimForfeit` **reverted**. Silence is not
+  treated as evidence of a no-show, which is the property that stops a maker taking bonds
+  by misconfiguring a hook the Book cannot verify.
+- **F-147** ⚠️ **What is still untested on real state:** the swap path itself. The
+  rehearsal exercised the Book, not a fill through Aqua, because that needs a maker
+  position shipped through the real Aqua with real tokens. That is the first thing to do
+  once the deployer is funded.
+
 ### 3.6n Base mainnet verified on-chain (2026-09-05)
 Read directly from a public Base RPC (`https://mainnet.base.org`, `eth_getCode`), which
 upgrades two claims that until now rested on research notes rather than the chain.
