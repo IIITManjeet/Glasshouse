@@ -48,13 +48,16 @@ export default defineConfig({
     // on deploy day.
     base: {
       type: "http",
-      url: configVariable("BASE_RPC_URL"),
+      // Public endpoint by default. An RPC URL is not a secret, and requiring it as a
+      // config variable meant a deploy could fail on shell quoting before sending
+      // anything. Override with BASE_RPC_URL for a private endpoint.
+      url: process.env.BASE_RPC_URL ?? "https://mainnet.base.org",
       chainId: 8453,
       accounts: [configVariable("DEPLOYER_PRIVATE_KEY")],
     },
     baseSepolia: {
       type: "http",
-      url: configVariable("BASE_SEPOLIA_RPC_URL"),
+      url: process.env.BASE_SEPOLIA_RPC_URL ?? "https://sepolia.base.org",
       chainId: 84532,
       accounts: [configVariable("DEPLOYER_PRIVATE_KEY")],
     },

@@ -17,8 +17,8 @@ import { join } from "node:path";
 const LIMIT = 24576;
 
 const CHAINS = {
-  "8453": { name: "Base mainnet", rpcEnv: "BASE_RPC_URL", needsAqua: true },
-  "84532": { name: "Base Sepolia", rpcEnv: "BASE_SEPOLIA_RPC_URL", needsAqua: false },
+  "8453": { name: "Base mainnet", rpcEnv: "BASE_RPC_URL", fallback: "https://mainnet.base.org", needsAqua: true },
+  "84532": { name: "Base Sepolia", rpcEnv: "BASE_SEPOLIA_RPC_URL", fallback: "https://sepolia.base.org", needsAqua: false },
 };
 
 const chainId = process.argv[2];
@@ -28,11 +28,9 @@ if (!chain) {
   process.exit(2);
 }
 
-const rpc = process.env[chain.rpcEnv];
-if (!rpc) {
-  console.error(`FAIL  ${chain.rpcEnv} is not set. Export it, or pass it through the keystore.`);
-  process.exit(1);
-}
+// Matches hardhat.config.ts: the public endpoint is the default, since an RPC URL is not
+// a secret and requiring one is a way for a deploy to fail before it sends anything.
+const rpc = process.env[chain.rpcEnv] || chain.fallback;
 
 let failures = 0;
 const pass = (msg) => console.log(`  ok    ${msg}`);
