@@ -1374,6 +1374,54 @@ it as a market would be exactly the F-114 error. Build the labelling regardless.
 
 ---
 
+### D-006 - The Graph scope, and how concentration is allowed to be framed
+**Date** 2026-09-07 - **Status** LOCKED (user, over a recommendation to the contrary)
+
+**Decided:** all three tracks; both open Graph sub-tracks; concentration monitoring for the
+second one.
+
+Main recommended cutting The Graph, on the grounds that at our scale the UI can read
+`outcome()` and `auctions()` directly over RPC and needs no indexer, so it was the one
+deliverable whose effort did not also improve the demo. Overruled.
+
+Main also recommended adaptive reserve pricing over concentration monitoring, because
+concentration over wallets we control is the F-114 toy-market error. Overruled. **So the
+work is to build the version that survives the objection rather than the version that
+invites it.**
+
+- **F-152** 🔑 **The honest framing for concentration, derived from our own measurements.**
+  `test/ReserveMatrix.t.sol` establishes that with five competitive bidders the reserve
+  never binds (clearing 250 bps at every reserve tested), while on a thin ladder
+  (400/30/20 bps) the reserve is the only protection the maker has: r=0 yields 30 bps,
+  r=50 yields 50.
+  **→ Concentration is therefore admissible strictly as a CONTROL INPUT to the reserve**,
+  measured over our own auctions and labelled as such: when competition thins, the reserve
+  should rise, because that is when the reserve does the work. This is a mechanical claim
+  provable from our own test output, not a claim about a market.
+  **→ REFUSED: HHI over wallets we control, "market share", "solver concentration", and any
+  metric that only means something across a market we do not have.**
+
+### D-007 - Consensus verification at every gate, plus an adversary
+**Date** 2026-09-07 - **Status** LOCKED (user)
+
+Independent reviewers with no shared memory run before each gate counts as done, plus one
+whose only brief is to attack the submission. Precedent: the bond-theft vector (0.3.0) was
+found by exactly this kind of independent reading, and it required a contract change that
+would have been impossible after deployment.
+
+**Roles:** Fable architects; Opus and Sonnet implement in parallel; three reviewers cover
+correctness, track qualification, and does-it-actually-run; a fourth attacks.
+**Gates:** subgraph before deploy, UI before freeze, whole submission on Wednesday.
+
+### D-008 - First live auction tomorrow, after the subgraph
+**Date** 2026-09-07 - **Status** LOCKED (user)
+
+Subgraph first, then the auction, so the demo shows events arriving in an indexer that
+already exists. Accepts that a live-execution surprise would surface a day later; mitigated
+by F-145 and the fork fill, which already ran the whole sequence against real Base state.
+
+---
+
 ## 5. Architecture
 
 ✅ **Written: [`ARCHITECTURE.md`](./ARCHITECTURE.md)** (2026-09-03).

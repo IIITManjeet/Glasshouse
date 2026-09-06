@@ -144,7 +144,71 @@ real value moving; **Run B** unbonded with invited bidders on longer windows, as
 
 `[ ] In your words: who you invited and what you asked them to do.`
 
-## 11. `[ ] Keep or cut The Graph` — pending
+## 11. Keep all three tracks — 7 Sep
+
+**Decided:** 1inch, The Graph and Uniswap. Roughly $18,000 addressable.
+
+I recommended cutting The Graph — it was the one deliverable where the effort did not also
+improve the demo, and the UI can read the contract directly over RPC at our scale without
+any indexer at all. Overruled, and the schedule does fit: the explanation page and the
+invariant harness both landed early, so there are four build days for about three and a
+half days of work.
+
+`[ ] In your words: why you wanted all three rather than two done well.`
+
+## 12. Concentration monitoring, as a control input rather than a market claim — 7 Sep
+
+**Decided:** target the second Graph sub-track with concentration monitoring, not the
+adaptive-reserve alternative.
+
+I pushed back on this one and was overruled, so the job is to build the version that
+survives a hostile judge. The trap is real: concentration measured across three wallets we
+control is not a finding, and presenting it as a market is the fastest way to lose
+credibility in a demo.
+
+The honest version is grounded in something we already measured. `test/ReserveMatrix.t.sol`
+shows that with five competitive bidders the reserve never binds — the clearing price is
+250 bps at every reserve tested — while with thin competition it is the **only** thing
+protecting the maker: at reserve 0 the maker captures 30 bps, at reserve 50 it captures 50.
+
+So concentration is measured, labelled explicitly as **our own auctions**, and used as a
+control input: when competition thins, the reserve should rise, because the reserve is what
+does the work then. That claim is mechanical and provable from our own test output rather
+than a claim about a market we do not have.
+
+**Refused outright:** HHI over wallets we control, anything called market share or solver
+concentration, any metric that only means something across a market we do not have.
+
+## 13. Three-way consensus review at every gate, plus an adversary — 7 Sep
+
+**Decided:** independent reviewers, no shared memory, before each gate counts as done —
+and one whose only job is to attack.
+
+The precedent is that this works. The bond-theft vector was found by exactly this kind of
+independent reading, and it needed a contract change, which would have been impossible
+after deployment.
+
+| Role | Model | Brief |
+|---|---|---|
+| Architect | Fable | Designs before anything is built |
+| Implementers | Opus, Sonnet | Build from the design, in parallel |
+| Reviewer 1 | | Correctness: does it do what it claims |
+| Reviewer 2 | | Track qualification: does it actually satisfy the rules |
+| Reviewer 3 | | Does it work: run it, do not read it |
+| Adversary | | Attack it. Find the claim that does not hold, the number that cannot be reproduced, the thing that looks like a market and is not |
+
+Reviewers do not see each other's output.
+
+**Gates:** the subgraph before it is deployed, the UI before the freeze, and the whole
+submission on Wednesday.
+
+## 14. First live auction tomorrow, after the subgraph — 7 Sep
+
+**Decided:** build the subgraph first, then run the auction and watch it appear.
+
+The cleaner demo narrative, at the cost of finding any live-execution surprise a day later.
+Mitigated by the fact that the full sequence has already run against forked Base state,
+including a real fill through the official Aqua.
 
 ---
 
