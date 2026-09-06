@@ -73,7 +73,9 @@ contract ComparisonTest is Test {
     uint40 internal LADDER_START;
     uint16 internal constant LADDER_DURATION = 300; // seconds of exclusivity
 
-    /// @dev 0.1% per second, the middle of the three factors upstream's own tests use.
+    /// @dev 0.1% per second. This is the SLOWEST of the three factors upstream's own tests
+    ///      use (0.999 / 0.995 / 0.99), not the middle. The slowest decay is the one most
+    ///      favourable to the clock here, so the comparison is not helped by this choice.
     uint64 internal constant DECAY = 0.999e18;
     uint16 internal constant DUTCH_DURATION = 600;
 

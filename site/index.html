@@ -443,6 +443,7 @@ ctx.swap.balanceIn =
         <h3>Honest limits</h3>
         <ul>
           <li><strong>It is slower than what it replaces.</strong> A latency race resolves in one block. This takes 150 seconds, during which the maker's order is frozen and their price can go stale. That is the trade, stated plainly.</li>
+          <li><strong>The improvement delivered is slightly under the bid.</strong> The winner pays the runner-up's 250 bps nominally, but the improvement is applied as a divisor on <code>balanceIn</code> rather than subtracted, so the price actually moves 244 bps. On the constant-product curve the deployed router uses, it is 243. The direction is exact; the magnitude is not.</li>
           <li><strong>The exclusive window is still a free option.</strong> At 30 seconds it is worth about 4.7 bps at normal volatility and 15.6 on a volatile pair &mdash; roughly 2% of the maker's improvement, spent on optionality rather than allocation.</li>
           <li><strong>Forfeiture requires evidence.</strong> The book cannot verify that the maker wired the fill hook correctly, so it only penalises a winner when someone else demonstrably filled. A no-show that nobody else fills behind keeps its bond. The alternative was a mechanism the maker could use to take bonds at will.</li>
           <li><strong>Bidder rings are bounded, not solved.</strong> Posting the bond at commit makes withholding a reveal cost something. It does not make collusion impossible.</li>
@@ -454,7 +455,7 @@ ctx.swap.balanceIn =
   <footer class="spine">
     <p>Built on the official 1inch Aqua and SwapVM contracts, which are consumed as dependencies and not vendored. The router is a redeployment carrying one added opcode, which the track explicitly permits.</p>
     <p class="meta">
-      88 tests &middot; GlasshouseRouter 21 108 bytes, 3 468 under the EIP-170 limit<br>
+      115 tests &middot; GlasshouseRouter 21 108 bytes, 3 468 under the EIP-170 limit<br>
       Aqua verified live on Base at 0x1111113ccf1426a8e30e2bff5e005d929bf6a90a<br>
       <a href="https://github.com/IIITManjeet/Glasshouse">github.com/IIITManjeet/Glasshouse</a>
     </p>
