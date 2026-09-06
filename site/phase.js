@@ -31,10 +31,16 @@ function toBigInt(value) {
  *
  * Returns one of "commit" | "reveal" | "exclusive" | "open".
  *
- * "settled" is not a phase returned here: settle() only requires `n > exclusiveEnd`
- * (GlasshouseBook.sol:266), which is the same condition as "open", so a settled auction
- * is still "open" by this function and the caller layers the `Auction.settled` flag on
- * top of it.
+ * "settled" is not a phase returned here. A settled auction is still "open" by this
+ * function and the caller layers the `Auction.settled` flag on top of it.
+ *
+ * "open" is NOT the same predicate as "settle() would succeed", and a caller that
+ * treats it as one shows a reverting button. settle() requires
+ * `n > revealEnd + exclusiveBlocks` unconditionally (GlasshouseBook.sol:266), whereas
+ * this function returns "open" from `n > revealEnd` onward when nobody revealed,
+ * because that is when the FILL is open (:222-225). For a winnerless auction with
+ * exclusiveBlocks = 15 those differ for 15 blocks, about 30 s on Base. Use
+ * `canSettle(a, n)` below for the settle predicate; do not re-derive it from the phase.
  */
 export function phase(a, n) {
   const block = toBigInt(n);
@@ -51,4 +57,28 @@ export function phase(a, n) {
   if (a.bestBidder != null && block <= toBigInt(a.exclusiveEnd)) return "exclusive"; // :231, GlasshouseAuctionLib.sol:62
 
   return "open"; // :224, GlasshouseAuctionLib.sol:76-77
+}
+
+/**
+ * Would `settle(maker, orderHash)` succeed at block `n`?
+ *
+ * A separate function from `phase()` because the two boundaries genuinely differ.
+ * settle() requires `block.number > a.revealEnd + a.exclusiveBlocks`
+ * (GlasshouseBook.sol:266) with NO test on `a.best`, so the exclusive window counts
+ * against the settle clock even for an auction nobody bid on -- which is exactly the
+ * auction `phase()` calls "open" the block after revealEnd. `Auction.exclusiveEnd` is
+ * stored as `revealEnd + exclusiveBlocks` at every bidder count (subgraph
+ * schema.graphql), so it is the correct boundary to compare here even though `phase()`
+ * skips past it when there is no winner.
+ *
+ * Also false once `a.settled` is true: settle() reverts with AlreadySettled (:265).
+ * A row that omits `settled` is treated as not settled, which is what a query that did
+ * not ask for the field means.
+ *
+ * a: needs `exclusiveEnd`, and `settled` if the caller asked for it.
+ * n: the block the answer is "as of", from the same query (see `phase`).
+ */
+export function canSettle(a, n) {
+  if (a.settled === true) return false;
+  return toBigInt(n) > toBigInt(a.exclusiveEnd);
 }

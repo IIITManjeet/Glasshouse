@@ -98,6 +98,25 @@ and the deployed `ignition/deployments/chain-8453/artifacts/Glasshouse#Glasshous
 `abis/ERC20.json` is a three-function ABI (`name`, `symbol`, `decimals`) used only to
 resolve bond-token metadata.
 
+## Tests
+
+```sh
+cd subgraph
+npx graph codegen     # tests import ./generated, so codegen must run first
+npx graph test        # matchstick, tests/book.test.ts
+```
+
+`tests/book.test.ts` covers the top-2 replay in `handleBidRevealed`, which is the one
+piece of this directory that reimplements contract logic rather than recording it: ties
+at two and three bidders in both reveal orders, a bid of `0` under `reserveBps == 0`,
+and ascending and descending ladders that must reach the same winner and runner-up. It
+also pins the three mapping defects fixed against this schema: the corrected
+`Auction.fillByWinner`, the per-role unique counters, and `ReserveControl.hasWinnerSeen`.
+
+Matchstick ships no Windows binary. On Windows run `npx graph test -d` (Docker) or the
+same command inside WSL; `graph test` says so itself when it cannot find a binary for
+the platform.
+
 ## Deploy and publish
 
 Not done yet — there is no Studio account. When there is:

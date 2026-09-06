@@ -52,7 +52,13 @@ export function dayOf(event: ethereum.Event): i32 {
 // ---- account get-or-create -------------------------------------------------------
 
 /// AssemblyScript has no tuples, so the (Account, isNew) pair of design section 5 is a
-/// tiny class. The caller bumps the protocol's unique-user counters when isNew.
+/// tiny class.
+///
+/// `isNew` means "no Account entity existed", i.e. first sighting in ANY role. It is the
+/// right gate for `protocol.cumulativeUniqueUsers` and the WRONG gate for the per-role
+/// counters: an address that opens an auction and later bids is not new at its first
+/// commit, so gating on `isNew` would never count it as a bidder. Use
+/// `isFirstAsMaker` / `isFirstAsBidder` for those, before the per-role counter is bumped.
 export class AccountResult {
   account: Account;
   isNew: boolean;
@@ -110,6 +116,22 @@ export function getOrCreateAccount(address: Address, block: ethereum.Block): Acc
   return new AccountResult(account as Account, isNew);
 }
 
+/// True when this account has never opened an auction. Call BEFORE bumping
+/// `auctionsOpened`; the caller then increments `protocol.cumulativeUniqueMakers`.
+export function isFirstAsMaker(account: Account): boolean {
+  return account.auctionsOpened == 0;
+}
+
+/// True when this account has never been seen as a bidder. Call BEFORE bumping
+/// `bidsCommitted` / `bidsRevealed` / `unrevealedForfeits`.
+///
+/// Both counters are tested, not just `bidsCommitted`, so the gate stays correct if a
+/// reveal or a forfeit ever arrives without the commit that must precede it on chain
+/// (`src/book/GlasshouseBook.sol:190`) -- e.g. an indexer started past the commit block.
+export function isFirstAsBidder(account: Account): boolean {
+  return account.bidsCommitted == 0 && account.bidsRevealed == 0;
+}
+
 /// Bond denomination metadata, so the receipt can print "0.5 USDC bond" rather than an
 /// address. Three eth_calls once per new token (design Q7). The zero address is a legal
 /// tokenIn for a zero-bond auction, and is never called.
@@ -161,6 +183,7 @@ export function getOrCreateReserveControl(maker: Address, block: ethereum.Block)
     control.revealedBidderSum = 0;
     control.clearingBpsSum = 0;
     control.winnerMarginBpsSum = 0;
+    control.hasWinnerSeen = false;
     control.minBestBps = 0;
     control.maxBestBps = 0;
     control.lastUpdateBlock = block.number;
@@ -258,4 +281,26 @@ export function applyDerivedClearing(auction: Auction): void {
   }
   auction.competition = classify(auction.revealedCount);
   auction.thin = isThin(auction.competition, auction.winnerMarginBps, auction.clearingBps);
+}
+
+/// Recomputes `Auction.fillByWinner` from the CURRENT best bidder.
+///
+/// The value written at the fill can be wrong. A fill in the BIDDING phase
+/// (`block <= revealEnd`) sees a provisional `bestBidder`, so a later reveal can move
+/// the win to someone else and leave the auction claiming `fillByWinner = true` for a
+/// taker who is no longer the winner -- next to `winnerForfeited = true`, which says the
+/// opposite. Calling this on every reveal and again at settle keeps the auction's own
+/// answer consistent with its own `bestBidder` at all times, and makes it final once
+/// `block > revealEnd` freezes the top-2.
+///
+/// This deliberately does NOT touch `AuctionFilledEvent.fillByWinner`, which is
+/// immutable and correct as a statement about its own block.
+export function applyFillByWinner(auction: Auction): void {
+  const filledBy = auction.filledBy;
+  const best = auction.bestBidder;
+  if (filledBy === null || best === null) {
+    auction.fillByWinner = false;
+    return;
+  }
+  auction.fillByWinner = best.equals(filledBy);
 }

@@ -177,6 +177,63 @@ test("recommendReserve: provenance and unrevealed counts sum across the window u
 // wallets. This rule stays inside that: the summary object carries only counts (n,
 // empty, weak, strong, minBest, unrevealed, provenance), never a derived ratio or index.
 // Locking the key set catches an accidental addition early.
+// The COMPETITION_PRICES arm used to return `band: [floorBps, minBest - 1]` with no
+// guard, so a window whose winners all bid below the floor produced band [50, 29]: a
+// high end below the low end. `bps` was the floor either way, so nothing unsafe was
+// recommended, but a band that runs backwards is not a band. The THIN_COMPETITION arm
+// has always had the guard; this is the same one.
+//
+// The window is reachable: reveal() accepts any bps >= reserveBps, so at reserveBps 0
+// a ladder of 30/20 is a legal CONTESTED auction whose winner is far below the 50 bps
+// staleness floor.
+test("recommendReserve: a strong window whose winners are all below the floor collapses the band", () => {
+  const window = [
+    contested({ bestBps: 30, thin: false }),
+    contested({ bestBps: 30, thin: false }),
+  ];
+  const rec = recommendReserve(window, { floorBps: 50, maxBps: 500, K: 8 });
+  assert.equal(rec.reason, COMPETITION_PRICES);
+  assert.equal(rec.bps, 50);
+  assert.equal(rec.minBest, 30);
+  assert.deepEqual(rec.band, [50, 50]); // not [50, 29]
+});
+
+test("recommendReserve: the strong-window band is capped at maxBps like the thin one", () => {
+  const window = [
+    contested({ bestBps: 5000, thin: false }),
+    contested({ bestBps: 5000, thin: false }),
+  ];
+  const rec = recommendReserve(window, { floorBps: 50, maxBps: 500, K: 8 });
+  assert.equal(rec.reason, COMPETITION_PRICES);
+  assert.deepEqual(rec.band, [50, 500]);
+});
+
+// The property behind both guards, over every arm of the rule: the band is an interval,
+// it contains the recommendation, and it never leaves [floorBps, maxBps].
+test("recommendReserve: the band is a well-formed interval containing bps, in every arm", () => {
+  const windows = [
+    [],
+    [empty(), empty()],
+    [contested({ bestBps: 30, thin: false }), contested({ bestBps: 30, thin: false })],
+    [contested({ bestBps: 400, thin: false }), contested({ bestBps: 400, thin: false })],
+    [contested({ bestBps: 5000, thin: false }), contested({ bestBps: 5000, thin: false })],
+    [sole({ bestBps: 30, unrevealedCount: 1 })],
+    [sole({ bestBps: 51, unrevealedCount: 1 })],
+    [sole({ bestBps: 400, unrevealedCount: 2 })],
+    [sole({ bestBps: 5000, unrevealedCount: 0 })],
+    [empty(), sole({ bestBps: 20, unrevealedCount: 1 })],
+    [contested({ bestBps: 40, thin: true }), empty(), sole({ bestBps: 45, unrevealedCount: 1 })],
+  ];
+  for (const window of windows) {
+    const rec = recommendReserve(window, { floorBps: 50, maxBps: 500, K: 8 });
+    const [lo, hi] = rec.band;
+    assert.ok(lo <= hi, `inverted band ${JSON.stringify(rec.band)} for ${rec.reason}`);
+    assert.equal(lo, 50, `band starts at the floor for ${rec.reason}`);
+    assert.ok(hi <= 500, `band exceeds maxBps for ${rec.reason}`);
+    assert.ok(rec.bps >= lo && rec.bps <= hi, `bps outside its own band for ${rec.reason}`);
+  }
+});
+
 test("recommendReserve: result carries only the documented count fields", () => {
   const rec = recommendReserve([contested({ bestBps: 300, thin: false })], { floorBps: 50, maxBps: 500, K: 8 });
   assert.deepEqual(

@@ -151,7 +151,15 @@ type Auction @entity(immutable: false) {
   openedTx: Bytes!
   commitEnd: BigInt!                        # last block of commit, inclusive
   revealEnd: BigInt!                        # last block of reveal, inclusive
-  exclusiveEnd: BigInt!                     # revealEnd + exclusiveBlocks, inclusive
+  # revealEnd + exclusiveBlocks, inclusive. ALWAYS stored, even when nobody revealed,
+  # in which case no such window exists on chain: outcome() returns
+  # exclusiveUntil = revealEnd when a.best == address(0)
+  # (src/book/GlasshouseBook.sol:222-225), i.e. the window collapses to zero length.
+  # A reader MUST gate on bestBidder != null before using this boundary. site/phase.js
+  # does; so does handleAuctionFilled. The stored value is kept as the arithmetic
+  # boundary because settle() uses revealEnd + exclusiveBlocks unconditionally (:266),
+  # so it is the right number for canSettle() at every bidder count.
+  exclusiveEnd: BigInt!
 
   # participation
   committedCount: Int!
@@ -186,6 +194,13 @@ type Auction @entity(immutable: false) {
   fillAmountIn: BigInt                      # in the ORDER's tokens, which are not indexed
   fillAmountOut: BigInt
   fillPhase: FillPhase
+  # filledBy == bestBidder, kept in step with bestBidder rather than frozen at the fill
+  # block. A fill in the BIDDING phase (fillPhase == BIDDING, an anomaly) can land while
+  # bestBidder is still provisional, so this is recomputed on every later reveal and at
+  # settle. Without that, an auction could report bestBidder = B, filledBy = A and
+  # fillByWinner = true at once. AuctionFilledEvent.fillByWinner is the as-of-the-fill
+  # value and is deliberately NOT corrected; the two disagree exactly when a later
+  # reveal changed the winner.
   fillByWinner: Boolean!
 
   # settlement, from AuctionSettled
@@ -227,7 +242,14 @@ type Bid @entity(immutable: false) {
   revealedAtBlock: BigInt
   revealedAtTimestamp: BigInt
   revealedTx: Bytes
-  tookLead: Boolean!                        # this reveal displaced the previous best
+  # this reveal took the lead, i.e. it made this bid the best. TRUE for the first reveal
+  # of an auction, which takes the lead from nobody. The predicate is "the lead changed
+  # hands here", not "someone was displaced": it is what a replay of who-led-when needs,
+  # and it holds the invariant that the reveals with tookLead == true are exactly the
+  # reveals after which bestBidder differed from before. Excluding the first reveal
+  # would break both and would contradict the already-emitted
+  # BidRevealedEvent.tookLead, which is immutable.
+  tookLead: Boolean!
   leading: Boolean!                         # currently bestBidder; final after revealEnd
 
   bondStatus: BondStatus!
@@ -253,8 +275,13 @@ type ReserveControl @entity(immutable: false) {
   revealedBidderSum: Int!                   # sum of revealedCount; mean is client-side
   clearingBpsSum: Int!                      # sum of clearingBps over auctions with a winner
   winnerMarginBpsSum: Int!
-  minBestBps: Int!                          # over auctions with a winner; 0 when none yet
-  maxBestBps: Int!
+  # True once a settled auction with a winner has been counted. minBestBps/maxBestBps
+  # are meaningless until it is. It exists because 0 is a LEGAL bestBps: reveal()
+  # accepts bps == 0 when reserveBps == 0 (src/book/GlasshouseBook.sol:187) and the
+  # empty-book arm (:196) makes that bidder the winner, so 0 cannot double as "unset".
+  hasWinnerSeen: Boolean!
+  minBestBps: Int!                          # min bestBps over settled auctions with a winner
+  maxBestBps: Int!                          # max bestBps over the same set
   lastSettledAuction: Auction
   lastUpdateBlock: BigInt!
 }
@@ -335,6 +362,10 @@ type AuctionFilledEvent implements AuctionEvent @entity(immutable: true) {
   amountIn: BigInt!
   amountOut: BigInt!
   fillPhase: FillPhase!
+  # As of THIS block, and never corrected: this is the record of what was true when the
+  # fill landed, which is a fact about that block. Auction.fillByWinner is the
+  # corrected, final answer. They differ only for a BIDDING-phase fill followed by a
+  # reveal that changed the winner.
   fillByWinner: Boolean!
 }
 

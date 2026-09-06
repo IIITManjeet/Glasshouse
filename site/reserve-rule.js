@@ -99,7 +99,21 @@ export function recommendReserve(window, { floorBps = 50, maxBps = 500, K = 8 } 
     // Strict majority of auctions where competition, not the reserve, set the price.
     // minBest is defined here: strong > 0 requires at least one CONTESTED row, and
     // CONTESTED implies a winner.
-    return { bps: floorBps, band: [floorBps, minBest - 1], reason: COMPETITION_PRICES, ...base };
+    //
+    // Same band arithmetic and the same guard as the THIN_COMPETITION arm below.
+    // Without the guard this returns an inverted band: two settled auctions at
+    // reserveBps 0 with reveals of 30 and 20 bps give minBest = 30 and, at the default
+    // floor of 50, [50, 29]. `bps` is the floor either way, so only the band was
+    // nonsense, but a band whose high end is below its low end is not a band.
+    //
+    // The reason stays COMPETITION_PRICES: it names why the recommendation is the
+    // floor, which is still "competition set the price". WINNER_BELOW_FLOOR is the
+    // thin arm's answer to a different question, where the band IS the recommendation.
+    const hi = Math.min(minBest - 1, maxBps);
+    if (hi < floorBps) {
+      return { bps: floorBps, band: [floorBps, floorBps], reason: COMPETITION_PRICES, ...base };
+    }
+    return { bps: floorBps, band: [floorBps, hi], reason: COMPETITION_PRICES, ...base };
   }
 
   if (empty * 2 > n) {

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { phase } from "../../site/phase.js";
+import { canSettle, phase } from "../../site/phase.js";
 
 // Same boundary constants as test/ReserveMatrix.t.sol and test/GlasshouseBook.t.sol:
 // vm.roll(1000), commitBlocks = 30, revealBlocks = 30, exclusiveBlocks = 15.
@@ -77,4 +77,54 @@ test("phase: rejects a reference block it cannot interpret", () => {
 test("phase: before commitEnd, before any activity, is commit", () => {
   const a = auction(null);
   assert.equal(phase(a, OPENED_AT), "commit");
+});
+
+// ---- canSettle -------------------------------------------------------------------
+//
+// settle() requires block.number > a.revealEnd + a.exclusiveBlocks (GlasshouseBook.sol:266)
+// with no test on a.best, so it is NOT the same predicate as phase() == "open". These
+// tests pin the difference, which is the whole reason canSettle exists as its own export.
+
+test("canSettle: with a winner, opens one block after exclusiveEnd, in step with phase", () => {
+  const a = auction("0xWINNER");
+  assert.equal(canSettle(a, REVEAL_END), false);
+  assert.equal(canSettle(a, EXCLUSIVE_END), false); // last exclusive block, inclusive
+  assert.equal(canSettle(a, EXCLUSIVE_END + 1n), true);
+  // With a winner the two predicates agree, which is why the bug hid.
+  assert.equal(phase(a, EXCLUSIVE_END + 1n), "open");
+});
+
+// The defect this function was added for: phase() calls a winnerless auction "open"
+// from revealEnd + 1, because the FILL is open then (:222-225), but settle() still
+// counts the exclusive blocks. A page that drove a settle button off the phase showed
+// a reverting button for 15 blocks, about 30 s on Base.
+test("canSettle: with no winner, stays false through the whole exclusive window", () => {
+  const a = auction(null);
+  for (let n = REVEAL_END + 1n; n <= EXCLUSIVE_END; n += 1n) {
+    assert.equal(phase(a, n), "open", `phase at ${n}`);
+    assert.equal(canSettle(a, n), false, `canSettle at ${n}`);
+  }
+  assert.equal(canSettle(a, EXCLUSIVE_END + 1n), true);
+});
+
+test("canSettle: an already settled auction can never be settled again", () => {
+  const a = { ...auction("0xWINNER"), settled: true };
+  assert.equal(canSettle(a, EXCLUSIVE_END + 1n), false);
+  assert.equal(canSettle(a, EXCLUSIVE_END + 1000n), false);
+  // A row that did not ask for `settled` is treated as not settled.
+  assert.equal(canSettle(auction("0xWINNER"), EXCLUSIVE_END + 1n), true);
+  assert.equal(canSettle({ ...auction("0xWINNER"), settled: false }, EXCLUSIVE_END + 1n), true);
+});
+
+test("canSettle: accepts numbers, decimal strings and bigints interchangeably", () => {
+  const rows = [
+    auction("w"),
+    { commitEnd: String(COMMIT_END), revealEnd: String(REVEAL_END), exclusiveEnd: String(EXCLUSIVE_END), bestBidder: "w" },
+    { commitEnd: Number(COMMIT_END), revealEnd: Number(REVEAL_END), exclusiveEnd: Number(EXCLUSIVE_END), bestBidder: "w" },
+  ];
+  for (const a of rows) {
+    assert.equal(canSettle(a, Number(EXCLUSIVE_END)), false);
+    assert.equal(canSettle(a, String(EXCLUSIVE_END + 1n)), true);
+    assert.equal(canSettle(a, EXCLUSIVE_END + 1n), true);
+  }
 });

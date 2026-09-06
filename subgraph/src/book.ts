@@ -10,6 +10,18 @@
 // log.critical and returns. The contract makes those states unreachable
 // (GlasshouseBook.sol:158, :190); if one appears, the ABI or startBlock is wrong and
 // the subgraph should fail loudly rather than fabricate.
+//
+// Three places deliberately DIVERGE from subgraph-design.md, because the design as
+// written is wrong. Correctness wins; the design needs the same edits.
+//
+//   - §5.4 step 4 writes Auction.fillByWinner once, at the fill. A BIDDING-phase fill
+//     sees a provisional bestBidder, so the stored value can be permanently wrong. It
+//     is recomputed here on every later reveal and at settle.
+//   - §5 ("when isNew, the caller bumps ... cumulativeUniqueMakers or
+//     cumulativeUniqueBidders by role") undercounts every dual-role address, because
+//     isNew is first sighting in ANY role. The gates here are per role.
+//   - §5.5 uses `minBestBps == 0` as "unset", which loses a genuine bestBps of 0.
+//     ReserveControl.hasWinnerSeen is the sentinel instead.
 
 import { Address, BigInt, Bytes, log } from "@graphprotocol/graph-ts";
 
@@ -57,12 +69,15 @@ import {
 } from "./constants";
 import {
   applyDerivedClearing,
+  applyFillByWinner,
   auctionId,
   bidId,
   getOrCreateAccount,
   getOrCreateProtocol,
   getOrCreateReserveControl,
   getOrCreateToken,
+  isFirstAsBidder,
+  isFirstAsMaker,
   newEventId,
   touchUsage,
 } from "./helpers";
@@ -82,10 +97,16 @@ export function handleAuctionOpened(event: AuctionOpened): void {
 
   const makerResult = getOrCreateAccount(event.params.maker, event.block);
   const maker = makerResult.account;
+  // Read the role gate BEFORE the increment. isNew is "first sighting in any role", so
+  // it is right for cumulativeUniqueUsers and wrong for the per-role counter: a wallet
+  // that bid before it ever opened an auction is not new here but IS a new maker.
+  const firstAsMaker = isFirstAsMaker(maker);
   maker.auctionsOpened = maker.auctionsOpened + 1;
   maker.save();
   if (makerResult.isNew) {
     protocol.cumulativeUniqueUsers = protocol.cumulativeUniqueUsers + 1;
+  }
+  if (firstAsMaker) {
     protocol.cumulativeUniqueMakers = protocol.cumulativeUniqueMakers + 1;
   }
 
@@ -202,10 +223,16 @@ export function handleBidCommitted(event: BidCommitted): void {
 
   const bidderResult = getOrCreateAccount(event.params.bidder, event.block);
   const bidder = bidderResult.account;
+  // Role gate read before the increment; see handleAuctionOpened. The maker of an
+  // earlier auction bidding on someone else's is exactly the case isNew misses, and it
+  // is the deployer's case on our own demo data (src/provenance.ts).
+  const firstAsBidder = isFirstAsBidder(bidder);
   bidder.bidsCommitted = bidder.bidsCommitted + 1;
   bidder.save();
   if (bidderResult.isNew) {
     protocol.cumulativeUniqueUsers = protocol.cumulativeUniqueUsers + 1;
+  }
+  if (firstAsBidder) {
     protocol.cumulativeUniqueBidders = protocol.cumulativeUniqueBidders + 1;
   }
 
@@ -273,10 +300,16 @@ export function handleBidRevealed(event: BidRevealed): void {
 
   const bidderResult = getOrCreateAccount(event.params.bidder, event.block);
   const bidder = bidderResult.account;
+  // A reveal is always preceded by the commit that created this account and counted it
+  // as a bidder (:190), so neither gate fires in practice. Both are kept, and both are
+  // read before the increment, so a subgraph started mid-auction still counts once.
+  const firstAsBidder = isFirstAsBidder(bidder);
   bidder.bidsRevealed = bidder.bidsRevealed + 1;
   bidder.save();
   if (bidderResult.isNew) {
     protocol.cumulativeUniqueUsers = protocol.cumulativeUniqueUsers + 1;
+  }
+  if (firstAsBidder) {
     protocol.cumulativeUniqueBidders = protocol.cumulativeUniqueBidders + 1;
   }
 
@@ -322,6 +355,10 @@ export function handleBidRevealed(event: BidRevealed): void {
   auction.revealedCount = auction.revealedCount + 1;
   auction.unrevealedCount = auction.committedCount - auction.revealedCount;
   applyDerivedClearing(auction);
+  // The winner may have just changed. If a fill already landed in the BIDDING phase,
+  // the auction's fillByWinner has to follow it; see handleAuctionFilled. A no-op when
+  // nothing has filled, which is the ordinary case.
+  applyFillByWinner(auction);
 
   if (bidder.provenance == Provenance.TEAM) {
     auction.teamRevealed = auction.teamRevealed + 1;
@@ -398,10 +435,20 @@ export function handleAuctionFilled(event: AuctionFilled): void {
   }
   auction.fillPhase = fillPhase;
 
-  // The derived best is final at any fill block > revealEnd; a BIDDING fill is the one
-  // case where it is not, and the field is still set from the state at that moment.
-  const fillByWinner = best !== null && best.equals(event.params.taker);
-  auction.fillByWinner = fillByWinner;
+  // Two different questions, two different fields.
+  //
+  // AuctionFilledEvent.fillByWinner answers "was the taker the best bidder AT THIS
+  // BLOCK". It is a fact about this block, the entity is immutable, and it is never
+  // revised.
+  //
+  // Auction.fillByWinner answers "did the winner fill", which is only decidable once
+  // the winner is final. At a fill with block > revealEnd the two coincide, because the
+  // top-2 is frozen. At a BIDDING-phase fill they can diverge: a later reveal can take
+  // the lead, and then leaving this field alone would report bestBidder = B alongside
+  // filledBy = A, fillByWinner = true and winnerForfeited = true. So the auction's copy
+  // is recomputed on every later reveal (5.3) and again at settle (5.5).
+  const fillByWinnerAtThisBlock = best !== null && best.equals(event.params.taker);
+  applyFillByWinner(auction);
   auction.save();
 
   const record = new AuctionFilledEvent(newEventId(event));
@@ -415,7 +462,7 @@ export function handleAuctionFilled(event: AuctionFilled): void {
   record.amountIn = event.params.amountIn;
   record.amountOut = event.params.amountOut;
   record.fillPhase = fillPhase;
-  record.fillByWinner = fillByWinner;
+  record.fillByWinner = fillByWinnerAtThisBlock;
   record.save();
 
   protocol.cumulativeFillCount = protocol.cumulativeFillCount + 1;
@@ -471,6 +518,10 @@ export function handleAuctionSettled(event: AuctionSettled): void {
   }
 
   auction.unrevealedCount = auction.committedCount - auction.revealedCount; // now final
+  // settle() requires block > revealEnd + exclusiveBlocks (:266), so bestBidder is
+  // final here whatever happened earlier. This is the last chance to correct a
+  // fillByWinner written from provisional state by a BIDDING-phase fill.
+  applyFillByWinner(auction);
   auction.save();
 
   if (!event.params.winner.equals(Address.zero())) {
@@ -508,12 +559,18 @@ export function handleAuctionSettled(event: AuctionSettled): void {
   if (best !== null) {
     control.clearingBpsSum = control.clearingBpsSum + auction.clearingBps;
     control.winnerMarginBpsSum = control.winnerMarginBpsSum + auction.winnerMarginBps;
-    if (control.minBestBps == 0 || auction.bestBps < control.minBestBps) {
+    // hasWinnerSeen, not `minBestBps == 0`, is the "nothing recorded yet" test. 0 is a
+    // legal bestBps: reveal() accepts bps == 0 when reserveBps == 0 (:187) and the
+    // empty-book arm (:196) makes that bidder the winner. With 0 as the sentinel a
+    // genuine 0 reads as unset, so the next auction overwrites it and the reported
+    // minimum can only climb away from the truth.
+    if (!control.hasWinnerSeen || auction.bestBps < control.minBestBps) {
       control.minBestBps = auction.bestBps;
     }
-    if (auction.bestBps > control.maxBestBps) {
+    if (!control.hasWinnerSeen || auction.bestBps > control.maxBestBps) {
       control.maxBestBps = auction.bestBps;
     }
+    control.hasWinnerSeen = true;
   }
   control.lastSettledAuction = auction.id;
   control.lastUpdateBlock = event.block.number;
@@ -678,10 +735,15 @@ export function handleUnrevealedForfeited(event: UnrevealedForfeited): void {
 
   const bidderResult = getOrCreateAccount(event.params.bidder, event.block);
   const bidder = bidderResult.account;
+  // As in handleBidRevealed: the commit that this forfeit punishes already counted the
+  // account as a bidder, so this gate is belt and braces, not a live path.
+  const firstAsBidder = isFirstAsBidder(bidder);
   bidder.unrevealedForfeits = bidder.unrevealedForfeits + 1;
   bidder.save();
   if (bidderResult.isNew) {
     protocol.cumulativeUniqueUsers = protocol.cumulativeUniqueUsers + 1;
+  }
+  if (firstAsBidder) {
     protocol.cumulativeUniqueBidders = protocol.cumulativeUniqueBidders + 1;
   }
 
