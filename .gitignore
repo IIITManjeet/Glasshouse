@@ -8,5 +8,8 @@ coverage/
 deployments/localhost/
 *.log
 
-# Local/fork deployment artifacts. Real deployments are recorded in run.md.
+# Fork/local deployments are throwaway. Real deployment journals are kept -- they are the
+# record of what was deployed and when -- but the solc build-info blobs beside them are
+# large and machine-generated.
 ignition/deployments/chain-31337/
+ignition/deployments/*/build-info/
