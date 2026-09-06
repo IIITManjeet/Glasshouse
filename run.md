@@ -922,6 +922,37 @@ paraphrase in F-44** and settles the question of what may be removed from the re
 - **F-143** ✅ **`AI-DISCLOSURE.md` rewritten to satisfy the second clause**, which asks
   for *specific files*, not a general statement. It now carries a per-path table.
 
+### 3.6s The Graph: what qualification actually costs (2026-09-07)
+
+- **F-153** 🔴 **CORRECTION. The Subgraph MCP needs a PUBLISHED subgraph, not a Studio dev
+  endpoint.** Main told the user the Studio dev endpoint (free, 3,000 queries/day) would be
+  enough and we would probably never publish. That was wrong. Verified against
+  `github.com/graphops/subgraph-mcp`: *"A Gateway API key for The Graph Network"* is
+  **required** for both the remote and local setups, and the server queries The Graph's
+  **Gateway** over subgraphs *"available on The Graph Network"*. Studio dev endpoints are
+  not mentioned and are not reachable that way.
+  **→ The composition story that qualifies us for the Composable sub-track depends on the
+  MCP, and the MCP depends on publishing.** F-81's rule is unforgiving here: *"Simply
+  querying one Subgraph with no composition or standardization does not qualify."*
+  **→ Publishing is an on-chain transaction on Arbitrum One (F-83), so the Graph track now
+  needs: a working Studio login, ETH on Arbitrum One, and a Gateway API key.**
+- **F-154** ❌ **Messari conformance is NOT honest here, and is dropped.** The architect
+  checked the generic Messari schema against what Glasshouse is: it requires non-null USD
+  TVL and revenue fields that an auction book does not have and that we would have to
+  fabricate. Glasshouse is not a DEX-AMM. **Supersedes the "Messari-conformant subgraph"
+  plan in F-93 and `DESIGN.md` §1.** Qualification leans entirely on composition instead,
+  which makes F-153 load-bearing rather than optional.
+- **F-155** ⚠️ **The AI sub-track is a stretch and is entered as TOOLING, not as an AI
+  decision.** The reserve rule is integer arithmetic over live data. It qualifies against
+  the named deliverable types as tooling — a skill definition, an MCP configuration, and an
+  advisor over live data — and the architect recommends never using "AI" as the noun for
+  the rule itself. Recorded so nobody later claims more than this on stage.
+- **F-156** 🔑 **A binding reserve is invisible in the obvious place.** `reveal()` rejects
+  sub-reserve bids outright (`GlasshouseBook.sol:187`), so a reserve that is doing its job
+  never shows up as "reveals below the reserve". It shows up as **a sole reveal plus
+  unrevealed commitments**. Any thinness classifier that looks for low reveals will read a
+  working reserve as a healthy auction.
+
 ### 3.6r Documentation trimmed (2026-09-07)
 
 - **F-151** ⚠️ **The documentation had grown to 9.6x the size of the source** - 5,519 lines
