@@ -1,0 +1,59 @@
+specVersion: 1.3.0
+description: Glasshouse - sealed second-price auctions for the right to fill a SwapVM order, on Base.
+repository: https://github.com/IIITManjeet/Glasshouse
+schema:
+  file: ./schema.graphql
+indexerHints:
+  prune: auto            # no time-travel queries; history is replayed from event entities
+dataSources:
+  - kind: ethereum
+    name: GlasshouseBook
+    network: base
+    source:
+      address: "0xc4ea91Fe700918220423ac307C6B1c59650FFbfe"
+      abi: GlasshouseBook
+      startBlock: 50965408
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      file: ./src/book.ts
+      entities:
+        - Protocol
+        - Token
+        - Account
+        - ActiveAccount
+        - Auction
+        - Bid
+        - ReserveControl
+        - AuctionOpenedEvent
+        - BidCommittedEvent
+        - BidRevealedEvent
+        - AuctionFilledEvent
+        - AuctionSettledEvent
+        - BondClaimedEvent
+        - ForfeitClaimedEvent
+        - UnrevealedForfeitedEvent
+        - UsageMetricsDailySnapshot
+      abis:
+        - name: GlasshouseBook
+          file: ./abis/GlasshouseBook.json
+        - name: ERC20
+          file: ./abis/ERC20.json
+      eventHandlers:
+        - event: AuctionOpened(indexed address,indexed bytes32,address,address,uint40,uint40,uint40,uint24,uint24,uint128)
+          handler: handleAuctionOpened
+        - event: BidCommitted(indexed address,indexed bytes32,indexed address,uint40)
+          handler: handleBidCommitted
+        - event: BidRevealed(indexed address,indexed bytes32,indexed address,uint24,uint128)
+          handler: handleBidRevealed
+        - event: AuctionFilled(indexed address,indexed bytes32,indexed address,uint256,uint256)
+          handler: handleAuctionFilled
+        - event: AuctionSettled(indexed address,indexed bytes32,address,uint24,bool)
+          handler: handleAuctionSettled
+        - event: BondClaimed(indexed address,indexed bytes32,indexed address,uint128)
+          handler: handleBondClaimed
+        - event: ForfeitClaimed(indexed address,indexed bytes32,uint128)
+          handler: handleForfeitClaimed
+        - event: UnrevealedForfeited(indexed address,indexed bytes32,indexed address,uint128)
+          handler: handleUnrevealedForfeited

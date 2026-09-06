@@ -1,0 +1,412 @@
+# Glasshouse subgraph schema.
+#
+# Transcribed from docs/design/subgraph-design.md section 3. Conventions fixed there:
+#
+#   - Every id is Bytes!. Address ids are the 20-byte address; the auction id is the
+#     contract's own key; composite ids are concatenations, spelled out per entity in
+#     section 3.2.
+#   - Solidity uint24 becomes Int (graph-ts maps it to i32). uint40/uint128/uint256
+#     become BigInt. Counters maintained by the mapping are Int. No BigDecimal
+#     anywhere: AssemblyScript has no floats and every ratio is divided by the
+#     consumer, which shows numerator and denominator.
+#   - Event entities are immutable. Everything else is mutable.
+#   - Fields on Auction that mirror contract storage keep the contract's names
+#     (bestBps, secondBps, commitEnd) so that `cast call auctions(...)` and a GraphQL
+#     result can be read side by side.
+#
+# Usage metrics follow the Messari common conventions for COUNTS only. No financial
+# schema is claimed: Glasshouse indexes no price source, so there is no USD anywhere.
+# See section 9 for the metrics this subgraph refuses to compute, and why.
+
+# ---- enums -------------------------------------------------------------------
+
+enum Network { BASE }
+enum ProtocolType { GENERIC }
+
+# Which row of config/auction.json the auction's parameters match. OTHER means the
+# maker chose something else; it is a label, not a judgment.
+enum ParameterSet { ADVOCATED HUMAN_DEMO OTHER }
+
+# Mechanical classification of who set the price. Each value is one row of the
+# ReserveMatrix test suite. See section 6.3. There is no "reserve bound with two or
+# more reveals" class: reveal() rejects sub-reserve bids, so with two reveals the
+# runner-up is always at or above the reserve.
+enum CompetitionClass {
+  NONE        # no reveal; no winner
+  SOLE        # one reveal; secondBps is 0, the reserve is the price
+  CONTESTED   # two or more reveals; the second-highest bid is the price
+}
+
+# Where in block space the first fill landed. BIDDING is an anomaly (an order that
+# reported the fill to the Book but did not carry opcode 0x2e).
+enum FillPhase { BIDDING EXCLUSIVE OPEN }
+
+enum BondStatus {
+  HELD                   # escrowed at commit (or zero bond), not yet claimed
+  RETURNED               # claimBond
+  FORFEITED_TO_MAKER     # claimForfeit, winner who did not fill
+  UNREVEALED_FORFEITED   # claimUnrevealed, committed and never revealed
+}
+
+# Set from a constant list in src/provenance.ts. UNKNOWN means "not on our list",
+# not "external"; the page must say so.
+enum Provenance { TEAM INVITED UNKNOWN }
+
+enum EventKind {
+  AUCTION_OPENED BID_COMMITTED BID_REVEALED AUCTION_FILLED
+  AUCTION_SETTLED BOND_CLAIMED FORFEIT_CLAIMED UNREVEALED_FORFEITED
+}
+
+# ---- protocol ------------------------------------------------------------------
+
+type Protocol @entity(immutable: false) {
+  id: Bytes!                                # Book address
+  name: String!                             # "Glasshouse"
+  slug: String!                             # "glasshouse"
+  schemaVersion: String!                    # "0.5.0"
+  subgraphVersion: String!                  # from package.json of subgraph/
+  methodologyVersion: String!               # "0.5.0"; bump when section 6 or 7 changes
+  network: Network!
+  type: ProtocolType!
+  startBlock: BigInt!                       # 50965408
+
+  cumulativeAuctionCount: Int!
+  cumulativeCommitCount: Int!
+  cumulativeRevealCount: Int!
+  cumulativeFillCount: Int!
+  cumulativeSettleCount: Int!
+  cumulativeTransactionCount: Int!          # one per handled event
+  cumulativeUniqueUsers: Int!               # distinct Account ids ever seen
+  cumulativeUniqueMakers: Int!
+  cumulativeUniqueBidders: Int!
+
+  lastUpdateBlock: BigInt!
+  lastUpdateTimestamp: BigInt!
+
+  auctions: [Auction!]! @derivedFrom(field: "protocol")
+  dailyUsageMetrics: [UsageMetricsDailySnapshot!]! @derivedFrom(field: "protocol")
+}
+
+# ---- token ---------------------------------------------------------------------
+
+# The bond denomination. NOT the order's token pair; the Book never sees that.
+type Token @entity(immutable: false) {
+  id: Bytes!                                # token address
+  name: String
+  symbol: String
+  decimals: Int
+  resolved: Boolean!                        # all three eth_calls succeeded
+}
+
+# ---- accounts ------------------------------------------------------------------
+
+type Account @entity(immutable: false) {
+  id: Bytes!                                # address
+  provenance: Provenance!
+
+  auctionsOpened: Int!                      # as maker
+  bidsCommitted: Int!
+  bidsRevealed: Int!
+  auctionsWon: Int!                         # incremented at AuctionSettled only
+  fillsRecorded: Int!                       # as taker in AuctionFilled
+  forfeits: Int!                            # settled as winner with winnerForfeited
+  unrevealedForfeits: Int!                  # UnrevealedForfeited naming this bidder
+
+  firstSeenBlock: BigInt!
+  lastSeenBlock: BigInt!
+
+  auctions: [Auction!]! @derivedFrom(field: "maker")
+  bids: [Bid!]! @derivedFrom(field: "bidder")
+  reserveControl: ReserveControl @derivedFrom(field: "maker")
+}
+
+# Per-day active-user helper, Messari convention.
+type ActiveAccount @entity(immutable: true) {
+  id: Bytes!                                # Bytes.fromI32(day) ++ address
+}
+
+# ---- auction -------------------------------------------------------------------
+
+type Auction @entity(immutable: false) {
+  # keccak256(abi.encodePacked(maker, orderHash)), identical to GlasshouseBook.key()
+  id: Bytes!
+  protocol: Protocol!
+  maker: Account!
+  orderHash: Bytes!
+  router: Bytes!
+  bondToken: Token!
+  bond: BigInt!                             # uint128, per bidder
+
+  # immutable parameters, from AuctionOpened
+  reserveBps: Int!
+  maxBps: Int!
+  commitBlocks: BigInt!                     # commitEnd - openedAtBlock
+  revealBlocks: BigInt!                     # revealEnd - commitEnd
+  exclusiveBlocks: BigInt!
+  parameterSet: ParameterSet!
+
+  # block-space boundaries. Phase is NOT stored; see section 6.1.
+  openedAtBlock: BigInt!
+  openedAtTimestamp: BigInt!
+  openedTx: Bytes!
+  commitEnd: BigInt!                        # last block of commit, inclusive
+  revealEnd: BigInt!                        # last block of reveal, inclusive
+  exclusiveEnd: BigInt!                     # revealEnd + exclusiveBlocks, inclusive
+
+  # participation
+  committedCount: Int!
+  revealedCount: Int!
+  unrevealedCount: Int!                     # committedCount - revealedCount, final at settle
+  teamRevealed: Int!                        # reveals by TEAM accounts
+  invitedRevealed: Int!
+  unknownRevealed: Int!
+
+  # running top-2, maintained exactly as GlasshouseBook.reveal() does (section 5.3).
+  # Provisional while block <= revealEnd; frozen after. bestBidder null means no reveal.
+  bestBidder: Account
+  bestBps: Int!
+  bestCommitIdx: BigInt!
+  secondBps: Int!
+
+  # derived clearing (section 6.2)
+  clearingBps: Int!                         # max(reserveBps, secondBps) if bestBidder, else 0
+  winnerMarginBps: Int!                     # bestBps - clearingBps
+  reserveBound: Boolean!                    # bestBidder != null && secondBps < reserveBps
+  competition: CompetitionClass!
+  # SOLE, or CONTESTED with winnerMarginBps > clearingBps (the runner-up bid less than
+  # half of what the winner bid). The thin-competition signal of section 7.
+  thin: Boolean!
+
+  # fill, from AuctionFilled (at most one per auction)
+  filled: Boolean!
+  filledBy: Account
+  fillBlock: BigInt
+  fillTimestamp: BigInt
+  fillTx: Bytes
+  fillAmountIn: BigInt                      # in the ORDER's tokens, which are not indexed
+  fillAmountOut: BigInt
+  fillPhase: FillPhase
+  fillByWinner: Boolean!
+
+  # settlement, from AuctionSettled
+  settled: Boolean!
+  settledAtBlock: BigInt
+  settledTimestamp: BigInt
+  settledTx: Bytes
+  settledWinner: Bytes                      # as emitted; zero address if none
+  settledClearingBps: Int                   # as emitted
+  winnerForfeited: Boolean!
+  settlementMatchesDerivation: Boolean      # null until settled; see section 6.2
+
+  # bond disposition
+  bondsReturnedCount: Int!
+  forfeitClaimed: Boolean!
+  forfeitAmount: BigInt
+  unrevealedForfeitedCount: Int!
+  unrevealedForfeitedAmount: BigInt!
+
+  bids: [Bid!]! @derivedFrom(field: "auction")
+  events: [AuctionEvent!]! @derivedFrom(field: "auction")
+}
+
+# ---- bid -----------------------------------------------------------------------
+
+type Bid @entity(immutable: false) {
+  id: Bytes!                                # auction.id ++ bidder (52 bytes)
+  auction: Auction!
+  bidder: Account!
+  commitIdx: BigInt!                        # the tie-break key
+  committedAtBlock: BigInt!
+  committedAtTimestamp: BigInt!
+  committedTx: Bytes!
+  bondAmount: BigInt!                       # auction.bond at commit
+
+  revealed: Boolean!
+  bps: Int                                  # null until revealed
+  revealOrder: Int                          # 0-based position among this auction's reveals
+  revealedAtBlock: BigInt
+  revealedAtTimestamp: BigInt
+  revealedTx: Bytes
+  tookLead: Boolean!                        # this reveal displaced the previous best
+  leading: Boolean!                         # currently bestBidder; final after revealEnd
+
+  bondStatus: BondStatus!
+  bondClaimedAtBlock: BigInt
+  bondClaimedTx: Bytes
+}
+
+# ---- reserve control (section 7) -------------------------------------------------
+
+# Facts about one maker's SETTLED auctions, as integers. The recommendation itself is
+# not computed here; see section 7.2. This is a control input to the reserve, and
+# nothing else: it is not a measure of market share and makes no claim about anyone
+# else's auctions.
+type ReserveControl @entity(immutable: false) {
+  id: Bytes!                                # maker address
+  maker: Account!
+  settledAuctions: Int!
+  settledEmpty: Int!                        # competition NONE
+  settledSole: Int!
+  settledContested: Int!
+  settledThin: Int!                         # rows with thin == true (overlaps SOLE)
+  settledReserveBound: Int!                 # count with reserveBound
+  revealedBidderSum: Int!                   # sum of revealedCount; mean is client-side
+  clearingBpsSum: Int!                      # sum of clearingBps over auctions with a winner
+  winnerMarginBpsSum: Int!
+  minBestBps: Int!                          # over auctions with a winner; 0 when none yet
+  maxBestBps: Int!
+  lastSettledAuction: Auction
+  lastUpdateBlock: BigInt!
+}
+
+# ---- events, immutable, one per contract event ----------------------------------
+
+interface AuctionEvent {
+  id: Bytes!                                # tx hash ++ logIndex (i32)
+  kind: EventKind!
+  auction: Auction!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+  logIndex: Int!
+  actor: Bytes!                             # the address that acted; see per-type note
+}
+
+type AuctionOpenedEvent implements AuctionEvent @entity(immutable: true) {
+  id: Bytes!
+  kind: EventKind!
+  auction: Auction!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+  logIndex: Int!
+  actor: Bytes!                             # maker
+  reserveBps: Int!
+  maxBps: Int!
+  commitEnd: BigInt!
+  revealEnd: BigInt!
+  exclusiveBlocks: BigInt!
+  bond: BigInt!
+}
+
+type BidCommittedEvent implements AuctionEvent @entity(immutable: true) {
+  id: Bytes!
+  kind: EventKind!
+  auction: Auction!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+  logIndex: Int!
+  actor: Bytes!                             # bidder
+  bid: Bid!
+  commitIdx: BigInt!
+}
+
+type BidRevealedEvent implements AuctionEvent @entity(immutable: true) {
+  id: Bytes!
+  kind: EventKind!
+  auction: Auction!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+  logIndex: Int!
+  actor: Bytes!                             # bidder
+  bid: Bid!
+  bps: Int!
+  revealOrder: Int!
+  tookLead: Boolean!
+  # state of the auction AFTER this reveal was applied; lets the UI replay without
+  # re-implementing the rule
+  bestBpsAfter: Int!
+  secondBpsAfter: Int!
+  clearingBpsAfter: Int!
+  revealedCountAfter: Int!
+}
+
+type AuctionFilledEvent implements AuctionEvent @entity(immutable: true) {
+  id: Bytes!
+  kind: EventKind!
+  auction: Auction!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+  logIndex: Int!
+  actor: Bytes!                             # taker
+  amountIn: BigInt!
+  amountOut: BigInt!
+  fillPhase: FillPhase!
+  fillByWinner: Boolean!
+}
+
+type AuctionSettledEvent implements AuctionEvent @entity(immutable: true) {
+  id: Bytes!
+  kind: EventKind!
+  auction: Auction!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+  logIndex: Int!
+  actor: Bytes!                             # transaction.from (settle is permissionless)
+  winner: Bytes!
+  clearingBps: Int!
+  winnerForfeited: Boolean!
+  matchesDerivation: Boolean!
+}
+
+type BondClaimedEvent implements AuctionEvent @entity(immutable: true) {
+  id: Bytes!
+  kind: EventKind!
+  auction: Auction!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+  logIndex: Int!
+  actor: Bytes!                             # bidder
+  bid: Bid!
+  amount: BigInt!
+}
+
+type ForfeitClaimedEvent implements AuctionEvent @entity(immutable: true) {
+  id: Bytes!
+  kind: EventKind!
+  auction: Auction!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+  logIndex: Int!
+  actor: Bytes!                             # maker
+  bid: Bid!                                 # the winner's bid, joined via settledWinner
+  amount: BigInt!
+}
+
+type UnrevealedForfeitedEvent implements AuctionEvent @entity(immutable: true) {
+  id: Bytes!
+  kind: EventKind!
+  auction: Auction!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+  logIndex: Int!
+  actor: Bytes!                             # maker
+  bid: Bid!
+  amount: BigInt!
+}
+
+# ---- usage, Messari common conventions, counts only ------------------------------
+
+type UsageMetricsDailySnapshot @entity(immutable: false) {
+  id: Bytes!                                # Bytes.fromI32(day), day = timestamp / 86400
+  day: Int!
+  protocol: Protocol!
+  dailyActiveUsers: Int!
+  cumulativeUniqueUsers: Int!
+  dailyTransactionCount: Int!
+  cumulativeTransactionCount: Int!
+  dailyAuctionsOpened: Int!
+  dailyCommits: Int!
+  dailyReveals: Int!
+  dailyFills: Int!
+  dailySettles: Int!
+  timestamp: BigInt!                        # last update
+  blockNumber: BigInt!
+}
