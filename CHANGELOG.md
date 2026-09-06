@@ -13,7 +13,9 @@ each one is in [`run.md`](./run.md).
 ### Planned
 - Base mainnet deployment of `GlasshouseBook` and `GlasshouseRouter` (module and preflight
   are ready; needs ETH and a deployer address)
-- Messari-conformant subgraph over the Base deployment, read through the Subgraph MCP
+- Subgraph over the Base deployment, published to The Graph Network and read through the
+  Subgraph MCP. Messari conformance is deliberately not claimed: its generic schema wants
+  non-null USD TVL and revenue fields an auction book does not have.
 - Explanation page and comparison UI
 
 ---
