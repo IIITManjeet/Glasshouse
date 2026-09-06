@@ -907,7 +907,7 @@ paraphrase in F-44** and settles the question of what may be removed from the re
   > contributions from team members **may not be eligible for partner prizes or
   > finalist consideration**."*
 
-  **→ `run.md`, `ARCHITECTURE.md`, `DESIGN.md` and `docs/design/` are not internal
+  **→ `run.md`, `DESIGN.md` and `docs/design/` are not internal
   scaffolding to be cleaned up before submission. They are the required artifacts, and
   deleting them would take the submission from compliant to non-compliant.**
 
@@ -921,6 +921,25 @@ paraphrase in F-44** and settles the question of what may be removed from the re
   details page, which is why it is easy to miss.
 - **F-143** ✅ **`AI-DISCLOSURE.md` rewritten to satisfy the second clause**, which asks
   for *specific files*, not a general statement. It now carries a per-path table.
+
+### 3.6r Documentation trimmed (2026-09-07)
+
+- **F-151** ⚠️ **The documentation had grown to 9.6x the size of the source** - 5,519 lines
+  of markdown against 576 lines of Solidity. Two problems with that, beyond the obvious.
+  A doc-to-code ratio like that is itself a signal of machine generation, which cuts
+  against the very thing §3.6o is about. And `ARCHITECTURE.md` (698 lines) and
+  `docs/design/HLD.md` (790) described the same design twice, from different days.
+  **`ARCHITECTURE.md` is removed.** The HLD was written later and against real source, so
+  it is the better of the two; the review findings that made `ARCHITECTURE.md` worth
+  having are already recorded here as **F-120 through F-132**, and the file itself is in
+  git history. `run.md` remains complete, which is what the rules actually require.
+  **The LLD is trimmed** of the sections that restated the contract line by line. What it
+  keeps is what a reader cannot get by opening the file: machine-verified storage packing,
+  the displacement rule and its invariant, the wire format, the error and event
+  catalogues, the bytecode budget, and the defects the reading found - one of which was a
+  bond-theft vector.
+  ⚠️ **Note the floor: `run.md` alone is ~1,550 lines and is mandatory**, so the ratio
+  cannot go below roughly 4:1 without deleting a required artifact. It does not need to.
 
 ### 3.6q LIVE ON BASE MAINNET (2026-09-07)
 

@@ -19,7 +19,6 @@ which are in the repository for exactly that reason.
 | `scripts/**` | Written with AI assistance. |
 | `ignition/**` | Written with AI assistance. |
 | `run.md` | The planning artifact. Research was carried out by AI agents against live sources; every fact carries the URL it was verified against, and superseded conclusions are marked rather than deleted. Decisions in the log were made by the author. |
-| `ARCHITECTURE.md` | Drafted with AI assistance, then reviewed against a local clone of `1inch/swap-vm@08089a1`. That review caught a mechanism flaw that would have made bidding strictly dominated. |
 | `docs/design/HLD.md`, `docs/design/LLD.md` | Written by AI agents reading the source directly. Both end with a section stating what they could not verify. The LLD's reading of the Book surfaced the bond-theft vector fixed in 0.3.0. |
 | `README.md`, `DESIGN.md`, `CHANGELOG.md`, `DEPLOY.md` | Written with AI assistance. |
 | Demo video narration | **Human.** No TTS. |
@@ -34,8 +33,6 @@ how the AI was directed rather than a summary written afterwards:
   was chosen; adversarial review rounds with their verdicts and the corrections they
   forced; and a change log. Where a conclusion was later falsified, the original is kept
   and marked superseded, so the reasoning can be audited rather than taken on trust.
-- **[`ARCHITECTURE.md`](./ARCHITECTURE.md)** — the design as reviewed, with rejected
-  alternatives.
 - **[`DESIGN.md`](./DESIGN.md)** — product and UI design, including its open questions.
 - **[`docs/design/`](./docs/design/)** — HLD and LLD.
 

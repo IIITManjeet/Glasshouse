@@ -1,12 +1,11 @@
 # Glasshouse documentation
 
-Five documents, five different readers. If you only read one, read the HLD.
+Four documents, four different readers. If you only read one, read the HLD.
 
 | Document | For | What it answers |
 |---|---|---|
 | [`design/HLD.md`](./design/HLD.md) | someone new to the project | What is this, why does it exist, how do the pieces fit, what are the trust boundaries |
 | [`design/LLD.md`](./design/LLD.md) | someone about to change the code | Storage layout, function contracts, the top-2 algorithm, instruction encoding, error and event catalogues, bytecode budget |
-| [`../ARCHITECTURE.md`](../ARCHITECTURE.md) | a reviewer | The design as it was reviewed, with the alternatives that were rejected |
 | [`../DECISIONS.md`](../DECISIONS.md) | anyone who wants the short version | Every judgment call, in order, in plain language, with the reasoning behind it |
 | [`../run.md`](../run.md) | anyone auditing how we got here | Every fact with its source, every decision with its options, and the corrections that superseded earlier conclusions |
 
