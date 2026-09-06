@@ -61,6 +61,17 @@ to the **lowest-latency** participant regardless of valuation. Glasshouse fixes 
 allocation rule and the surplus recipient. That difference *is* the extractable value,
 and it is measurable — which is what the comparison test demonstrates.
 
+## Deployed on Base mainnet
+
+| Contract | Address |
+|---|---|
+| `GlasshouseBook` | [`0xc4ea91Fe700918220423ac307C6B1c59650FFbfe`](https://basescan.org/address/0xc4ea91Fe700918220423ac307C6B1c59650FFbfe) |
+| `GlasshouseRouter` | [`0x5c3baE054e8b4915a13726B397b1AeA864247DBf`](https://basescan.org/address/0x5c3baE054e8b4915a13726B397b1AeA864247DBf) |
+
+The router is built on the official `AquaSwapVMRouter` and points at the real Aqua at
+`0x1111113CCf1426A8E30e2bfF5E005d929bF6a90a`. Redeploying a modified SwapVM router is
+explicitly permitted by the track, and no 1inch source is vendored.
+
 ## Architecture
 
 Three phases, disjoint in block space. This split exists to satisfy a hard SwapVM
@@ -152,6 +163,7 @@ status line at the top, and are updated at release boundaries.
 | `v0.2.0` | Three-way comparison: identity, clock and bid on the same order |
 | `v0.3.0` | Bond mechanism hardened; deployment tooling; HLD and LLD |
 | `v0.4.0` | Auction parameters derived from simulation and a reserve sweep |
+| `v0.5.0` | Live on Base mainnet |
 
 ## Licence
 

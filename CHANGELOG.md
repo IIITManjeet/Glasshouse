@@ -18,6 +18,46 @@ each one is in [`run.md`](./run.md).
 
 ---
 
+## [0.5.0] - 2026-09-07
+
+Live on Base mainnet.
+
+### Deployed
+| Contract | Address | Size |
+|---|---|---|
+| `GlasshouseBook` | `0xc4ea91Fe700918220423ac307C6B1c59650FFbfe` | 6,149 B |
+| `GlasshouseRouter` | `0x5c3baE054e8b4915a13726B397b1AeA864247DBf` | 21,108 B |
+
+Cost 0.000037 ETH against 0.000039 estimated. Both sizes match the local artifacts, and
+the router is 3,468 B under EIP-170.
+
+### Added
+- `test/invariants/GlasshouseInvariants.t.sol` - upstream's own `CoreInvariants` harness
+  applied to opcode 0x2e in every auction phase. Nothing fills during bidding, not even
+  for the eventual winner; symmetry, additivity, monotonicity and rounding all survive the
+  improvement inside the window; and afterwards the order prices as though no auction were
+  attached.
+- `test/fork/AquaBaseFork.t.sol` - a real fill through the official Aqua on forked Base:
+  0.01 WETH in, 38.986354 USDC out, gated by 0x2e and priced at the second bid. This is
+  the 1inch track's on-chain-execution requirement, which permits local forks.
+- `site/index.html` - the explanation page. Single static file, no build step.
+- `DECISIONS.md` - every judgment call in order, written to be spoken from.
+- `scripts/check-key.mjs` - verifies a deployer key without revealing it.
+
+### Fixed
+- `BASE_RPC_URL` now defaults to the public endpoint in both `hardhat.config.ts` and
+  preflight. Requiring it meant the deploy command needed an inline env assignment, which
+  is bash syntax and a parse error in PowerShell.
+
+### Learned
+- `AquaOpcodes` has no `LimitSwap`, so the deployed router prices with `XYCSwap`, where
+  scaling `balanceIn` by (1 + b) moves the price by *approximately* b rather than exactly
+  b. Measured 243 bps against a nominal 250. The exact result holds only for `LimitSwap`.
+- Aqua mode requires `useTransferFromAndAquaPush`, or the router's post-push balance check
+  reverts.
+
+---
+
 ## [0.4.0] - 2026-09-05
 
 Parameters stop being guesses.
@@ -165,7 +205,8 @@ invariant the design rests on is demonstrated rather than argued.
 - Fills record through `IMakerHooks.postTransferIn`, which `swap()` calls and `quote()`
   does not - the instruction itself cannot emit, since `LOG` reverts under `STATICCALL`.
 
-[Unreleased]: https://github.com/IIITManjeet/Glasshouse/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/IIITManjeet/Glasshouse/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/IIITManjeet/Glasshouse/releases/tag/v0.5.0
 [0.4.0]: https://github.com/IIITManjeet/Glasshouse/releases/tag/v0.4.0
 [0.3.0]: https://github.com/IIITManjeet/Glasshouse/releases/tag/v0.3.0
 [0.2.0]: https://github.com/IIITManjeet/Glasshouse/releases/tag/v0.2.0

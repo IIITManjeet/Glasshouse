@@ -21,9 +21,10 @@
 | Event | ETHGlobal ETHOnline 2026 |
 | Hacking window | **2026-09-04 → 2026-09-16** |
 | Submission deadline | **2026-09-13, 12:00 EDT** (= 21:30 IST) ⚠️ **8 days left** |
-| Today | **2026-09-05 — day 2 of 10** |
-| Phase | **P3 — Building. Contracts drafted, Book unproven.** Roadmap in §9. |
-| Repo | **https://github.com/IIITManjeet/Glasshouse** — own repo, 7 incremental commits, ⚠️ **still PRIVATE** |
+| Today | **2026-09-07 — day 4 of 10** |
+| Phase | **P4 — LIVE ON BASE MAINNET.** Roadmap in §9. |
+| Repo | **https://github.com/IIITManjeet/Glasshouse** — ⚠️ **still PRIVATE** |
+| **Deployed** | **Book `0xc4ea91Fe700918220423ac307C6B1c59650FFbfe`** · **Router `0x5c3baE054e8b4915a13726B397b1AeA864247DBf`** — Base mainnet |
 | **Name** | **Glasshouse** ✅ *(user, 2026-09-03)* |
 | Category | **DeFi + Infrastructure** — market microstructure, not a consumer app |
 | Strategy | ✅ **Prize-aligned pivot, novel mechanism, infra-deep** (D-001) |
@@ -921,6 +922,35 @@ paraphrase in F-44** and settles the question of what may be removed from the re
 - **F-143** ✅ **`AI-DISCLOSURE.md` rewritten to satisfy the second clause**, which asks
   for *specific files*, not a general statement. It now carries a per-path table.
 
+### 3.6q LIVE ON BASE MAINNET (2026-09-07)
+
+- **F-148** ✅ **Deployed to Base mainnet.**
+  | | Address | Size |
+  |---|---|---|
+  | `GlasshouseBook` | `0xc4ea91Fe700918220423ac307C6B1c59650FFbfe` | 6,149 B |
+  | `GlasshouseRouter` | `0x5c3baE054e8b4915a13726B397b1AeA864247DBf` | 21,108 B |
+
+  Deployer `0xeEbf737F92C8F0d9070f35a7D9BAf416923bEcDf`, nonce 1 → 3.
+  **Cost 0.000037 ETH**, against the 0.000039 estimated beforehand — within 5%.
+  Both sizes match the local artifacts exactly, and the router is 3,468 B under EIP-170.
+- **F-149** ✅ **Verified live, by behaviour and not only by bytecode.**
+  - `AQUA()` returns `0x1111113CCf1426A8E30e2bfF5E005d929bF6a90a` — the real Aqua.
+  - `WETH()` returns the Base canonical WETH; `owner()` is the deployer.
+  - `commitmentFor(bidder, 250, salt)` on the deployed Book returns
+    `0x79ab7f88…8a57`, **byte-identical to a local `keccak256(abi.encodePacked(...))`**.
+    The deployed contract packs commitments exactly as `reveal()` checks them.
+  - `outcome()` on an unopened auction returns status `0` (None), so an order with the
+    gate attached but no auction opened stays fillable as a plain limit order.
+- **F-150** ⚠️ **The keystore trap that cost two failed attempts, recorded so nobody
+  repeats it.** `DEPLOYER_PRIVATE_KEY` was set to the **address** rather than the private
+  key. An address is 20 bytes, a key is 32, and both are `0x` hex strings from the same
+  wallet screen. Hardhat surfaces this as
+  *`invalid private key, expected hex or 32 bytes, got object`* — which reads like a type
+  error and is actually a length error. `scripts/check-key.mjs` now names it directly.
+  A separate earlier failure was self-inflicted: the deploy command was written with a
+  bash-style `VAR=x cmd` prefix, which is a parse error in PowerShell. Both
+  `hardhat.config.ts` and preflight now default the RPC so no env var is needed.
+
 ### 3.6p Deployment rehearsed on a Base fork (2026-09-06)
 
 - **F-145** ✅ **The whole deployment and the whole auction ran against real Base state**,
@@ -1466,7 +1496,7 @@ Sep 10 freeze real rather than optimistic.
 |---|---|---|---|
 | ✅ | Fri 05 | D2 Book suite · D3 first VM execution — **57 tests green** | done |
 | ✅ | **Fri 05** | **`Comparison.t.sol` DONE — 67 tests green.** identity 10000 · clock 10618 · **bid 9756** (bps of base; lower is better for the maker). Winner values 100/100/**400** bps. | ✅ **G1 — the submission exists** |
-| | Sat 06 | **Base mainnet:** Ignition module, deploy Book + Router, one real auction with dust. Invariant harness cloned from `DutchAuctionLimitSwapInvariants`. | **G2 — 1inch qualified** |
+| ✅ | Sat 06 – Sun 07 | **Base mainnet: DEPLOYED.** Invariant harness done; a real fill through the official Aqua proven on a fork. Live auction with dust still to run. | ✅ **G2** |
 | | Sun 07 | **The Graph:** Messari-conformant subgraph over the Base deployment + Subgraph MCP | **G3 — Graph viable or cut** |
 | | Mon 08 | **Explanation page** — the problem, the mechanism, the comparison. Standalone, shareable, no build step. | Testers could read it |
 | | Tue 09 | **Comparison + auction UI** wired to real data | Demo-able |
