@@ -2,7 +2,7 @@
     "$global": {
         "aqua": "0x1111113ccf1426a8e30e2bff5e005d929bf6a90a",
         "weth": "0x4200000000000000000000000000000000000006",
-        "owner": "0x0000000000000000000000000000000000000000",
+        "owner": "0xeEbf737F92C8F0d9070f35a7D9BAf416923bEcDf",
         "name": "GlasshouseRouter",
         "version": "1.0.0"
     }
