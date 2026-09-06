@@ -7,7 +7,7 @@ Four documents, four different readers. If you only read one, read the HLD.
 | [`design/HLD.md`](./design/HLD.md) | someone new to the project | What is this, why does it exist, how do the pieces fit, what are the trust boundaries |
 | [`design/LLD.md`](./design/LLD.md) | someone about to change the code | Storage layout, function contracts, the top-2 algorithm, instruction encoding, error and event catalogues, bytecode budget |
 | [`../ARCHITECTURE.md`](../ARCHITECTURE.md) | a reviewer | The design as it was reviewed, with the alternatives that were rejected |
-| [`../run.md`](../run.md) | anyone auditing how we got here | Every fact with its source, every decision with its options, and the corrections that superseded earlier conclusions |
+| [`../DECISIONS.md`](../DECISIONS.md) | anyone who wants the short version | Every fact with its source, every decision with its options, and the corrections that superseded earlier conclusions |
 
 Product and UI design lives in [`../DESIGN.md`](../DESIGN.md).
 Release history is in [`../CHANGELOG.md`](../CHANGELOG.md).

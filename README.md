@@ -93,7 +93,8 @@ scripts/size-check.mjs                EIP-170 guard, runs on every build
 | [`docs/design/HLD.md`](./docs/design/HLD.md) | High-level design: context, components, trust boundaries, lifecycle flows |
 | [`docs/design/LLD.md`](./docs/design/LLD.md) | Low-level design: storage layout, function contracts, encoding, error and event catalogues |
 | [`ARCHITECTURE.md`](./ARCHITECTURE.md) | The design as reviewed, with the alternatives rejected |
-| [`run.md`](./run.md) | Decision log: every fact with its source, every decision with its options |
+| [`DECISIONS.md`](./DECISIONS.md) | Every judgment call, in order, in plain language |
+| [`run.md`](./run.md) | Research dossier: every fact with its source, every decision with its options |
 | [`DESIGN.md`](./DESIGN.md) | UI and product design |
 | [`CHANGELOG.md`](./CHANGELOG.md) | Release history |
 
