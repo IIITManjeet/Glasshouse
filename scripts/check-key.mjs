@@ -28,6 +28,21 @@ const trimmed = key.trim().replace(/^["']|["']$/g, "");
 const body = trimmed.startsWith("0x") || trimmed.startsWith("0X") ? trimmed.slice(2) : trimmed;
 
 console.log("");
+
+// The single most likely mistake, called out by name: an address is 20 bytes and a
+// private key is 32, and both are "a 0x hex string from my wallet".
+if (body.length === 40) {
+  console.log("  *** THIS IS AN ADDRESS, NOT A PRIVATE KEY. ***");
+  console.log("");
+  console.log("  An address is 20 bytes / 40 hex characters and is public.");
+  console.log("  A private key is 32 bytes / 64 hex characters and is secret.");
+  console.log("");
+  console.log("  In MetaMask: the three dots next to the account name ->");
+  console.log("  Account details -> Show private key. It asks for your password.");
+  console.log("");
+  process.exit(1);
+}
+
 console.log(`  characters after 0x   ${body.length}   ${body.length === 64 ? "ok" : "SHOULD BE 64"}`);
 console.log(`  has 0x prefix         ${trimmed.startsWith("0x") ? "yes" : "no  <- hardhat wants it"}`);
 console.log(`  hex only              ${/^[0-9a-fA-F]*$/.test(body) ? "yes" : "NO  <- stray characters"}`);
