@@ -137,7 +137,7 @@ Record here once they exist:
 
 | | |
 |---|---|
-| Deployment id (`Qm…`) | _not yet deployed_ |
+| Deployment id (`Qm…`) | `Qmc9Ah4ow5mXD7599hi3ewze7Fg77x1GivAqaCSAmmpK7E` |
 | Studio query URL | _not yet deployed_ |
 | Subgraph id (network) | _not yet published_ |
 | Gateway query URL | _not yet published_ |

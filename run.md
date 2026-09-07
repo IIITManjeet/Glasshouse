@@ -922,6 +922,28 @@ paraphrase in F-44** and settles the question of what may be removed from the re
 - **F-143** ✅ **`AI-DISCLOSURE.md` rewritten to satisfy the second clause**, which asks
   for *specific files*, not a general statement. It now carries a per-path table.
 
+### 3.6t Subgraph deployed to Studio (2026-09-07)
+
+- **F-157** ✅ **Deployed.** `Qmc9Ah4ow5mXD7599hi3ewze7Fg77x1GivAqaCSAmmpK7E`, version label
+  `v0.5.1`, indexing `GlasshouseBook` on Base from block 50,965,408.
+- **F-158** ⚠️ **The Studio API was down for ~2.5 hours** (503 from nginx behind Cloudflare)
+  while the web frontend, the deploy endpoint and the Gateway all stayed up. Because the
+  frontend serves and the wallet connects client-side, the failure presented as a CORS
+  error rather than an outage — nginx's 503 page carries no `Access-Control-Allow-Origin`
+  header, so Chrome reports the missing header instead of the status code. **Diagnosing
+  this from the browser console alone is misleading; probe the endpoint directly.**
+- **F-159** 🔑 **`graph auth` cannot obtain a deploy key, only store one.** It validates 32
+  hex characters and writes them to disk. The dashboard API is the sole issuer, so the CLI
+  cannot route around a Studio outage for enrolment — only for deployment, which uses a
+  separate endpoint that stayed up throughout.
+- **F-160** 🔑 **The Graph's Token API is operated by Pinax.**
+  `thegraph.com/docs/en/token-api/quick-start/` **301-redirects to `app.pinax.network`**.
+  Pinax authenticates through Auth0 (Google/GitHub/email), independently of Studio, and
+  covers **Base** with balances, transfers and **swaps**. **→ A second Graph product that
+  is reachable even when Studio is not, and a source of independent DEX price data for the
+  benchmark the adversary said the headline number needs.** It does not host custom
+  subgraphs, so it does not replace ours.
+
 ### 3.6s The Graph: what qualification actually costs (2026-09-07)
 
 - **F-153** 🔴 **CORRECTION. The Subgraph MCP needs a PUBLISHED subgraph, not a Studio dev
