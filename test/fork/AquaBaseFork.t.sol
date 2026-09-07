@@ -106,7 +106,11 @@ contract AquaBaseFork is Test {
     }
 
     modifier onlyForked() {
-        if (!forked) return;
+        // vm.skip, not a silent return. With `return` these tests report PASS having
+        // executed nothing whenever the fork RPC is unavailable or rate limited -- so the
+        // suite could print all green with zero coverage of the only real-Aqua evidence
+        // in the project. A skip is visible in the output; a green tick is a lie.
+        if (!forked) vm.skip(true);
         _;
     }
 
