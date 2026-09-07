@@ -53,10 +53,12 @@ contract LiveFillPreflightTest is Test {
     // balance could be anything. It is set to what the maker will really hold, because a
     // strategy that could not honour a larger fill is a strategy we should not advertise.
     //
-    // 0.001 WETH against 4 USDC is ~4000 USDC/WETH, near the real rate, so the curve
-    // prices this the way a real one would. A 0.00001 WETH fill is 1% of the reserve.
-    uint256 internal constant BALANCE_WETH = 0.001 ether;
-    uint256 internal constant BALANCE_USDC = 4e6;
+    // 0.0008 WETH against 2 USDC is ~2500 USDC/WETH, which is where the Uniswap v3
+    // WETH/USDC pool on Base actually is, so the curve prices this the way a real one
+    // would and the strategy is not trivially arbitrageable. A 0.00001 WETH fill is
+    // ~1.2% of the reserve.
+    uint256 internal constant BALANCE_WETH = 0.0008 ether;
+    uint256 internal constant BALANCE_USDC = 2e6;
     uint256 internal constant SWAP_AMOUNT = 0.00001 ether;
 
     // --- auction, the `advocated` set from config/auction.json -------------------

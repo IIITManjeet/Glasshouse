@@ -68,8 +68,8 @@ const EXPECTED_ORDER_HASH =
 const TAKER_DATA_PREFIX = "0x001400140014001400140014001400140014000000c1" as const;
 
 // --- amounts, matching the preflight exactly -----------------------------------------
-const BALANCE_WETH = 1_000_000_000_000_000n; // 0.001 WETH, declared to Aqua
-const BALANCE_USDC = 4_000_000n; // 4 USDC, declared AND actually held
+const BALANCE_WETH = 800_000_000_000_000n; // 0.0008 WETH, declared to Aqua
+const BALANCE_USDC = 2_000_000n; // 2 USDC, declared AND actually held
 const SWAP_AMOUNT = 10_000_000_000_000n; // 0.00001 WETH, what the winner pays in
 
 // --- auction, the `advocated` set from config/auction.json ---------------------------
