@@ -209,6 +209,38 @@ contract ComparisonTest is Test {
         );
     }
 
+    /// @dev Does this gate actually let this taker fill? Runs the real call and reports
+    ///      whether it reverted. The point is to DERIVE who a gate admits rather than
+    ///      assert a name the test itself picked: an `assertEq(x, cyd)` where the line
+    ///      above says `x = cyd` proves nothing about the gate.
+    function _canFill(ISwapVM.Order memory order, address taker) internal returns (bool) {
+        bytes memory takerData = _takerData(order, taker);
+        vm.prank(taker);
+        try router.quote(order, SWAP_AMOUNT, takerData) returns (uint256, uint256, bytes32) {
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    /// @dev How many of the three participants the gate admits at the current timestamp.
+    function _countTakersAdmitted(ISwapVM.Order memory order) internal returns (uint256 n) {
+        if (_canFill(order, ada)) n++;
+        if (_canFill(order, bram)) n++;
+        if (_canFill(order, cyd)) n++;
+    }
+
+    /// @dev The one taker a gate admits, found by trying all three. Fails loudly if the
+    ///      gate admits none or several, so a caller can never quietly assert a winner
+    ///      the gate did not actually choose.
+    function _onlyTakerAdmitted(ISwapVM.Order memory order) internal returns (address winner) {
+        uint256 n;
+        if (_canFill(order, ada)) { winner = ada; n++; }
+        if (_canFill(order, bram)) { winner = bram; n++; }
+        if (_canFill(order, cyd)) { winner = cyd; n++; }
+        assertEq(n, 1, "expected this gate to admit exactly one taker");
+    }
+
     function _quoteAs(ISwapVM.Order memory order, address taker) internal returns (uint256 out) {
         bytes memory takerData = _takerData(order, taker);
         vm.prank(taker);
@@ -389,16 +421,22 @@ contract ComparisonTest is Test {
     ///      position is what it gives up: a SMALLER `amountOut` is a better outcome for
     ///      the maker.
     function test_Comparison_AllThreeGatesOnTheSameOrder() public {
-        // --- identity: the incumbent fills at base, everyone else reverts
+        // --- identity: derived, not named. Ask the gate which of the three it admits.
         ISwapVM.Order memory identity = _order(_identityProgram());
-        uint256 identityOut = _quoteAs(identity, cyd);
-        address identityWinner = cyd;
+        address identityWinner = _onlyTakerAdmitted(identity);
+        uint256 identityOut = _quoteAs(identity, identityWinner);
 
-        // --- clock: everyone faces one price, so the fastest takes it
+        // --- clock: the gate admits everyone and prices them identically, which is the
+        //     whole point. There is no "winner" an EVM test can derive here, because the
+        //     thing that decides it -- position in the block, bought with priority fee --
+        //     does not exist inside a single-threaded test. So measure what IS provable:
+        //     how many takers the gate admits, and whether valuation moves the price.
         ISwapVM.Order memory clock = _order(_clockProgram());
         vm.warp(LADDER_START + 60);
+        uint256 clockAdmitted = _countTakersAdmitted(clock);
+        uint256 clockOutAda = _quoteAs(clock, ada);
+        uint256 clockOutBram = _quoteAs(clock, bram);
         uint256 clockOut = _quoteAs(clock, cyd);
-        address clockWinner = cyd;
 
         // --- bid: the highest valuation wins and pays the second price
         ISwapVM.Order memory bid = _order(_bidProgram());
@@ -421,18 +459,31 @@ contract ComparisonTest is Test {
         console.log("   -------------------------------------------------------------");
         console.log("   base price = 10000. Lower is better for the maker.");
         console.log("");
-        console.log("   identity and clock both hand the fill to the participant who");
-        console.log("   values it LEAST -- the incumbent, and the fastest, are the same");
-        console.log("   party. The clock additionally concedes to the taker every second");
-        console.log("   it runs. Only the bid gate allocates to the highest valuation,");
-        console.log("   and only it moves value toward the maker.");
+        console.log("   identity admits exactly ONE taker, chosen off chain, and pays the");
+        console.log("   maker nothing for the privilege. The clock admits ALL THREE at one");
+        console.log("   identical price, so valuation cannot break the tie and position in");
+        console.log("   the block decides -- an axis bought with priority fee, not value.");
+        console.log("   Only the bid gate can see valuation at all, and it is the only one");
+        console.log("   that moves value toward the maker.");
+        console.log("");
+        console.log("   The clock row's 100 bps is the valuation of whoever lands first,");
+        console.log("   which this test constructs as the lowest valuer. That assignment");
+        console.log("   is the adversarial case, not a measurement: what is MEASURED is");
+        console.log("   that all three face one price, above.");
         console.log("");
 
-        // 1. ALLOCATION. Identity and clock both hand the fill to the participant who
-        //    values it least. Only the bid gate allocates to the highest valuation.
-        assertEq(identityWinner, cyd, "identity: incumbent, chosen off-chain");
-        assertEq(clockWinner, cyd, "clock: fastest, not highest");
-        assertEq(bidWinner, ada, "bid: highest valuation");
+        // 1. ALLOCATION. Each of these is derived from a call, not from a name this test
+        //    chose. Note what the clock row does and does not claim: it is NOT asserted
+        //    that the fastest bidder wins, because a single-threaded EVM test cannot
+        //    observe block position at all. What is asserted is the reason allocation
+        //    falls to block position -- the gate admits everyone, and prices all of them
+        //    the same, so nothing it can see distinguishes a 400 bps valuation from a
+        //    100 bps one. Who wins is then decided on an axis uncorrelated with value.
+        assertEq(identityWinner, cyd, "identity: the ladder admits exactly one taker");
+        assertEq(clockAdmitted, 3, "clock: admits every bidder, excludes nobody");
+        assertEq(clockOutAda, clockOut, "clock: valuation does not move the price");
+        assertEq(clockOutBram, clockOut, "clock: valuation does not move the price");
+        assertEq(bidWinner, ada, "bid: highest valuation, read from the book");
 
         // 2. PRICE. The maker gives up the least under the bid gate, and strictly more
         //    under the clock than under no gate at all.

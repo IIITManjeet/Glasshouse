@@ -20,16 +20,16 @@
 |---|---|
 | Event | ETHGlobal ETHOnline 2026 |
 | Hacking window | **2026-09-04 → 2026-09-16** |
-| Submission deadline | **2026-09-13, 12:00 EDT** (= 21:30 IST) ⚠️ **8 days left** |
-| Today | **2026-09-07 — day 4 of 10** |
+| Submission deadline | **2026-09-13, 12:00 EDT** (= 21:30 IST) ⚠️ **5 days left** |
+| Today | **2026-09-08 — day 5 of 10.** Build freezes **Wed 10** (§9). |
 | Phase | **P4 — LIVE ON BASE MAINNET.** Roadmap in §9. |
-| Repo | **https://github.com/IIITManjeet/Glasshouse** — ⚠️ **still PRIVATE** |
+| Repo | **https://github.com/IIITManjeet/Glasshouse** — ✅ **PUBLIC** (verified 2026-09-08, unauthenticated API returns 200; U-e closed) |
 | **Deployed** | **Book `0xc4ea91Fe700918220423ac307C6B1c59650FFbfe`** · **Router `0x5c3baE054e8b4915a13726B397b1AeA864247DBf`** — Base mainnet |
 | **Name** | **Glasshouse** ✅ *(user, 2026-09-03)* |
 | Category | **DeFi + Infrastructure** — market microstructure, not a consumer app |
 | Strategy | ✅ **Prize-aligned pivot, novel mechanism, infra-deep** (D-001) |
 | Thesis | ✅ **"Taker priority is allocated by identity or by clock, never by bid"** — D-004 |
-| Target tracks | 1inch $7K · The Graph $15K · Chainlink $2.5K *(max 3, F-42)* |
+| Target tracks | 1inch $7K · The Graph $15K · **Uniswap $5K** *(max 3, F-42)* — ⚠️ Chainlink was **dropped** for Uniswap in F-96; this row said Chainlink until 2026-09-08 |
 | Dropped | ❌ EigenLayer ❌ Sui/Move — no sponsor, no prize path (F-4) |
 
 > ⚠️ **Hard gate:** no project code may be written before **Sep 4** (F-38), and the

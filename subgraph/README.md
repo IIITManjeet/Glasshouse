@@ -119,11 +119,12 @@ the platform.
 
 ## Deploy and publish
 
-Not done yet — there is no Studio account. When there is:
+**Deployed to Studio 2026-09-07** (F-157). **Not published to The Graph Network**, which
+is the step the Subgraph MCP actually needs — see below.
 
 ```sh
 npx graph auth <deploy-key>
-npx graph deploy glasshouse-base --version-label v0.5.0
+npx graph deploy glasshouse-base --version-label v0.5.1
 ```
 
 Then **publish to The Graph Network** from Studio (an Arbitrum One transaction). The
@@ -133,11 +134,21 @@ in Studio, restricted to this subgraph and with a monthly spend cap; it is used 
 server-side, from `GRAPH_API_KEY`, by `scripts/reserve-advisor.mjs` and the Claude skill
 — never in `site/`.
 
-Record here once they exist:
+Status, as of 2026-09-08:
 
 | | |
 |---|---|
-| Deployment id (`Qm…`) | `Qmc9Ah4ow5mXD7599hi3ewze7Fg77x1GivAqaCSAmmpK7E` |
-| Studio query URL | _not yet deployed_ |
-| Subgraph id (network) | _not yet published_ |
-| Gateway query URL | _not yet published_ |
+| Deployment id (`Qm…`) | `Qmc9Ah4ow5mXD7599hi3ewze7Fg77x1GivAqaCSAmmpK7E` ✅ |
+| Version label | `v0.5.1` ✅ |
+| Studio query URL | deployed, URL not recorded here — it carries the Studio account id |
+| Subgraph id (network) | ❌ not published — needs ETH on Arbitrum One |
+| Gateway query URL | ❌ not published |
+| `GRAPH_API_KEY` | ❌ not created |
+
+`@modelcontextprotocol/sdk` is installed as of 2026-09-08, so the two remaining blockers
+for `scripts/reserve-advisor.mjs` are the published subgraph and the Gateway key. Run it
+with neither and it names both and stops, rather than falling back to a cached number.
+
+⚠️ **The Book had emitted no events at all until 2026-09-08**, so a healthy, fully synced
+subgraph over an empty contract is the expected state, not a fault. The first live auction
+run put `AuctionOpened` and two `BidCommitted` into the index.
