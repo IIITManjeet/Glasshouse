@@ -1,9 +1,7 @@
 import { network } from "hardhat";
 import {
-  createPublicClient,
   createWalletClient,
   custom,
-  http,
   encodeFunctionData,
   parseEventLogs,
   parseEther,
@@ -16,6 +14,7 @@ import {
 } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
+import { basePublicClient, waitForBlock, rpc } from "./lib/chain.ts";
 import { randomBytes } from "node:crypto";
 
 /**
@@ -179,36 +178,25 @@ const bookAbi = [
 
 const order = { maker: MAKER, traits: ORDER_TRAITS, data: ORDER_DATA } as const;
 
-// Both clients honour BASE_RPC_URL. `http()` with no argument silently uses viem's
-// hardcoded default for the chain, which is the same load-balanced public endpoint whose
-// replica lag broke the first run -- so setting BASE_RPC_URL had no effect on the reads
-// that actually mattered. Now it does.
-const rpc = () => http(process.env.BASE_RPC_URL);
+// Connectivity, retry and block subscription all live in ./lib/chain.ts. Block waiting
+// there is eth_subscribe("newHeads") over a WebSocket rather than a getBlockNumber poll,
+// which is what earned "-32016 over rate limit" from Base's public endpoint: this run
+// waits out 75 blocks across three windows, which was ~57 polls before.
 
-let pub: ReturnType<typeof createPublicClient>;
+let pub: ReturnType<typeof basePublicClient>;
 
 /**
  * Read contract state AT A KNOWN BLOCK, never at "latest".
  *
- * Base's public endpoint is load balanced. A read at `latest` can land on a replica that
- * has not applied the block we just observed, and it answers from that older state with
- * no error at all -- a populated mapping reads back as zeros. That is precisely how the
- * first live run died. Pinning turns the failure loud: a node that lacks the block
- * answers `-32001 block not found` (verified against mainnet.base.org) rather than
- * lying, and viem does not retry that code, so we retry it here.
+ * Base's public endpoints are load balanced. A read at "latest" can land on a replica
+ * that has not applied the block we just observed, and it answers from that older state
+ * with no error at all -- a populated mapping reads back as zeros. That is exactly how
+ * the first live run died. Pinning turns the failure loud: a node lacking the block
+ * answers -32001 "block not found" (verified against mainnet.base.org) instead of lying,
+ * and rpc() retries that.
  */
-async function readPinned<T>(fn: (blockNumber: bigint) => Promise<T>, at: bigint, what: string): Promise<T> {
-  for (let attempt = 1; attempt <= 8; attempt++) {
-    try {
-      return await fn(at);
-    } catch (e: any) {
-      const msg = String(e?.details ?? e?.message ?? e);
-      if (!/block not found|-32001|missing trie node|header not found/i.test(msg)) throw e;
-      if (attempt === 8) throw new Error(`${what}: no replica had block ${at} after 8 tries`);
-      await new Promise((r) => setTimeout(r, 1500));
-    }
-  }
-  throw new Error("unreachable");
+function pinned<T>(fn: (blockNumber: bigint) => Promise<T>, at: bigint, what: string): Promise<T> {
+  return rpc(() => fn(at), what);
 }
 
 /** Every receipt is checked. viem resolves reverted receipts without throwing, so a
@@ -222,24 +210,13 @@ async function mined(hash: `0x${string}`, what: string) {
   return r;
 }
 
-async function waitFor(target: bigint, what: string) {
-  let n = await pub.getBlockNumber({ cacheTime: 0 });
-  if (n >= target) return n;
-  console.log(`\n  waiting for ${what}: block ${n} -> ${target} (about ${Number(target - n) * 2}s)`);
-  while (n < target) {
-    await new Promise((r) => setTimeout(r, 4000));
-    n = await pub.getBlockNumber({ cacheTime: 0 });
-    process.stdout.write(`\r  block ${n}   `);
-  }
-  process.stdout.write("\n");
-  return n;
-}
+const waitFor = (target: bigint, what: string) => waitForBlock(pub, target, what);
 
 async function main() {
   const conn = await network.create();
   const [account] = (await conn.provider.request({ method: "eth_accounts" })) as `0x${string}`[];
 
-  pub = createPublicClient({ chain: base, transport: rpc() });
+  pub = basePublicClient();
   const maker = getAddress(account);
   if (maker !== getAddress(MAKER)) {
     throw new Error(`the keystore account is ${maker}, but the order was built for ${MAKER}. The order hash depends on the maker, so this run would open an auction against an order nobody shipped.`);
@@ -254,8 +231,8 @@ async function main() {
   console.log(`  maker       ${maker}`);
 
   // --- the order is the one the preflight proved fillable ---------------------------
-  const head0 = await pub.getBlockNumber({ cacheTime: 0 });
-  const onChainHash = await readPinned(
+  const head0 = await rpc(() => pub.getBlockNumber({ cacheTime: 0 }), "head");
+  const onChainHash = await pinned(
     (blockNumber) => pub.readContract({ address: ROUTER, abi: routerAbi, functionName: "hash", args: [order], blockNumber }),
     head0, "router.hash(order)",
   );
@@ -267,7 +244,7 @@ async function main() {
   console.log(`              (router.hash(order), matching the preflight -- not a timestamp)`);
 
   const ethBal = await pub.getBalance({ address: maker });
-  const usdcBal = await readPinned(
+  const usdcBal = await pinned(
     (blockNumber) => pub.readContract({ address: USDC, abi: erc20Abi, functionName: "balanceOf", args: [maker], blockNumber }),
     head0, "maker USDC",
   );
@@ -277,7 +254,7 @@ async function main() {
   }
 
   // --- approvals ---------------------------------------------------------------------
-  const allowance = await readPinned(
+  const allowance = await pinned(
     (blockNumber) => pub.readContract({ address: USDC, abi: erc20Abi, functionName: "allowance", args: [maker, AQUA], blockNumber }),
     head0, "USDC allowance",
   );
@@ -363,11 +340,11 @@ async function main() {
   // --- commit ---------------------------------------------------------------------------
   console.log("\n  committing sealed bids");
   for (const b of bidders) {
-    const now = await pub.getBlockNumber({ cacheTime: 0 });
+    const now = await rpc(() => pub.getBlockNumber({ cacheTime: 0 }), "head");
     if (now > commitEnd) throw new Error(`the commit window closed at block ${commitEnd} and the chain is at ${now}`);
     // Taken from the contract, never packed by hand: a wrongly packed commitment can
     // never be revealed, and with a bond posted that loses it.
-    const commitment = await readPinned(
+    const commitment = await pinned(
       (blockNumber) => pub.readContract({ address: BOOK, abi: bookAbi, functionName: "commitmentFor", args: [b.account.address, b.bps, b.salt], blockNumber }),
       now, "commitmentFor",
     );
@@ -379,8 +356,8 @@ async function main() {
     console.log(link(t));
   }
 
-  const duringBidding = await pub.getBlockNumber({ cacheTime: 0 });
-  const o1 = await readPinned(
+  const duringBidding = await rpc(() => pub.getBlockNumber({ cacheTime: 0 }), "head");
+  const o1 = await pinned(
     (blockNumber) => pub.readContract({ address: BOOK, abi: bookAbi, functionName: "outcome", args: [maker, orderHash], blockNumber }),
     duringBidding, "outcome during bidding",
   );
@@ -388,7 +365,7 @@ async function main() {
 
   // --- reveal ----------------------------------------------------------------------------
   await waitFor(commitEnd + 1n, "the commit window to close");
-  const atReveal = await pub.getBlockNumber({ cacheTime: 0 });
+  const atReveal = await rpc(() => pub.getBlockNumber({ cacheTime: 0 }), "head");
   if (atReveal <= commitEnd || atReveal + BigInt(bidders.length) > revealEnd) {
     throw new Error(`the reveal window is blocks ${commitEnd + 1n}..${revealEnd} and ${bidders.length} reveals must fit; the chain is at ${atReveal}.`);
   }
@@ -405,7 +382,7 @@ async function main() {
 
   // --- outcome, pinned to a block we have proven exists ------------------------------------
   const afterReveal = await waitFor(revealEnd + 1n, "the reveal window to close");
-  const o = await readPinned(
+  const o = await pinned(
     (blockNumber) => pub.readContract({ address: BOOK, abi: bookAbi, functionName: "outcome", args: [maker, orderHash], blockNumber }),
     afterReveal, "final outcome",
   );

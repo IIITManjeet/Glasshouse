@@ -1,7 +1,8 @@
 import { network } from "hardhat";
-import { createPublicClient, createWalletClient, custom, http, encodeFunctionData, parseEventLogs, parseEther, formatEther } from "viem";
+import { createWalletClient, custom, encodeFunctionData, parseEventLogs, parseEther, formatEther } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
+import { basePublicClient, baseTransport, waitForBlock, rpc } from "./lib/chain.ts";
 
 /**
  * Runs one complete auction on Base mainnet, end to end, from a single command:
@@ -127,10 +128,10 @@ async function main() {
   const conn = await network.create();
   const [maker] = (await conn.provider.request({ method: "eth_accounts" })) as `0x${string}`[];
 
-  // http() with no argument silently uses viem's hardcoded default for the chain, so
-  // BASE_RPC_URL never reached the reads -- including the one whose stale answer broke
-  // the first run. Both this client and the bidders' now honour it.
-  const pub = createPublicClient({ chain: base, transport: http(process.env.BASE_RPC_URL) });
+  // Connectivity comes from ./lib/chain.ts: several providers behind viem's fallback,
+  // WebSockets first so block waiting is a subscription rather than a poll, and
+  // BASE_RPC_URL ahead of all of them when it is set.
+  const pub = basePublicClient();
   const makerWallet = createWalletClient({ account: maker, chain: base, transport: custom(conn.provider) });
 
   // A distinct order per run, so repeated demos do not collide: one auction may exist per
@@ -153,7 +154,7 @@ async function main() {
     return {
       bps,
       account,
-      wallet: createWalletClient({ account, chain: base, transport: http(process.env.BASE_RPC_URL) }),
+      wallet: createWalletClient({ account, chain: base, transport: baseTransport() }),
     };
   });
 
@@ -224,7 +225,7 @@ async function main() {
   // reveal() needs commitEnd < block <= revealEnd (:185-186). Checking it here turns a
   // bare "execution reverted" from the node into a message naming the window we are in
   // and why -- which is what the first live run needed and did not have.
-  const atReveal = await pub.getBlockNumber();
+  const atReveal = await rpc(() => pub.getBlockNumber(), "head");
   if (atReveal <= commitEnd || atReveal > revealEnd) {
     throw new Error(
       `the reveal window is blocks ${commitEnd + 1n}..${revealEnd}, but the chain is at ${atReveal}. ` +
@@ -282,16 +283,11 @@ async function mined(pub: any, hash: `0x${string}`, what: string) {
   return r;
 }
 
-async function waitFor(pub: ReturnType<typeof createPublicClient>, target: bigint, what: string) {
-  let n = await pub.getBlockNumber();
-  if (n >= target) return;
-  console.log(`\n  waiting for ${what}: block ${n} -> ${target} (about ${Number(target - n) * 2}s)`);
-  while (n < target) {
-    await new Promise((r) => setTimeout(r, 4000));
-    n = await pub.getBlockNumber();
-    process.stdout.write(`\r  block ${n}   `);
-  }
-  process.stdout.write("\n");
+// Block waiting is a subscription, not a poll: see scripts/lib/chain.ts. The old loop
+// asked getBlockNumber every four seconds for the length of each window, which is what
+// earns "-32016 over rate limit" from Base's public endpoint.
+async function waitFor(pub: ReturnType<typeof basePublicClient>, target: bigint, what: string) {
+  return waitForBlock(pub, target, what);
 }
 
 main().catch((e) => {

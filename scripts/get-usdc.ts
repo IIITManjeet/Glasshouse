@@ -1,17 +1,15 @@
 import { network } from "hardhat";
 import {
-  createPublicClient,
   createWalletClient,
   custom,
-  http,
   encodeFunctionData,
   formatEther,
   formatUnits,
   getAddress,
   parseEther,
-  fallback,
 } from "viem";
 import { base } from "viem/chains";
+import { basePublicClient, rpc } from "./lib/chain.ts";
 
 /**
  * Swap a little of the maker's ETH into USDC on Base, through Uniswap v3.
@@ -40,38 +38,6 @@ const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as const;
 const SWAP_ROUTER_02 = "0x2626664c2603336E57B271c5C0b26F421741e481" as const;
 const QUOTER_V2 = "0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a" as const;
 const POOL_FEE = 500;
-
-// Base's own public endpoint rate limits (-32016 "over rate limit") and is load balanced
-// across replicas a block or two apart, so one endpoint is both a throughput ceiling and
-// a correctness hazard. BASE_RPC_URL wins when set; otherwise requests spread over
-// several public providers, each verified reachable, and viem's fallback moves on when
-// one errors.
-const ENDPOINTS = process.env.BASE_RPC_URL
-  ? [process.env.BASE_RPC_URL]
-  : [
-      "https://mainnet.base.org",
-      "https://base-rpc.publicnode.com",
-      "https://base.drpc.org",
-      "https://1rpc.io/base",
-      "https://base.meowrpc.com",
-    ];
-const transport = () => fallback(ENDPOINTS.map((u) => http(u, { retryCount: 2, retryDelay: 800 })));
-
-/** Retry a read through rate limiting. viem retries some codes but not -32016, which is
- *  what Base returns, so a burst of polling reads dies on the public endpoint. */
-async function rl<T>(fn: () => Promise<T>, what: string): Promise<T> {
-  for (let attempt = 1; ; attempt++) {
-    try {
-      return await fn();
-    } catch (e: any) {
-      const msg = String(e?.details ?? e?.shortMessage ?? e?.message ?? e);
-      if (attempt >= 6 || !/over rate limit|-32016|429|too many requests/i.test(msg)) throw e;
-      const wait = 1000 * 2 ** (attempt - 1);
-      console.log(`  ${what}: rate limited, waiting ${wait}ms`);
-      await new Promise((r) => setTimeout(r, wait));
-    }
-  }
-}
 
 /** ~$2 at $2,500/ETH. The live run needs about 0.04 USDC; the declared strategy balance
  *  is what makes this larger, and all of it stays in the wallet. */
@@ -128,7 +94,7 @@ async function main() {
   const [account] = (await conn.provider.request({ method: "eth_accounts" })) as `0x${string}`[];
   const me = getAddress(account);
 
-  const pub = createPublicClient({ chain: base, transport: transport() });
+  const pub = basePublicClient();
   const wallet = createWalletClient({ account, chain: base, transport: custom(conn.provider) });
 
   const mined = async (hash: `0x${string}`, what: string) => {
@@ -139,8 +105,8 @@ async function main() {
     return r;
   };
 
-  const ethBefore = await rl(() => pub.getBalance({ address: me }), "eth balance");
-  const usdcBefore = await rl(() => pub.readContract({ address: USDC, abi: erc20Abi, functionName: "balanceOf", args: [me] }), "usdc balance");
+  const ethBefore = await rpc(() => pub.getBalance({ address: me }), "eth balance");
+  const usdcBefore = await rpc(() => pub.readContract({ address: USDC, abi: erc20Abi, functionName: "balanceOf", args: [me] }), "usdc balance");
 
   console.log("\n  Glasshouse - fund the maker with USDC on Base");
   console.log("  ------------------------------------------------------------");
@@ -172,7 +138,7 @@ async function main() {
 
   // Idempotent: wrap only the shortfall. A re-run after a failed swap must not wrap a
   // second SPEND on top of WETH that is already sitting there.
-  const wethHeld = await rl(() => pub.readContract({ address: WETH, abi: erc20Abi, functionName: "balanceOf", args: [me] }), "weth balance");
+  const wethHeld = await rpc(() => pub.readContract({ address: WETH, abi: erc20Abi, functionName: "balanceOf", args: [me] }), "weth balance");
   if (wethHeld >= SPEND) {
     console.log(`\n  already holding ${formatEther(wethHeld)} WETH, skipping the wrap`);
   } else {
@@ -183,7 +149,7 @@ async function main() {
     }), "deposit");
   }
 
-  const allowance = await rl(() => pub.readContract({ address: WETH, abi: erc20Abi, functionName: "allowance", args: [me, SWAP_ROUTER_02] }), "allowance");
+  const allowance = await rpc(() => pub.readContract({ address: WETH, abi: erc20Abi, functionName: "allowance", args: [me, SWAP_ROUTER_02] }), "allowance");
   if (allowance < SPEND) {
     console.log("\n  approving WETH to the Uniswap router");
     await mined(await wallet.sendTransaction({
@@ -201,8 +167,8 @@ async function main() {
   // cause -- the transaction was correct and the node answering was behind. The same
   // call simulated clean seconds later.
   for (let i = 0; i < 10; i++) {
-    const a = await rl(() => pub.readContract({ address: WETH, abi: erc20Abi, functionName: "allowance", args: [me, SWAP_ROUTER_02] }), "allowance poll");
-    const b = await rl(() => pub.readContract({ address: WETH, abi: erc20Abi, functionName: "balanceOf", args: [me] }), "balance poll");
+    const a = await rpc(() => pub.readContract({ address: WETH, abi: erc20Abi, functionName: "allowance", args: [me, SWAP_ROUTER_02] }), "allowance poll");
+    const b = await rpc(() => pub.readContract({ address: WETH, abi: erc20Abi, functionName: "balanceOf", args: [me] }), "balance poll");
     if (a >= SPEND && b >= SPEND) break;
     if (i === 9) throw new Error(`after 10 tries the endpoints still report allowance ${a} and balance ${b}, needing ${SPEND}`);
     console.log(`  waiting for the approval to be visible (${i + 1}/10)`);
@@ -231,8 +197,8 @@ async function main() {
     }
   }
 
-  const ethAfter = await rl(() => pub.getBalance({ address: me }), "eth after");
-  const usdcAfter = await rl(() => pub.readContract({ address: USDC, abi: erc20Abi, functionName: "balanceOf", args: [me] }), "usdc after");
+  const ethAfter = await rpc(() => pub.getBalance({ address: me }), "eth after");
+  const usdcAfter = await rpc(() => pub.readContract({ address: USDC, abi: erc20Abi, functionName: "balanceOf", args: [me] }), "usdc after");
 
   console.log("\n  ------------------------------------------------------------");
   console.log(`  ETH   ${formatEther(ethBefore)}  ->  ${formatEther(ethAfter)}`);
