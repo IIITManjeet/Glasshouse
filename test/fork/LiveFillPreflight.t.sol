@@ -265,6 +265,41 @@ contract LiveFillPreflightTest is Test {
         console.log("");
     }
 
+    /// @dev The live runner is TypeScript and must build taker data for an ephemeral
+    ///      winner whose address does not exist until run time. Re-implementing upstream's
+    ///      bit packing in TS is exactly how you produce an unfillable order, so instead
+    ///      the runner splices the address into a fixed prefix. That is only safe if the
+    ///      encoding really does differ in nothing but those 20 bytes, which is what this
+    ///      pins. If upstream's TakerTraitsLib ever changes shape, this fails and the
+    ///      runner must be revisited rather than quietly shipping a malformed fill.
+    function test_Preflight_TakerDataDiffersOnlyInTheRecipient() public pure {
+        address a = address(0xA1);
+        address b = address(0xB2);
+
+        bytes memory da = _takerData(a);
+        bytes memory db = _takerData(b);
+        assertEq(da.length, db.length, "same length for any recipient");
+
+        // Everything before the trailing 20 bytes must be byte-identical.
+        uint256 cut = da.length - 20;
+        for (uint256 i; i < cut; i++) {
+            assertEq(da[i], db[i], "taker data differs outside the recipient");
+        }
+        // And the trailing 20 bytes must be exactly the recipient.
+        for (uint256 i; i < 20; i++) {
+            assertEq(uint8(da[cut + i]), uint8(bytes20(a)[i]), "recipient not in the last 20 bytes");
+            assertEq(uint8(db[cut + i]), uint8(bytes20(b)[i]), "recipient not in the last 20 bytes");
+        }
+
+        console.log("   takerData length   %s", da.length);
+        console.log("   splice prefix      %s", vm.toString(_slice(da, 0, cut)));
+    }
+
+    function _slice(bytes memory b, uint256 start, uint256 len) internal pure returns (bytes memory out) {
+        out = new bytes(len);
+        for (uint256 i; i < len; i++) out[i] = b[start + i];
+    }
+
     /// @dev What the winner is buying: the same order, filled by anyone else inside the
     ///      exclusive window, reverts. This is the property the mainnet run has to show,
     ///      and the first attempt could not show it because there was no order.

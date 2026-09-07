@@ -1,5 +1,5 @@
 import { network } from "hardhat";
-import { createPublicClient, createWalletClient, custom, http, encodeFunctionData, parseEther, formatEther } from "viem";
+import { createPublicClient, createWalletClient, custom, http, encodeFunctionData, parseEventLogs, parseEther, formatEther } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
 
@@ -12,6 +12,19 @@ import { base } from "viem/chains";
  * the keystore and never leaves it -- Hardhat signs for that account through its own
  * provider. The bidders are ephemeral accounts generated here and funded with dust, so no
  * additional keys need to exist anywhere.
+ *
+ * SUPERSEDED BY scripts/run-live-fill.ts, AND KEPT ONLY AS A FALLBACK.
+ *
+ * This script opens an auction against a SYNTHETIC orderHash derived from Date.now().
+ * No SwapVM order hashes to that value, so opcode 0x2e never runs, no gate is exercised
+ * and no fill is possible. The events it produces are real, but what they demonstrate is
+ * that the Book's five functions can be called in order -- not that the instruction
+ * works. Do not present its output as evidence that it does.
+ *
+ * Use run-live-fill.ts, which opens against router.hash(order) for an order really
+ * shipped to Aqua and ends in a real fill. This one exists because that one is
+ * single-shot (its order hash is deterministic, and both ship and open are one-time), so
+ * if it burns mid-run this still produces indexable auction events.
  *
  * WHAT THIS DOES AND DOES NOT DO. It runs the auction lifecycle: open, commit, reveal,
  * outcome, settle. That is what the Book emits and what the subgraph indexes. It does NOT
@@ -94,6 +107,17 @@ const bookAbi = [
       ],
     }],
   },
+  {
+    type: "event", name: "AuctionOpened",
+    inputs: [
+      { name: "maker", type: "address", indexed: true },
+      { name: "orderHash", type: "bytes32", indexed: true },
+      { name: "router", type: "address" }, { name: "tokenIn", type: "address" },
+      { name: "commitEnd", type: "uint40" }, { name: "revealEnd", type: "uint40" },
+      { name: "exclusiveBlocks", type: "uint40" }, { name: "reserveBps", type: "uint24" },
+      { name: "maxBps", type: "uint24" }, { name: "bond", type: "uint128" },
+    ],
+  },
 ] as const;
 
 const STATUS = ["None", "Bidding", "Closed"];
@@ -103,7 +127,10 @@ async function main() {
   const conn = await network.create();
   const [maker] = (await conn.provider.request({ method: "eth_accounts" })) as `0x${string}`[];
 
-  const pub = createPublicClient({ chain: base, transport: http() });
+  // http() with no argument silently uses viem's hardcoded default for the chain, so
+  // BASE_RPC_URL never reached the reads -- including the one whose stale answer broke
+  // the first run. Both this client and the bidders' now honour it.
+  const pub = createPublicClient({ chain: base, transport: http(process.env.BASE_RPC_URL) });
   const makerWallet = createWalletClient({ account: maker, chain: base, transport: custom(conn.provider) });
 
   // A distinct order per run, so repeated demos do not collide: one auction may exist per
@@ -126,14 +153,14 @@ async function main() {
     return {
       bps,
       account,
-      wallet: createWalletClient({ account, chain: base, transport: http() }),
+      wallet: createWalletClient({ account, chain: base, transport: http(process.env.BASE_RPC_URL) }),
     };
   });
 
   console.log("  funding ephemeral bidders");
   for (const b of bidders) {
     const hash = await makerWallet.sendTransaction({ to: b.account.address, value: GAS_PER_BIDDER });
-    await pub.waitForTransactionReceipt({ hash });
+    await mined(pub, hash, "transaction");
     console.log(`  ${b.account.address}  bids ${b.bps} bps`);
   }
 
@@ -146,12 +173,30 @@ async function main() {
       args: [orderHash, ROUTER, WETH, COMMIT_BLOCKS, REVEAL_BLOCKS, EXCLUSIVE_BLOCKS, RESERVE_BPS, MAX_BPS, BOND],
     }),
   });
-  await pub.waitForTransactionReceipt({ hash });
+  const openReceipt = await mined(pub, hash, "open");
   console.log(link(hash));
 
-  const auction = await pub.readContract({ address: BOOK, abi: bookAbi, functionName: "auctions", args: [maker, orderHash] });
-  const commitEnd = BigInt(auction.commitEnd);
-  const revealEnd = BigInt(auction.revealEnd);
+  // The window boundaries are read out of the AuctionOpened log in THIS receipt, never
+  // from a readContract against the Book.
+  //
+  // Base's public endpoint is load balanced. A read issued immediately after a write can
+  // land on a replica that has not yet applied the block the write is in, and it answers
+  // from that older state: the mapping entry does not exist there yet, so a struct that
+  // is populated on chain reads back as all zeros. Nothing errors. That is what happened
+  // on the first live run -- commitEnd came back 0, the wait for it returned immediately,
+  // and the script revealed while still inside the commit phase, reverting with
+  // RevealNotOpen (GlasshouseBook.sol:185). The receipt carries the contract's own
+  // emitted numbers and is by definition from the block that produced them.
+  const opened = parseEventLogs({ abi: bookAbi, eventName: "AuctionOpened", logs: openReceipt.logs })[0];
+  if (opened === undefined) {
+    throw new Error(`open() was mined in block ${openReceipt.blockNumber} but emitted no AuctionOpened log`);
+  }
+  const commitEnd = BigInt(opened.args.commitEnd);
+  const revealEnd = BigInt(opened.args.revealEnd);
+  // open() sets commitEnd = block.number + commitBlocks and requires commitBlocks > 0
+  // (:134), so zero is not a value it can emit. If it appears, stop rather than race.
+  if (commitEnd === 0n) throw new Error("AuctionOpened reported commitEnd 0, which open() cannot produce");
+  console.log(`  opened in block ${openReceipt.blockNumber}`);
   console.log(`  commitEnd ${commitEnd}, revealEnd ${revealEnd}`);
 
   // --- commit --------------------------------------------------------------------
@@ -165,7 +210,7 @@ async function main() {
     const h = await b.wallet.sendTransaction({
       to: BOOK, data: encodeFunctionData({ abi: bookAbi, functionName: "commit", args: [maker, orderHash, commitment] }),
     });
-    await pub.waitForTransactionReceipt({ hash: h });
+    await mined(pub, h, "transaction");
     console.log(`  ${b.account.address.slice(0, 10)}...  committed`);
     console.log(link(h));
   }
@@ -175,12 +220,25 @@ async function main() {
 
   // --- wait, reveal --------------------------------------------------------------
   await waitFor(pub, commitEnd + 1n, "commit window to close");
+
+  // reveal() needs commitEnd < block <= revealEnd (:185-186). Checking it here turns a
+  // bare "execution reverted" from the node into a message naming the window we are in
+  // and why -- which is what the first live run needed and did not have.
+  const atReveal = await pub.getBlockNumber();
+  if (atReveal <= commitEnd || atReveal > revealEnd) {
+    throw new Error(
+      `the reveal window is blocks ${commitEnd + 1n}..${revealEnd}, but the chain is at ${atReveal}. ` +
+      (atReveal > revealEnd
+        ? "It has closed, so this auction can no longer be revealed. Re-run for a fresh one."
+        : "It has not opened yet."),
+    );
+  }
   console.log("\n  revealing");
   for (const b of bidders) {
     const h = await b.wallet.sendTransaction({
       to: BOOK, data: encodeFunctionData({ abi: bookAbi, functionName: "reveal", args: [maker, orderHash, b.bps, SALT] }),
     });
-    await pub.waitForTransactionReceipt({ hash: h });
+    await mined(pub, h, "transaction");
     console.log(`  ${b.account.address.slice(0, 10)}...  revealed ${b.bps} bps`);
     console.log(link(h));
   }
@@ -207,12 +265,21 @@ async function main() {
   hash = await makerWallet.sendTransaction({
     to: BOOK, data: encodeFunctionData({ abi: bookAbi, functionName: "settle", args: [maker, orderHash] }),
   });
-  await pub.waitForTransactionReceipt({ hash });
+  await mined(pub, hash, "transaction");
   const final = await pub.readContract({ address: BOOK, abi: bookAbi, functionName: "auctions", args: [maker, orderHash] });
   console.log("  settled");
   console.log(link(hash));
   console.log(`  winnerForfeited ${final.winnerForfeited}  (no fill was recorded, and silence is not evidence)\n`);
   console.log(`  orderHash for the subgraph:  ${orderHash}\n`);
+}
+
+/** viem resolves REVERTED receipts without throwing, so an unchecked receipt lets a
+ *  transaction that estimated fine and reverted on inclusion print as a success -- with
+ *  a Basescan link the reader is unlikely to open. Every receipt goes through here. */
+async function mined(pub: any, hash: `0x${string}`, what: string) {
+  const r = await pub.waitForTransactionReceipt({ hash });
+  if (r.status !== "success") throw new Error(`${what} REVERTED: https://basescan.org/tx/${hash}`);
+  return r;
 }
 
 async function waitFor(pub: ReturnType<typeof createPublicClient>, target: bigint, what: string) {

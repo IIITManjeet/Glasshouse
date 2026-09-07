@@ -25,15 +25,21 @@ test("parseArgs: rejects a flag it does not know", () => {
   assert.throws(() => parseArgs(["--nonsense"]));
 });
 
-// This is the whole of the "make it fail with a clear message" requirement: with none of
-// the environment set up (which is the truth today, per subgraph-design.md sections 2 and
-// 8.1), every missing piece must be named, not just the first one encountered.
-test("checkPrerequisites: names every missing piece when nothing is configured", async () => {
+// This is the whole of the "make it fail with a clear message" requirement: every missing
+// piece must be named, not just the first one encountered.
+//
+// The advisor listed THREE prerequisites when it was written. One, @modelcontextprotocol
+// /sdk, was simply an uninstalled dependency and was installed on 2026-09-08, so it must
+// no longer be reported. Its absence is asserted rather than the case being dropped: a
+// prerequisite check that still names something already satisfied sends the reader off to
+// fix a non-problem. The two that remain need a human with a Studio account
+// (subgraph-design.md sections 2 and 8.1).
+test("checkPrerequisites: names the two that remain, and not the installed dependency", async () => {
   const missing = await checkPrerequisites({}, {});
   const joined = missing.join("\n");
   assert.match(joined, /GRAPH_API_KEY/);
   assert.match(joined, /deployment id/i);
-  assert.match(joined, /@modelcontextprotocol\/sdk/);
+  assert.doesNotMatch(joined, /@modelcontextprotocol\/sdk/);
 });
 
 test("checkPrerequisites: a deployment id can come from the flag instead of the env var", async () => {
