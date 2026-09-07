@@ -26,6 +26,7 @@
     "@nomicfoundation/hardhat-verify": "^3.0.0",
     "hardhat": "^3.8.0",
     "hardhat-ignore-warnings": "0.3.0",
+    "typescript": "^7.0.2",
     "viem": "^2.56.3"
   },
   "type": "module"

@@ -48,22 +48,29 @@ const HTTP_ENDPOINTS = [
 ];
 
 /**
- * BASE_RPC_URL overrides everything when set. A `wss://` value is used as a socket, an
- * `https://` one as HTTP; either way the public providers stay in the chain behind it, so
- * one flaky private endpoint cannot strand a run that is mid-auction.
+ * BASE_RPC_URL, when set, is used EXCLUSIVELY -- the public providers are dropped, not
+ * kept as a fallback behind it.
+ *
+ * That is deliberate and it matters for more than tidiness. The dry run points this at a
+ * local Anvil fork of Base. If the public endpoints stayed in the chain, one failed
+ * request against the fork would fail over to REAL MAINNET mid-run: reads would answer
+ * from a different chain state than the one being written to, and a transaction meant
+ * only as a rehearsal could be broadcast for real. An override that silently widens to
+ * the public internet is not an override.
+ *
+ * A wss:// or ws:// value is used as a socket, anything else as HTTP.
  */
 export function baseTransport() {
   const override = process.env.BASE_RPC_URL;
-  const ws = WS_ENDPOINTS.map((u) => webSocket(u, { retryCount: 2, keepAlive: true, reconnect: true }));
-  const rest = HTTP_ENDPOINTS.map((u) => http(u, { retryCount: 2, retryDelay: 800 }));
-
   if (override) {
-    const first = override.startsWith("wss://") || override.startsWith("ws://")
+    return override.startsWith("wss://") || override.startsWith("ws://")
       ? webSocket(override, { retryCount: 2, keepAlive: true, reconnect: true })
       : http(override, { retryCount: 3, retryDelay: 800 });
-    return fallback([first, ...ws, ...rest]);
   }
-  return fallback([...ws, ...rest]);
+  return fallback([
+    ...WS_ENDPOINTS.map((u) => webSocket(u, { retryCount: 2, keepAlive: true, reconnect: true })),
+    ...HTTP_ENDPOINTS.map((u) => http(u, { retryCount: 2, retryDelay: 800 })),
+  ]);
 }
 
 export function basePublicClient(): PublicClient {
@@ -95,53 +102,71 @@ export async function rpc<T>(fn: () => Promise<T>, what: string, tries = 6): Pro
 }
 
 /**
- * Wait until the chain reaches `target`, driven by pushed heads rather than polling.
+ * Wait until the chain reaches `target`, driven by pushed heads, with a polling backstop.
  *
- * Resolves with the block number actually observed, which the caller should use as the
- * pin for any read that follows: it is a height some node has demonstrably produced.
+ * Resolves with the block number actually observed, which the caller MUST use as the pin
+ * for any read that follows: it is a height some node has demonstrably produced. Throwing
+ * that away and re-reading "latest" reintroduces exactly the replica-lag bug this exists
+ * to avoid.
  *
- * `watchBlockNumber` falls back to polling by itself if the active transport is HTTP, so
- * this is correct either way -- it is just far quieter over a socket. `emitOnBegin` gives
- * us the current head immediately, so a target already reached returns without waiting.
+ * WHY BOTH A SUBSCRIPTION AND A POLL. Over a `fallback`, viem pins the newHeads
+ * subscription to the FIRST WebSocket transport and does not move to another if that one
+ * fails -- it only retries the same URL a handful of times. So a socket that connects and
+ * then goes quiet would hang the run until the guard fires, which for a 60-second auction
+ * window is far too late. The ticker below is cheap (one read every 6s, against a wait
+ * measured in minutes) and turns a dead socket into a slower success rather than a burned
+ * auction.
  */
 export function waitForBlock(client: PublicClient, target: bigint, what: string): Promise<bigint> {
   return new Promise((resolve, reject) => {
     let settled = false;
     let announced = false;
 
-    const done = (n: bigint) => {
+    const finish = (n: bigint) => {
       if (settled) return;
       settled = true;
       unwatch();
+      clearInterval(ticker);
       clearTimeout(guard);
       process.stdout.write("\n");
       resolve(n);
     };
 
-    // A subscription that silently stops delivering would hang the run forever, so there
-    // is an upper bound. Base produces a block every ~2s; 20 minutes is far beyond any
-    // window these scripts wait for, and is a fault rather than a slow chain.
-    const guard = setTimeout(() => {
+    const saw = (n: bigint) => {
       if (settled) return;
-      settled = true;
-      unwatch();
-      reject(new Error(`waiting for ${what}: no block >= ${target} within 20 minutes`));
-    }, 20 * 60 * 1000);
+      if (n >= target) return finish(n);
+      if (!announced) {
+        announced = true;
+        console.log(`\n  waiting for ${what}: block ${n} -> ${target} (about ${Number(target - n) * 2}s)`);
+      }
+      process.stdout.write(`\r  block ${n}   `);
+    };
+
+    // Five minutes, not twenty. The longest wait here is 30 blocks -- about 60 seconds on
+    // Base -- so five minutes is already generous, and failing fast matters when the step
+    // after this one has its own deadline measured in blocks.
+    const guard = setTimeout(
+      () => {
+        if (settled) return;
+        settled = true;
+        unwatch();
+        clearInterval(ticker);
+        reject(new Error(`waiting for ${what}: no block >= ${target} in time`));
+      },
+      5 * 60_000,
+    );
+
+    const ticker = setInterval(() => {
+      if (settled) return;
+      rpc(() => client.getBlockNumber({ cacheTime: 0 }), `${what} poll`, 2).then(saw).catch(() => {});
+    }, 6000);
 
     const unwatch = client.watchBlockNumber({
       emitOnBegin: true,
       emitMissed: true,
-      onBlockNumber: (n) => {
-        if (n >= target) return done(n);
-        if (!announced) {
-          announced = true;
-          console.log(`\n  waiting for ${what}: block ${n} -> ${target} (about ${Number(target - n) * 2}s)`);
-        }
-        process.stdout.write(`\r  block ${n}   `);
-      },
+      onBlockNumber: saw,
       onError: (e) => {
-        // A dropped socket is not fatal: viem's fallback moves to the next transport and
-        // the watcher re-establishes. Only report it.
+        // Not fatal: the polling ticker above is the backstop. Report and carry on.
         console.log(`\n  block watcher: ${String(e).slice(0, 80)}`);
       },
     });

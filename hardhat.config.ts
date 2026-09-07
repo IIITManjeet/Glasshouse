@@ -55,6 +55,18 @@ export default defineConfig({
       chainId: 8453,
       accounts: [configVariable("DEPLOYER_PRIVATE_KEY")],
     },
+    // The dry run: a local Anvil fork of Base mainnet. Same chainId, so every address
+    // in the scripts resolves to the real deployed contract and the order hash is
+    // unchanged -- but the money is not real. No `accounts`, because the maker is
+    // impersonated on the fork rather than signed for; the keystore is never touched.
+    //
+    //   anvil --fork-url https://mainnet.base.org --chain-id 8453
+    //   BASE_RPC_URL=http://127.0.0.1:8545 npx hardhat run scripts/run-live-fill.ts --network baseFork
+    baseFork: {
+      type: "http",
+      url: process.env.FORK_RPC_URL ?? "http://127.0.0.1:8545",
+      chainId: 8453,
+    },
     baseSepolia: {
       type: "http",
       url: process.env.BASE_SEPOLIA_RPC_URL ?? "https://sepolia.base.org",

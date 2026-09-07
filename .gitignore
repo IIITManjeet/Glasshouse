@@ -13,3 +13,6 @@ deployments/localhost/
 # large and machine-generated.
 ignition/deployments/chain-31337/
 ignition/deployments/*/build-info/
+
+# Throwaway bidder keys from a live run; worth cents, but written so a crashed run is sweepable
+.ephemeral-bidders.json

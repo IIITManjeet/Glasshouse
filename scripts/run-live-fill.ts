@@ -14,7 +14,8 @@ import {
 } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
-import { basePublicClient, waitForBlock, rpc } from "./lib/chain.ts";
+import { basePublicClient, baseTransport, waitForBlock, rpc } from "./lib/chain.ts";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 
 /**
@@ -80,6 +81,18 @@ const MAX_BPS = 500;
 const BOND = 0n;
 const BIDS = [400, 250] as const; // the winner pays the second: 250
 
+// What the fill must return, from the preflight against real Base state.
+//
+// The winning bid scales balanceIn UP by (1 + 250bps), and on the constant-product curve
+// amountOut = amountIn * balanceOut / (balanceIn + amountIn), so a larger balanceIn means
+// the taker receives LESS. That is the improvement: 24,096 USDC to the winner instead of
+// the 24,691 the base price would have given, with the difference staying with the maker.
+//
+// Asserting the exact figure is what separates "a fill happened" from "the auction moved
+// the price", and only the second is the claim.
+const EXPECTED_AMOUNT_OUT = 24_096n;
+const BASE_PRICE_AMOUNT_OUT = 24_691n;
+
 // The winner sends five transactions (wrap, approve, commit, reveal, fill); the rival
 // sends two. The float is ~10x what those cost at Base's usual sub-gwei gas, because a
 // bidder that runs dry BETWEEN commit and reveal is stranded inside a 60-second window
@@ -87,6 +100,30 @@ const BIDS = [400, 250] as const; // the winner pays the second: 250
 // discarded with the ephemeral key, so this is the price of not losing the run.
 const WINNER_GAS = parseEther("0.0002");
 const RIVAL_GAS = parseEther("0.0001");
+
+const KEYFILE = new URL("../.ephemeral-bidders.json", import.meta.url);
+// EXPLICIT GAS LIMITS, SO NOTHING CALLS eth_estimateGas.
+//
+// viem and Hardhat both estimate at "latest" inside sendTransaction. On Base that read
+// can land on a replica which has not applied the block we just wrote, and the estimate
+// then reverts against stale state -- NotOpened right after open(), or
+// GlasshouseAuctionInProgress right after the reveal window closes. The transaction is
+// fine; the node simulating it is behind. That killed one run already, and it would kill
+// this one at the two worst moments: the first commit, and the fill.
+//
+// These are roughly twice the measured cost. Unused gas is not charged, so generous
+// limits cost nothing and buy the removal of an entire failure mode.
+const GAS = {
+  approve: 100_000n,
+  transfer: 30_000n,
+  wrap: 100_000n,
+  ship: 400_000n,
+  open: 300_000n,
+  commit: 200_000n,
+  reveal: 250_000n,
+  fill: 700_000n,
+  settle: 200_000n,
+} as const;
 
 const link = (h: string) => `  https://basescan.org/tx/${h}`;
 const STATUS = ["None", "Bidding", "Closed"];
@@ -123,58 +160,22 @@ const aquaAbi = [
     outputs: [{ type: "bytes32" }],
   },
 ] as const;
-
-// Every custom error the Book can raise. Without these viem reports a bare
-// "execution reverted" plus an undecoded selector, which is what made the first failed
-// run take a chain query to diagnose instead of a glance at the message.
-const bookAbi = [
-  { type: "function", name: "open", stateMutability: "nonpayable", outputs: [], inputs: [{ name: "orderHash", type: "bytes32" }, { name: "router", type: "address" }, { name: "tokenIn", type: "address" }, { name: "commitBlocks", type: "uint40" }, { name: "revealBlocks", type: "uint40" }, { name: "exclusiveBlocks", type: "uint40" }, { name: "reserveBps", type: "uint24" }, { name: "maxBps", type: "uint24" }, { name: "bond", type: "uint128" }] },
-  { type: "function", name: "commit", stateMutability: "nonpayable", outputs: [], inputs: [{ name: "maker", type: "address" }, { name: "orderHash", type: "bytes32" }, { name: "commitment", type: "bytes32" }] },
-  { type: "function", name: "reveal", stateMutability: "nonpayable", outputs: [], inputs: [{ name: "maker", type: "address" }, { name: "orderHash", type: "bytes32" }, { name: "bps", type: "uint24" }, { name: "salt", type: "bytes32" }] },
-  { type: "function", name: "settle", stateMutability: "nonpayable", outputs: [], inputs: [{ name: "maker", type: "address" }, { name: "orderHash", type: "bytes32" }] },
-  { type: "function", name: "commitmentFor", stateMutability: "pure", inputs: [{ name: "bidder", type: "address" }, { name: "bps", type: "uint24" }, { name: "salt", type: "bytes32" }], outputs: [{ type: "bytes32" }] },
-  { type: "function", name: "outcome", stateMutability: "view", inputs: [{ name: "maker", type: "address" }, { name: "orderHash", type: "bytes32" }], outputs: [{ type: "tuple", components: [{ name: "status", type: "uint8" }, { name: "winner", type: "address" }, { name: "clearingBps", type: "uint24" }, { name: "exclusiveUntil", type: "uint40" }] }] },
-  {
-    type: "event", name: "AuctionOpened",
-    inputs: [
-      { name: "maker", type: "address", indexed: true }, { name: "orderHash", type: "bytes32", indexed: true },
-      { name: "router", type: "address" }, { name: "tokenIn", type: "address" },
-      { name: "commitEnd", type: "uint40" }, { name: "revealEnd", type: "uint40" },
-      { name: "exclusiveBlocks", type: "uint40" }, { name: "reserveBps", type: "uint24" },
-      { name: "maxBps", type: "uint24" }, { name: "bond", type: "uint128" },
-    ],
-  },
-  {
-    type: "event", name: "AuctionFilled",
-    inputs: [
-      { name: "maker", type: "address", indexed: true }, { name: "orderHash", type: "bytes32", indexed: true },
-      { name: "taker", type: "address", indexed: true }, { name: "amountIn", type: "uint256" },
-      { name: "amountOut", type: "uint256" }, { name: "fillByWinner", type: "bool" },
-    ],
-  },
-  {
-    type: "event", name: "AuctionSettled",
-    inputs: [
-      { name: "maker", type: "address", indexed: true }, { name: "orderHash", type: "bytes32", indexed: true },
-      { name: "winner", type: "address", indexed: true }, { name: "clearingBps", type: "uint24" },
-      { name: "winnerForfeited", type: "bool" },
-    ],
-  },
-  { type: "error", name: "AlreadyOpened", inputs: [] },
-  { type: "error", name: "NotOpened", inputs: [] },
-  { type: "error", name: "BadWindow", inputs: [] },
-  { type: "error", name: "CommitClosed", inputs: [] },
-  { type: "error", name: "AlreadyCommitted", inputs: [] },
-  { type: "error", name: "RevealNotOpen", inputs: [] },
-  { type: "error", name: "RevealClosed", inputs: [] },
-  { type: "error", name: "NoCommitment", inputs: [] },
-  { type: "error", name: "AlreadyRevealed", inputs: [] },
-  { type: "error", name: "BadReveal", inputs: [] },
-  { type: "error", name: "AlreadySettled", inputs: [] },
-  { type: "error", name: "NotSettled", inputs: [] },
-  { type: "error", name: "WindowNotElapsed", inputs: [] },
-  { type: "error", name: "NothingToClaim", inputs: [] },
-] as const;
+// THE BOOK ABI IS LOADED, NOT HAND-WRITTEN.
+//
+// It used to be typed out here, and that produced a silent bug the dry run caught: the
+// AuctionFilled entry carried a sixth parameter, fillByWinner, which the CONTRACT event
+// does not have -- that field belongs to the subgraph entity, not the log. A wrong
+// parameter list changes topic0, so parseEventLogs matched nothing and the script
+// reported that the maker hook had failed to record a fill which had in fact been
+// recorded perfectly.
+//
+// subgraph/abis/GlasshouseBook.json is generated from the compiled artifact and
+// cross-checked against the deployed bytecode, so it cannot drift from the contract the
+// way a hand-typed copy can. It also carries every custom error, so a revert prints its
+// name instead of a bare selector.
+const bookAbi = JSON.parse(
+  readFileSync(new URL("../subgraph/abis/GlasshouseBook.json", import.meta.url), "utf8"),
+) as any;
 
 const order = { maker: MAKER, traits: ORDER_TRAITS, data: ORDER_DATA } as const;
 
@@ -203,7 +204,10 @@ function pinned<T>(fn: (blockNumber: bigint) => Promise<T>, at: bigint, what: st
  *  transaction that estimates fine and reverts on inclusion would otherwise be printed
  *  as a success, with a Basescan link the reader is unlikely to click. */
 async function mined(hash: `0x${string}`, what: string) {
-  const r = await pub.waitForTransactionReceipt({ hash });
+  // Retried: viem's receipt loop rejects on any error other than not-found, so a rate
+  // limit that survives the fallback chain would abandon a transaction that is already
+  // mined. Waiting for a receipt is idempotent, so retrying is free.
+  const r = await rpc(() => pub.waitForTransactionReceipt({ hash }), `receipt for ${what}`);
   if (r.status !== "success") {
     throw new Error(`${what} REVERTED on chain: https://basescan.org/tx/${hash}`);
   }
@@ -214,7 +218,45 @@ const waitFor = (target: bigint, what: string) => waitForBlock(pub, target, what
 
 async function main() {
   const conn = await network.create();
-  const [account] = (await conn.provider.request({ method: "eth_accounts" })) as `0x${string}`[];
+
+  // DRY RUN: the whole sequence against a local Anvil fork of Base mainnet.
+  //
+  // Same chainId, so every address resolves to the real deployed contract and the order
+  // hash is identical -- what is rehearsed is the actual run, not an approximation. The
+  // maker is IMPERSONATED rather than signed for, so the keystore is never touched and
+  // no key is exposed. It matters that the maker address is unchanged: the order hash
+  // includes it, so impersonating is the only way to rehearse the real order.
+  //
+  //   anvil --fork-url https://mainnet.base.org --chain-id 8453
+  //   DRY_RUN=1 BASE_RPC_URL=http://127.0.0.1:8545 npx hardhat run scripts/run-live-fill.ts --network baseFork
+  const DRY_RUN = process.env.DRY_RUN === "1";
+  if (DRY_RUN) {
+    const version = String(await conn.provider.request({ method: "web3_clientVersion" }));
+    if (!/anvil|hardhat/i.test(version)) {
+      throw new Error(`DRY_RUN=1 but the node reports "${version}", which is not a local fork. Refusing to run: a dry run against real Base would spend real money.`);
+    }
+    if (!/127\.0\.0\.1|localhost/.test(process.env.BASE_RPC_URL ?? "")) {
+      throw new Error(`DRY_RUN=1 requires BASE_RPC_URL to point at the local fork, otherwise the reads would come from real Base while the writes go to the fork. It is "${process.env.BASE_RPC_URL ?? "unset"}".`);
+    }
+    await conn.provider.request({ method: "anvil_impersonateAccount", params: [MAKER] } as any);
+
+    // Top the maker up ON THE FORK ONLY.
+    //
+    // Anvil adds a default 1 gwei priority fee on top of the forked base fee, so gas on
+    // the fork costs about 1.003 gwei against Base mainnet's measured 0.006 -- roughly
+    // 167x. The first dry run ran out of ETH at open() purely because of that, which
+    // says nothing about the real budget.
+    //
+    // So THE DRY RUN DOES NOT VALIDATE THE GAS BUDGET. It validates the sequence. The
+    // mainnet cost is computed separately from real Base gas prices, and the maker is
+    // checked against it before the real run.
+    await conn.provider.request({ method: "anvil_setBalance", params: [MAKER, "0xde0b6b3a7640000"] } as any);
+    console.log("  fork: maker topped up to 1 ETH (anvil gas is ~167x mainnet; this does NOT test the real budget)");
+    console.log("\n  *** DRY RUN on a local Base fork. Nothing here is real money. ***");
+  }
+
+  const [nodeAccount] = (await conn.provider.request({ method: "eth_accounts" })) as `0x${string}`[];
+  const account = DRY_RUN ? (MAKER as `0x${string}`) : nodeAccount;
 
   pub = basePublicClient();
   const maker = getAddress(account);
@@ -253,6 +295,25 @@ async function main() {
     throw new Error(`the maker holds ${formatUnits(usdcBal, 6)} USDC but the strategy declares ${formatUnits(BALANCE_USDC, 6)}. Send USDC on Base to ${maker} first. The fill itself only pulls ~0.04 USDC; the rest backs a balance we should not advertise without holding.`);
   }
 
+  // IS THIS ORDER STILL VIRGIN? Checked before a single wei is spent.
+  //
+  // The hash is deterministic and both Aqua.ship (StrategiesMustBeImmutable) and
+  // Book.open (AlreadyOpened) are one-time for it. If an earlier attempt consumed either,
+  // this run would fund bidders and wrap WETH and only then revert -- spending money to
+  // discover something two reads could have told us.
+  const existing = await pinned(
+    (blockNumber) => pub.readContract({ address: BOOK, abi: bookAbi, functionName: "auctions", args: [maker, orderHash], blockNumber }),
+    head0, "existing auction",
+  );
+  if (BigInt((existing as any).commitEnd) !== 0n) {
+    throw new Error(
+      `an auction for this order hash was already opened (commitEnd ${(existing as any).commitEnd}). ` +
+      "This order is spent: Book.open rejects a second one. Change MAX_BPS in " +
+      "test/fork/LiveFillPreflight.t.sol, re-run the preflight, and paste the new " +
+      "ORDER_DATA and EXPECTED_ORDER_HASH here.",
+    );
+  }
+
   // --- approvals ---------------------------------------------------------------------
   const allowance = await pinned(
     (blockNumber) => pub.readContract({ address: USDC, abi: erc20Abi, functionName: "allowance", args: [maker, AQUA], blockNumber }),
@@ -261,7 +322,7 @@ async function main() {
   if (allowance < BALANCE_USDC) {
     console.log("  approving USDC to Aqua");
     const h = await makerWallet.sendTransaction({
-      to: USDC, data: encodeFunctionData({ abi: erc20Abi, functionName: "approve", args: [AQUA, BALANCE_USDC * 100n] }),
+      to: USDC, gas: GAS.approve, data: encodeFunctionData({ abi: erc20Abi, functionName: "approve", args: [AQUA, BALANCE_USDC] }),
     });
     await mined(h, "USDC approve");
     console.log(link(h));
@@ -274,12 +335,43 @@ async function main() {
   // maxBps], so a published salt unseals both "sealed" bids in 451 hashes -- on the one
   // run whose entire point is to show sealing work. These are generated here and printed
   // only after the reveals are on chain.
-  const bidders = BIDS.map((bps, i) => ({
-    bps,
-    salt: toHex(randomBytes(32)),
-    account: privateKeyToAccount(generatePrivateKey()),
-    role: i === 0 ? "winner" : "rival",
-  }));
+  const bidders = BIDS.map((bps, i) => {
+    const privateKey = generatePrivateKey();
+    return {
+      bps,
+      privateKey,
+      salt: toHex(randomBytes(32)),
+      account: privateKeyToAccount(privateKey),
+      role: i === 0 ? "winner" : "rival",
+    };
+  });
+
+  // WRITTEN BEFORE ANY FUNDING, DELIBERATELY.
+  //
+  // These keys exist only in this process. An earlier attempt died AFTER funding the
+  // bidders and BEFORE they spent anything, and 0.00031 ETH became unrecoverable --
+  // not stranded, gone, because nothing outside memory knew the keys. Persisting them
+  // first turns that into a sweepable inconvenience. The file is gitignored and the
+  // keys are worth cents; the alternative is losing the funding of every failed run.
+  // Refuse to clobber a previous run's keys while they still hold funds. Overwriting
+  // them is the same permanent loss the file exists to prevent, just one run later.
+  if (existsSync(KEYFILE)) {
+    const prev = JSON.parse(readFileSync(KEYFILE, "utf8")) as { role: string; address: `0x${string}` }[];
+    for (const old of prev) {
+      const bal = await rpc(() => pub.getBalance({ address: old.address }), "previous bidder balance");
+      if (bal > 0n) {
+        throw new Error(
+          `${KEYFILE.pathname} still holds keys for ${old.address} (${old.role}) with ` +
+          `${formatEther(bal)} ETH. Sweep or delete it first -- overwriting loses that money.`,
+        );
+      }
+    }
+  }
+  writeFileSync(
+    KEYFILE,
+    JSON.stringify(bidders.map((b) => ({ role: b.role, address: b.account.address, privateKey: b.privateKey, bps: b.bps })), null, 2),
+  );
+  console.log(`  bidder keys written to ${KEYFILE.pathname} (gitignored, sweepable if this run dies)`);
   const winner = bidders[0];
   const rival = bidders[1];
   const takerData = concat([TAKER_DATA_PREFIX, winner.account.address]) as `0x${string}`;
@@ -287,29 +379,50 @@ async function main() {
   console.log("  funding ephemeral bidders");
   for (const b of bidders) {
     const value = b.role === "winner" ? WINNER_GAS + SWAP_AMOUNT : RIVAL_GAS;
-    const h = await makerWallet.sendTransaction({ to: b.account.address, value });
+    const h = await makerWallet.sendTransaction({ to: b.account.address, value, gas: GAS.transfer });
     await mined(h, `funding ${b.role}`);
     console.log(`  ${b.account.address}  ${b.role}, bids ${b.bps} bps`);
   }
 
-  const wallet = (b: (typeof bidders)[number]) =>
-    createWalletClient({ account: b.account, chain: base, transport: rpc() });
+  // Same fork-gas caveat as the maker: anvil charges ~167x Base, so the real float of
+  // 0.0002 ETH -- ample for five transactions at 0.006 gwei -- runs dry on the fork at
+  // the reveal. Topped up here so the rehearsal exercises the SEQUENCE. The funding
+  // transactions above still run, so that path is genuinely tested; only the amount is
+  // unrealistic, and deliberately so.
+  if (DRY_RUN) {
+    for (const b of bidders) {
+      await conn.provider.request({ method: "anvil_setBalance", params: [b.account.address, "0xde0b6b3a7640000"] } as any);
+    }
+    console.log("  fork: bidders topped up to 1 ETH each (gas artifact only)");
+  }
+
+  // Built ONCE per bidder. This used to construct a fresh fallback -- three WebSocket
+  // connections -- on every call, seven times over a run, none of them ever closed.
+  const wallets = new Map<string, ReturnType<typeof createWalletClient>>();
+  const wallet = (b: (typeof bidders)[number]) => {
+    let w = wallets.get(b.account.address);
+    if (!w) {
+      w = createWalletClient({ account: b.account, chain: base, transport: baseTransport() });
+      wallets.set(b.account.address, w);
+    }
+    return w;
+  };
 
   // --- the winner needs WETH and an approval to pay in --------------------------------
   console.log("\n  winner wraps ETH and approves the router");
   let h = await wallet(winner).sendTransaction({
-    to: WETH, value: SWAP_AMOUNT, data: encodeFunctionData({ abi: erc20Abi, functionName: "deposit", args: [] }),
+    to: WETH, value: SWAP_AMOUNT, gas: GAS.wrap, data: encodeFunctionData({ abi: erc20Abi, functionName: "deposit", args: [] }),
   });
   await mined(h, "WETH deposit");
   h = await wallet(winner).sendTransaction({
-    to: WETH, data: encodeFunctionData({ abi: erc20Abi, functionName: "approve", args: [ROUTER, SWAP_AMOUNT * 100n] }),
+    to: WETH, gas: GAS.approve, data: encodeFunctionData({ abi: erc20Abi, functionName: "approve", args: [ROUTER, SWAP_AMOUNT] }),
   });
   await mined(h, "WETH approve");
 
   // --- ship the strategy to the official Aqua -----------------------------------------
   console.log("\n  shipping the strategy to Aqua");
   h = await makerWallet.sendTransaction({
-    to: AQUA,
+    to: AQUA, gas: GAS.ship,
     data: encodeFunctionData({
       abi: aquaAbi, functionName: "ship",
       args: [ROUTER, encodeAbiParameters([orderTuple], [order]), [WETH, USDC], [BALANCE_WETH, BALANCE_USDC]],
@@ -321,7 +434,7 @@ async function main() {
   // --- open ----------------------------------------------------------------------------
   console.log("\n  opening the auction against the REAL order hash");
   h = await makerWallet.sendTransaction({
-    to: BOOK,
+    to: BOOK, gas: GAS.open,
     data: encodeFunctionData({
       abi: bookAbi, functionName: "open",
       args: [orderHash, ROUTER, WETH, COMMIT_BLOCKS, REVEAL_BLOCKS, EXCLUSIVE_BLOCKS, RESERVE_BPS, MAX_BPS, BOND],
@@ -349,7 +462,7 @@ async function main() {
       now, "commitmentFor",
     );
     const t = await wallet(b).sendTransaction({
-      to: BOOK, data: encodeFunctionData({ abi: bookAbi, functionName: "commit", args: [maker, orderHash, commitment] }),
+      to: BOOK, gas: GAS.commit, data: encodeFunctionData({ abi: bookAbi, functionName: "commit", args: [maker, orderHash, commitment] }),
     });
     await mined(t, `commit by ${b.role}`);
     console.log(`  ${b.account.address.slice(0, 10)}...  committed (sealed)`);
@@ -364,8 +477,11 @@ async function main() {
   console.log(`\n  status during bidding: ${STATUS[o1.status]}  (nothing can fill, not even the winner)`);
 
   // --- reveal ----------------------------------------------------------------------------
-  await waitFor(commitEnd + 1n, "the commit window to close");
-  const atReveal = await rpc(() => pub.getBlockNumber({ cacheTime: 0 }), "head");
+  // waitFor resolves with a height some node has demonstrably produced. Re-reading
+  // "latest" here would throw that away and could get an answer from a replica still
+  // behind the boundary -- which would abort the run with two commits already on chain
+  // and the auction unrevealable. Use what was proven.
+  const atReveal = await waitFor(commitEnd + 1n, "the commit window to close");
   if (atReveal <= commitEnd || atReveal + BigInt(bidders.length) > revealEnd) {
     throw new Error(`the reveal window is blocks ${commitEnd + 1n}..${revealEnd} and ${bidders.length} reveals must fit; the chain is at ${atReveal}.`);
   }
@@ -373,7 +489,7 @@ async function main() {
   console.log("\n  revealing");
   for (const b of bidders) {
     const t = await wallet(b).sendTransaction({
-      to: BOOK, data: encodeFunctionData({ abi: bookAbi, functionName: "reveal", args: [maker, orderHash, b.bps, b.salt] }),
+      to: BOOK, gas: GAS.reveal, data: encodeFunctionData({ abi: bookAbi, functionName: "reveal", args: [maker, orderHash, b.bps, b.salt] }),
     });
     await mined(t, `reveal by ${b.role}`);
     console.log(`  ${b.account.address.slice(0, 10)}...  revealed ${b.bps} bps   salt ${b.salt}`);
@@ -401,7 +517,7 @@ async function main() {
   // --- THE FILL --------------------------------------------------------------------------
   console.log("  the winner fills, inside its exclusive window, through the official Aqua");
   const fillHash = await wallet(winner).sendTransaction({
-    to: ROUTER,
+    to: ROUTER, gas: GAS.fill,
     data: encodeFunctionData({ abi: routerAbi, functionName: "swap", args: [order, SWAP_AMOUNT, takerData] }),
   });
   const fillReceipt = await mined(fillHash, "fill");
@@ -413,12 +529,34 @@ async function main() {
   }
   console.log(`  WETH in         ${filled.args.amountIn}`);
   console.log(`  USDC out        ${filled.args.amountOut}`);
-  console.log(`  by the winner   ${filled.args.fillByWinner}`);
+  console.log(`  recorded by     the Book, via the maker hook`);
+
+  // THE TWO THINGS THAT MAKE THIS EVIDENCE RATHER THAN A TRANSACTION.
+  //
+  // A fill after exclusiveUntil still succeeds and still emits AuctionFilled -- it just
+  // executes at the BASE price, because the gate has lapsed and the improvement is no
+  // longer applied. Nothing errors. So a slow run could print a fill that quietly proves
+  // the opposite of the claim. Both are asserted instead of assumed.
+  if (fillReceipt.blockNumber > BigInt(o.exclusiveUntil)) {
+    throw new Error(
+      `the fill landed in block ${fillReceipt.blockNumber} but the exclusive window ended at ` +
+      `${o.exclusiveUntil}. It filled at the BASE price, not the improved one, so it does not ` +
+      "demonstrate the gate.",
+    );
+  }
+  if (filled.args.amountOut !== EXPECTED_AMOUNT_OUT) {
+    throw new Error(
+      `expected ${EXPECTED_AMOUNT_OUT} USDC out, the improved price the preflight proved, ` +
+      `but got ${filled.args.amountOut}. The base price would be ${BASE_PRICE_AMOUNT_OUT}.`,
+    );
+  }
+  console.log(`  inside window   block ${fillReceipt.blockNumber} <= ${o.exclusiveUntil}`);
+  console.log(`  improved price  ${filled.args.amountOut} out, against ${BASE_PRICE_AMOUNT_OUT} at the base price`);
 
   // --- settle -----------------------------------------------------------------------------
   await waitFor(revealEnd + EXCLUSIVE_BLOCKS + 1n, "the exclusive window to elapse");
   h = await makerWallet.sendTransaction({
-    to: BOOK, data: encodeFunctionData({ abi: bookAbi, functionName: "settle", args: [maker, orderHash] }),
+    to: BOOK, gas: GAS.settle, data: encodeFunctionData({ abi: bookAbi, functionName: "settle", args: [maker, orderHash] }),
   });
   const settleReceipt = await mined(h, "settle");
   console.log(link(h));
