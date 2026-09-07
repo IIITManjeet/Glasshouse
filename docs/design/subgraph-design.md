@@ -1,4 +1,10 @@
-**Version 0.5.0 - 2026-09-07 - subgraph architecture.**
+**Version 0.5.1 - 2026-09-08 - subgraph architecture.**
+
+> **Corrected 2026-09-08 in six places**, marked inline with the date. The implementation
+> was built from this document and diverged from it where it was wrong; an independent
+> review then found seven defects, three of which this document had prescribed. The
+> corrections below bring it back in line with `subgraph/src/`, which is the behaviour
+> the tests pin. Where the two now disagree, the code is right and this file is stale.
 
 # Glasshouse subgraph design
 
@@ -334,6 +340,8 @@ type Auction @entity {
   fillAmountIn: BigInt                      # in the ORDER's tokens, which are not indexed
   fillAmountOut: BigInt
   fillPhase: FillPhase
+  # "Did the winner fill?" Recomputed on every reveal after the fill and again at settle.
+  # NOT the same field as AuctionFilledEvent.fillByWinner (corrected 2026-09-08).
   fillByWinner: Boolean!
 
   # settlement, from AuctionSettled
@@ -399,8 +407,16 @@ type ReserveControl @entity {
   revealedBidderSum: Int!                   # sum of revealedCount; mean is client-side
   clearingBpsSum: Int!                      # sum of clearingBps over auctions with a winner
   winnerMarginBpsSum: Int!
-  minBestBps: Int!                          # over auctions with a winner; 0 when none yet
-  maxBestBps: Int!
+  # True once a settled auction with a winner has been counted; minBestBps/maxBestBps are
+  # meaningless until it is.
+  # ⚠️ Corrected 2026-09-08: this field did not exist and `minBestBps == 0` was the
+  # "unset" sentinel. 0 is a LEGAL bestBps -- reveal() accepts bps == 0 when
+  # reserveBps == 0 (src/book/GlasshouseBook.sol:187) and the empty-book arm (:196) makes
+  # that bidder the winner -- so 0 cannot double as "unset" without silently discarding a
+  # genuine zero-bid minimum.
+  hasWinnerSeen: Boolean!
+  minBestBps: Int!                          # min bestBps over settled auctions with a winner
+  maxBestBps: Int!                          # max bestBps over the same set
   lastSettledAuction: Auction
   lastUpdateBlock: BigInt!
 }
@@ -481,6 +497,9 @@ type AuctionFilledEvent implements AuctionEvent @entity(immutable: true) {
   amountIn: BigInt!
   amountOut: BigInt!
   fillPhase: FillPhase!
+  # "Was the taker the best bidder AT THIS BLOCK?" A fact about the fill block, immutable
+  # and never revised. During BIDDING the best is provisional, so this can be true on an
+  # auction whose Auction.fillByWinner ends up false (corrected 2026-09-08).
   fillByWinner: Boolean!
 }
 
@@ -687,8 +706,17 @@ Shared helpers, in `src/helpers.ts`:
 - `getOrCreateAccount(address, block) -> (Account, isNew)`: on creation sets
   `provenance = provenanceOf(address)` from `src/provenance.ts`, counters 0,
   `firstSeenBlock`; always updates `lastSeenBlock`. When `isNew`, the caller bumps
-  `protocol.cumulativeUniqueUsers`, and `cumulativeUniqueMakers` or
-  `cumulativeUniqueBidders` by role.
+  `protocol.cumulativeUniqueUsers` -- and **only** that one.
+- `isFirstAsMaker(account)` / `isFirstAsBidder(account)`: the per-role gates, read
+  **before** the role's own counter is incremented. `cumulativeUniqueMakers` and
+  `cumulativeUniqueBidders` are gated on these, never on `isNew`.
+  > ⚠️ **Corrected 2026-09-08.** This said `isNew` gated the per-role counters too. It
+  > cannot: `isNew` is first sighting in **any** role, so an address that opens an
+  > auction and later bids is not new at its first commit and would never be counted as
+  > a bidder. That undercounts every dual-role address -- including our own deployer,
+  > who is the maker of the demo auctions and also bids in them, so the defect would
+  > have fired on our own live data. `subgraph/src/helpers.ts:121-133`, used at
+  > `src/book.ts:103` and `:229`.
 - `getOrCreateToken(address)`: binds `ERC20` at the address and calls `try_name`,
   `try_symbol`, `try_decimals`; `resolved = !reverted` for all three; reverted fields
   stay null. Zero address: create with `resolved = false` and no calls.
@@ -799,9 +827,17 @@ the one that filled (`:251`, and the settle comment at `:269-276`).
    else `bestBidder !== null && block <= exclusiveEnd -> EXCLUSIVE`;
    else `OPEN`. The `bestBidder` test mirrors `outcome()` returning
    `exclusiveUntil = revealEnd` when nobody revealed (`:222-225`).
-4. `fillByWinner = bestBidder !== null && taker == bestBidder`. The derived best is final
-   at any fill block `> revealEnd`; a `BIDDING` fill is the one case where it is not, and
-   the field is still set from the state at that moment.
+4. `AuctionFilledEvent.fillByWinner = bestBidder !== null && taker == bestBidder`, as of
+   this block. The event is immutable and keeps that as-of-the-fill meaning; it is never
+   revised. `Auction.fillByWinner` answers a **different** question -- "did the winner
+   fill" -- and is recomputed on every later reveal and again at settle, so it is right
+   once `revealEnd` passes even if nobody ever calls `settle()`.
+   > ⚠️ **Corrected 2026-09-08.** This step previously wrote `Auction.fillByWinner` once,
+   > here, from whatever `bestBidder` was at the fill block. During `BIDDING` that is a
+   > provisional best, so a later reveal displaces it and the stored value is then
+   > permanently wrong. An auction could end up recording `bestBidder = B`,
+   > `fillByWinner = true`, `filledBy = A` and `winnerForfeited = true` all at once.
+   > `subgraph/src/book.ts:440-465`, recomputed at `:359` and `:523`.
 5. `AuctionFilledEvent` with `actor = taker`.
 6. `protocol.cumulativeFillCount++`; `touchUsage`; `dailyFills++`.
 
@@ -826,7 +862,9 @@ Source: `settle()`, `:262-281`. The only event carrying the contract's own `clea
    `settledReserveBound += reserveBound ? 1 : 0`; `revealedBidderSum += revealedCount`;
    if `bestBidder !== null`: `clearingBpsSum += clearingBps`,
    `winnerMarginBpsSum += winnerMarginBps`,
-   `minBestBps = (minBestBps == 0) ? bestBps : min(minBestBps, bestBps)`,
+   `minBestBps = hasWinnerSeen ? min(minBestBps, bestBps) : bestBps` then
+   `hasWinnerSeen = true` (see the schema note on `hasWinnerSeen`; **corrected
+   2026-09-08**, this used `minBestBps == 0` as the unset sentinel),
    `maxBestBps = max(maxBestBps, bestBps)`; `lastSettledAuction = auction`;
    `lastUpdateBlock`.
 6. `AuctionSettledEvent` with `actor = event.transaction.from` (settle is permissionless,
@@ -908,7 +946,20 @@ export function phase(a, n) {
   if (a.bestBidder !== null && n <= a.exclusiveEnd) return "exclusive"; // :231, Lib:62
   return "open";                                                // :224, Lib:76-77
 }
-// "settled" is a flag layered on "open", not a phase: settle() requires n > exclusiveEnd (:266).
+
+// "settled" is a flag layered on "open", not a phase.
+//
+// ⚠️ Corrected 2026-09-08. This previously read as though "open" and "settle() would
+// succeed" were one predicate. They are not, and a caller that treats them as one shows
+// a button that reverts. settle() requires n > revealEnd + exclusiveBlocks
+// unconditionally (:266), whereas phase() returns "open" from n > revealEnd onward when
+// nobody revealed, because that is when the FILL opens (:222-225). For a winnerless
+// auction at exclusiveBlocks = 15 the two differ for 15 blocks, about 30 s on Base.
+// Use canSettle() for the settle predicate; never re-derive it from the phase.
+export function canSettle(a, n) {
+  if (a.settled === true) return false;
+  return n > a.exclusiveEnd;   // :266. exclusiveEnd is stored as revealEnd + exclusiveBlocks
+}
 ```
 
 Rules for consumers:
