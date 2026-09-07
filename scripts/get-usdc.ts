@@ -137,10 +137,18 @@ async function main() {
     throw new Error(`the quote implies ${impliedPrice} USDC/ETH, which is not a plausible price. Refusing to swap into a pool this far from the market.`);
   }
 
-  console.log("\n  wrapping ETH");
-  await mined(await wallet.sendTransaction({
-    to: WETH, value: SPEND, data: encodeFunctionData({ abi: erc20Abi, functionName: "deposit", args: [] }),
-  }), "deposit");
+  // Idempotent: wrap only the shortfall. A re-run after a failed swap must not wrap a
+  // second SPEND on top of WETH that is already sitting there.
+  const wethHeld = await pub.readContract({ address: WETH, abi: erc20Abi, functionName: "balanceOf", args: [me] });
+  if (wethHeld >= SPEND) {
+    console.log(`\n  already holding ${formatEther(wethHeld)} WETH, skipping the wrap`);
+  } else {
+    const shortfall = SPEND - wethHeld;
+    console.log(`\n  wrapping ${formatEther(shortfall)} ETH`);
+    await mined(await wallet.sendTransaction({
+      to: WETH, value: shortfall, data: encodeFunctionData({ abi: erc20Abi, functionName: "deposit", args: [] }),
+    }), "deposit");
+  }
 
   const allowance = await pub.readContract({ address: WETH, abi: erc20Abi, functionName: "allowance", args: [me, SWAP_ROUTER_02] });
   if (allowance < SPEND) {
@@ -150,17 +158,45 @@ async function main() {
     }), "approve");
   }
 
+  // WAIT FOR THE APPROVAL TO BE VISIBLE BEFORE SWAPPING.
+  //
+  // viem runs eth_estimateGas at "latest" inside sendTransaction, and Base's public
+  // endpoint is load balanced. The first attempt at this script died exactly here: the
+  // approve was mined, but the estimate landed on a replica that had not applied that
+  // block, so the allowance read as zero and Uniswap's TransferHelper reverted with
+  // "STF". That message points at the token transfer and says nothing about the real
+  // cause -- the transaction was correct and the node answering was behind. The same
+  // call simulated clean seconds later.
+  for (let i = 0; i < 20; i++) {
+    const a = await pub.readContract({ address: WETH, abi: erc20Abi, functionName: "allowance", args: [me, SWAP_ROUTER_02] });
+    const b = await pub.readContract({ address: WETH, abi: erc20Abi, functionName: "balanceOf", args: [me] });
+    if (a >= SPEND && b >= SPEND) break;
+    if (i === 19) throw new Error(`after 20 tries the endpoint still reports allowance ${a} and balance ${b}, needing ${SPEND}`);
+    process.stdout.write(`  waiting for the approval to be visible (${i + 1})   `);
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+
   console.log("\n  swapping");
-  await mined(await wallet.sendTransaction({
-    to: SWAP_ROUTER_02,
-    data: encodeFunctionData({
-      abi: routerAbi, functionName: "exactInputSingle",
-      args: [{
-        tokenIn: WETH, tokenOut: USDC, fee: POOL_FEE, recipient: me,
-        amountIn: SPEND, amountOutMinimum: minOut, sqrtPriceLimitX96: 0n,
-      }],
-    }),
-  }), "swap");
+  const swapData = encodeFunctionData({
+    abi: routerAbi, functionName: "exactInputSingle",
+    args: [{
+      tokenIn: WETH, tokenOut: USDC, fee: POOL_FEE, recipient: me,
+      amountIn: SPEND, amountOutMinimum: minOut, sqrtPriceLimitX96: 0n,
+    }],
+  });
+  // And retry STF anyway: the estimate can be served by a different replica than the
+  // reads above, so confirming visibility on one endpoint does not bind the next call.
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await mined(await wallet.sendTransaction({ to: SWAP_ROUTER_02, data: swapData }), "swap");
+      break;
+    } catch (e: any) {
+      const msg = String(e?.details ?? e?.shortMessage ?? e?.message ?? e);
+      if (!/STF/.test(msg) || attempt === 5) throw e;
+      console.log(`  attempt ${attempt} hit STF (a replica behind on the approval); retrying in 4s`);
+      await new Promise((r) => setTimeout(r, 4000));
+    }
+  }
 
   const ethAfter = await pub.getBalance({ address: me });
   const usdcAfter = await pub.readContract({ address: USDC, abi: erc20Abi, functionName: "balanceOf", args: [me] });
