@@ -6,6 +6,11 @@ via_ir         = true
 src            = "src"
 test           = "test"
 
+# Narrow on purpose: the ONLY writable path is ./config, which is where
+# test/fork/GenerateRounds.t.sol writes the keeper's round table. Tests otherwise have
+# no filesystem access at all, which is the default and worth keeping.
+fs_permissions = [{ access = "read-write", path = "./config" }]
+
 [fmt]
 single_line_statement_blocks = "multi"
 multiline_func_header        = "all"
