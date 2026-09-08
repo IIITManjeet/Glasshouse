@@ -267,6 +267,72 @@ contract LiveFillPreflightTest is Test {
         console.log("");
     }
 
+    /// @dev A ROUND COUNTER MAKES THE ORDER HASH FRESH, which is what lets a keeper open
+    ///      a new auction every few minutes instead of the run being one-shot forever.
+    ///
+    ///      `Aqua.ship` rejects a strategy hash it has already seen
+    ///      (StrategiesMustBeImmutable) and `Book.open` rejects an order hash it has
+    ///      already opened, so a deterministic order can be run exactly once. The escape
+    ///      is `postTransferInData`: MakerTraits concatenates it into `order.data`
+    ///      (MakerTraits.sol:163) so it changes the hash, while the Book ignores it -- its
+    ///      `postTransferIn` takes both hook-data arguments UNNAMED
+    ///      (GlasshouseBook.sol:245-246), so nothing about the mechanism depends on the
+    ///      bytes. A counter there is therefore free.
+    ///
+    ///      This pins that: same order in every other respect, different round, different
+    ///      hash, and the gate is still the first instruction in the program.
+    function test_Preflight_ARoundCounterGivesAFreshOrderHash() public pure {
+        bytes32 h0 = keccak256(abi.encode(_orderForRound(0)));
+        bytes32 h1 = keccak256(abi.encode(_orderForRound(1)));
+        bytes32 h2 = keccak256(abi.encode(_orderForRound(2)));
+
+        assertTrue(h0 != h1, "round 1 must not collide with round 0");
+        assertTrue(h1 != h2, "round 2 must not collide with round 1");
+        assertTrue(h0 != h2, "round 2 must not collide with round 0");
+
+        // The program is untouched by the counter: the gate still runs before the curve,
+        // which is the only thing about the order that carries meaning.
+        bytes memory program = bytes.concat(GlasshouseAuction.build(BOOK, MAX_BPS), XYCSwap.build());
+        ISwapVM.Order memory r7 = _orderForRound(7);
+        bool found;
+        for (uint256 i = 0; i + program.length <= r7.data.length; i++) {
+            bool same = true;
+            for (uint256 j; j < program.length; j++) {
+                if (r7.data[i + j] != program[j]) { same = false; break; }
+            }
+            if (same) { found = true; break; }
+        }
+        assertTrue(found, "the program must survive the round counter unchanged");
+    }
+
+    /// @dev The live order, with a round counter in the hook data the Book ignores.
+    function _orderForRound(uint32 round) internal pure returns (ISwapVM.Order memory) {
+        return MakerTraitsLib.build(
+            MakerTraitsLib.Args({
+                maker: MAKER,
+                tokenA: WETH,
+                tokenB: USDC,
+                shouldUnwrapWeth: false,
+                useAquaInsteadOfSignature: true,
+                allowZeroAmountIn: false,
+                receiver: address(0),
+                hasPreTransferInHook: false,
+                hasPostTransferInHook: true,
+                hasPreTransferOutHook: false,
+                hasPostTransferOutHook: false,
+                preTransferInTarget: address(0),
+                preTransferInData: "",
+                postTransferInTarget: BOOK,
+                postTransferInData: abi.encodePacked(round),
+                preTransferOutTarget: address(0),
+                preTransferOutData: "",
+                postTransferOutTarget: address(0),
+                postTransferOutData: "",
+                program: bytes.concat(GlasshouseAuction.build(BOOK, MAX_BPS), XYCSwap.build())
+            })
+        );
+    }
+
     /// @dev The live runner is TypeScript and must build taker data for an ephemeral
     ///      winner whose address does not exist until run time. Re-implementing upstream's
     ///      bit packing in TS is exactly how you produce an unfillable order, so instead

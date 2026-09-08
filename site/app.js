@@ -274,12 +274,12 @@ function banner(state) {
 
 async function tick() {
   const mount = $("#live-auctions");
-  if (!mount) return;
+  if (!mount) return { state: null, hc: null };
 
   const state = await load();
   if (!state) {
     mount.replaceChildren(el("p", "muted", "No data source available."));
-    return;
+    return { state: null, hc: null };
   }
   banner(state);
   const hc = await chainHead();
@@ -294,10 +294,51 @@ async function tick() {
     cap.innerHTML = "<strong>What produced this:</strong> a scan of the Book's logs on Base found no auctions.";
     empty.appendChild(cap);
     mount.replaceChildren(empty);
-    return;
+    return { state, hc };
   }
 
   mount.replaceChildren(...list.slice(0, 5).map((a) => renderAuction(a, state, hc)));
+  return { state, hc };
+}
+
+// POLLING IS TIERED, because a flat interval breaks the quota.
+//
+// Studio's dev endpoint allows 3,000 queries/day. A flat 12 s poll is 7,200 per open tab
+// per day -- one idle tab would exceed the whole budget, and three testers would exhaust
+// it before lunch. So the fast rate applies only while an auction is actually in a live
+// phase and the tab is visible; otherwise it drops to 120 s, and to nothing when hidden.
+// ui-spec section 5.3 specified this and the first cut of this file ignored it.
+const FAST_MS = 12_000;   // something is live and on screen
+const SLOW_MS = 120_000;  // nothing live; just keeping the board current
+const IDLE_AFTER_MS = 4 * 60 * 60 * 1000;
+
+let timer = null;
+let lastInteraction = Date.now();
+
+/** True when any listed auction is mid-flight, which is the only time 12 s is justified. */
+function anythingLive(state, hc) {
+  if (!state || !state.auctions) return false;
+  const hi = state.head;
+  return state.auctions.some((a) => {
+    const p = phase(
+      { commitEnd: a.commitEnd, revealEnd: a.revealEnd, exclusiveEnd: a.exclusiveEnd, bestBidder: a.bestBidder ?? null },
+      Math.max(hi, hc ?? 0),
+    );
+    return p !== "open";
+  });
+}
+
+function schedule(ms) {
+  clearTimeout(timer);
+  timer = setTimeout(loop, ms);
+}
+
+async function loop() {
+  if (document.hidden) return schedule(FAST_MS);
+  // A tab left open overnight is not a tester, and should not spend the quota.
+  if (Date.now() - lastInteraction > IDLE_AFTER_MS) return schedule(SLOW_MS);
+  const { state, hc } = await tick();
+  schedule(anythingLive(state, hc) ? FAST_MS : SLOW_MS);
 }
 
 function start() {
@@ -306,14 +347,14 @@ function start() {
   // no script and renders either way.
   for (const n of document.querySelectorAll(".needs-http")) n.remove();
 
-  tick();
-  // Budgeted per ui-spec 5.3: nothing while the tab is hidden.
-  setInterval(() => {
-    if (!document.hidden) tick();
-  }, 12_000);
+  for (const ev of ["pointerdown", "keydown", "focus"]) {
+    window.addEventListener(ev, () => { lastInteraction = Date.now(); }, { passive: true });
+  }
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) tick();
+    if (!document.hidden) { lastInteraction = Date.now(); loop(); }
   });
+
+  loop();
 }
 
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
