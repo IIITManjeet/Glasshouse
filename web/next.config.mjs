@@ -9,6 +9,11 @@
 // same claim the rest of the project makes about verifiability.
 const nextConfig = {
   output: "export",
+  // Without this the export writes rounds.html and account.html, and a plain static
+  // host (S3, nginx, GitHub Pages) 404s on /rounds. trailingSlash makes it
+  // rounds/index.html, which every static host resolves. A review caught this; it would
+  // have surfaced only after deploying.
+  trailingSlash: true,
   images: { unoptimized: true },
   // Pinned because the repo root also has a lockfile and Next would otherwise infer the
   // wrong workspace root, quietly resolving modules from the contracts project.

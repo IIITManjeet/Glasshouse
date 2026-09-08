@@ -717,6 +717,24 @@ export async function placeBid({ maker, orderHash, bps }, options = {}) {
   // A local record with no on-chain commitment is provably worthless and may be replaced.
   const existing = readRecordAt(recordKey(h, account));
   const onChain = await readOwnBid(m, h, account).catch(() => null);
+
+  // A FAILED READ IS NOT PERMISSION TO OVERWRITE.
+  //
+  // readOwnBid swallowing its error meant that when the RPC was merely unreachable,
+  // `onChain` came back null and the guard below waved us through -- a fresh salt then
+  // replaced a record whose commit had already been broadcast, and the only secret that
+  // could open that bid was gone. The bond goes with it. If this browser holds a record
+  // that reached the chain and we cannot confirm the chain, we stop.
+  if (existing && existing.txHash && !onChain) {
+    fail(
+      "CHAIN_UNREADABLE",
+      `This browser holds a bid of ${existing.bps} bps that was already broadcast for this round, ` +
+        "and the chain cannot be read right now to check it. Refusing to replace it: a new bid " +
+        "would destroy the only secret that can reveal the old one. Try again in a moment.",
+      { existing },
+    );
+  }
+
   if (onChain && onChain.committed) {
     fail(
       "ALREADY_SEALED",

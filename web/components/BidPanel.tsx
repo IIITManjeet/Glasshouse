@@ -787,8 +787,22 @@ export function BidPanel({ auction, head }: { auction: Auction | null; head: num
 
   const bounds = { commitEnd: auction.commitEnd, revealEnd: auction.revealEnd };
 
+  // A RECORD IS NOT A BID.
+  //
+  // bid.js writes the secret BEFORE opening the wallet, deliberately -- a secret that
+  // exists only after confirmation is a secret you lose by closing the tab. But that means
+  // a record also exists after the user presses Cancel, and after a commit that reverts.
+  // Branching on `record` alone showed those users "Sealed - reveal opens at block N",
+  // unmounted the form, and left them unable to bid at all in a round they have nothing in.
+  //
+  // So a record only counts as a bid once the chain agrees (st.committed) or it at least
+  // reached the chain (txHash). Everything else is a dead secret, and bid.js will happily
+  // let them try again.
+  const reachedChain = Boolean(record && (record as { txHash?: string | null }).txHash);
+  const haveBid = st.committed || (record != null && reachedChain);
+
   // --- a bid of ours exists, on chain or in this browser ------------------------------
-  if (st.committed || record) {
+  if (haveBid) {
     // Committed on chain, but the secret is not in this browser. The bid is not lost -- it
     // is one browser away -- and the sentence says which browser and offers the way back.
     if (!record) {
