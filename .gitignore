@@ -16,3 +16,6 @@ ignition/deployments/*/build-info/
 
 # Throwaway bidder keys from a live run; worth cents, but written so a crashed run is sweepable
 .ephemeral-bidders.json
+
+# Keeper round state, including the house bid salts it must be able to reveal with
+.keeper-state.json
