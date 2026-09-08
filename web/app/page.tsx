@@ -6,7 +6,8 @@ import { SourceChip, PhaseTrack, BidCards, Stats, ReplayCheck } from "@/componen
 import { WalletBar } from "@/components/WalletBar";
 import { BidPanel, RevealStrip } from "@/components/BidPanel";
 
-const num = (n: number) => n.toLocaleString("en-US");
+const num = (n?: number | null) =>
+  n === null || n === undefined || Number.isNaN(n) ? "—" : n.toLocaleString("en-US");
 
 /**
  * The front door.

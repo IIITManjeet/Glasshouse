@@ -53,6 +53,11 @@ const CHUNK = 9_000n;
 
 const short = (a) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
+// Which keeper round an order hash belongs to, or null for the pre-keeper auctions.
+const ROUND_TABLE = JSON.parse(readFileSync(new URL("../config/rounds.json", import.meta.url), "utf8"));
+const roundOf = (hash) =>
+  ROUND_TABLE.rounds.find((r) => r.orderHash.toLowerCase() === hash.toLowerCase())?.round ?? null;
+
 async function main() {
   const client = createPublicClient({ chain: base, transport: http(LOGS_RPC, { retryCount: 3, retryDelay: 1000 }) });
   const head = await rpc(() => client.getBlockNumber(), "head");
@@ -78,6 +83,10 @@ async function main() {
     if (!auctions.has(k)) {
       auctions.set(k, {
         id: k,
+        // Matched against the precomputed round table so both data paths carry the same
+        // fields. A historic auction predating the keeper has no round; null, not
+        // undefined, so a consumer can tell "no round" from "field missing".
+        round: roundOf(orderHash),
         maker: maker.toLowerCase(),
         orderHash: orderHash.toLowerCase(),
         openedAtBlock: null,

@@ -2,7 +2,8 @@
 
 import { type Auction, livePhase, type Source } from "@/lib/useAuctions";
 
-const num = (n: number) => n.toLocaleString("en-US");
+const num = (n?: number | null) =>
+  n === null || n === undefined || Number.isNaN(n) ? "—" : n.toLocaleString("en-US");
 const short = (a?: string | null) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "—");
 const BLOCK_SECONDS = 2;
 

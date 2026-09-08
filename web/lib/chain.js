@@ -201,6 +201,11 @@ export async function fromChain({ rpc, book, manifest, limit = 3 }) {
     const a = await isOpened(rpc, book, manifest.maker, r.orderHash, at);
     if (!a) continue;
     a.orderHash = r.orderHash;
+    // The maker is NOT in the Auction struct -- it is half of the mapping key, so the
+    // struct never repeats it. Without it BidPanel would call placeBid({maker: undefined})
+    // and build a commitment against the wrong auction key: a bid that can never be
+    // revealed. It comes from the manifest, which is where the hash came from.
+    a.maker = manifest.maker;
     a.round = r.round;
     a.openedAtBlock = a.commitEnd - COMMIT_WINDOW;
     a.clearingBps = a.bestBidder ? Math.max(a.secondBps, a.reserveBps) : null;

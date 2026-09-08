@@ -109,7 +109,8 @@ if (RPC_OVERRIDE) configure({ rpc: RPC_OVERRIDE });
 const IS_FORK = !!RPC_OVERRIDE && /127\.0\.0\.1|localhost/.test(RPC_OVERRIDE);
 
 const BLOCK_SECONDS = 2;
-const num = (n: number) => n.toLocaleString("en-US");
+const num = (n?: number | null) =>
+  n === null || n === undefined || Number.isNaN(n) ? "—" : n.toLocaleString("en-US");
 const short = (a?: string | null) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "—");
 
 /** Blocks are the fact; seconds are an estimate and are labelled as one. Never a clock time. */

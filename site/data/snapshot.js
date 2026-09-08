@@ -5,13 +5,14 @@
 // data. A .js file rather than .json on purpose -- fetch() of a sibling file fails
 // under file://, and a judge opening index.html directly is a case that has to work.
 window.GLASSHOUSE_SNAPSHOT = {
-  "producedAt": "2026-09-08T20:01:40.887Z",
+  "producedAt": "2026-09-08T21:03:42.554Z",
   "producedBy": "scripts/make-snapshot.mjs, from GlasshouseBook logs on Base",
-  "head": 51054174,
+  "head": 51056035,
   "book": "0xc4ea91Fe700918220423ac307C6B1c59650FFbfe",
   "auctions": [
     {
       "id": "0xeebf737f92c8f0d9070f35a7d9baf416923becdf-0x000000000000000000000000000000000000000000000000000001a07d2dfab2",
+      "round": null,
       "maker": "0xeebf737f92c8f0d9070f35a7d9baf416923becdf",
       "orderHash": "0x000000000000000000000000000000000000000000000000000001a07d2dfab2",
       "openedAtBlock": 51008611,

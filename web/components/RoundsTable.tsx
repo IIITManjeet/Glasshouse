@@ -2,7 +2,8 @@
 
 import { type Auction, livePhase } from "@/lib/useAuctions";
 
-const num = (n: number) => n.toLocaleString("en-US");
+const num = (n?: number | null) =>
+  n === null || n === undefined || Number.isNaN(n) ? "—" : n.toLocaleString("en-US");
 
 // Duplicated from components/Auction.tsx rather than imported: that file exports no such
 // helper, and this task's brief is to touch nothing outside these two new files -- adding
