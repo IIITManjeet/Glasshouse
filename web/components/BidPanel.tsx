@@ -6,19 +6,22 @@ import { base } from "wagmi/chains";
 import { type Auction } from "@/lib/useAuctions";
 // Plain ESM, deliberately untyped: bid.js is the same file the static page and the Node
 // tests load, and adding a .d.ts would create a second place for the shape to drift.
-// `allowJs` lets TypeScript infer it, so no suppression is needed or wanted here.
+// `allowJs` lets TypeScript infer it rather than a suppression -- but inference reads
+// `function pendingBid(orderHash, bidder = null)` as "bidder is of type null", which is
+// narrower than the function actually is. The typed surface below is the one place those
+// signatures are stated; the alternative was a cast at every call site.
 import {
-  adoptSecret,
-  bidState,
-  classifyRevert,
-  configure,
-  explainRevert,
-  exportSecret,
-  hasProvider,
-  listBids,
-  pendingBid,
-  placeBid,
-  revealBid,
+  adoptSecret as adoptSecretJs,
+  bidState as bidStateJs,
+  classifyRevert as classifyRevertJs,
+  configure as configureJs,
+  explainRevert as explainRevertJs,
+  exportSecret as exportSecretJs,
+  hasProvider as hasProviderJs,
+  listBids as listBidsJs,
+  pendingBid as pendingBidJs,
+  placeBid as placeBidJs,
+  revealBid as revealBidJs,
 } from "@/lib/bid.js";
 
 /*
@@ -43,6 +46,52 @@ import {
  * wagmi is used for what it is genuinely better at: the account, the chain, and
  * `useWaitForTransactionReceipt` for the hash bid.js hands back.
  */
+
+// --- the typed surface of bid.js ------------------------------------------------------
+// Asserted, not re-declared: every signature here is read off the exported function it
+// names, and nothing about behaviour is expressed in this block.
+
+type Bounds = {
+  commitEnd: number;
+  revealEnd: number;
+  exclusiveEnd: number;
+  bestBidder: string | null;
+  reserveBps: number;
+  maxBps: number;
+};
+type OnChainBid = { committed: boolean; commitIdx: number; revealed: boolean } | null;
+type Classified = { kind: string; name: string | null; selector: string | null; raw: string | null };
+
+const adoptSecret = adoptSecretJs as (args: {
+  maker: string;
+  orderHash: string;
+  bidder: string;
+  bps: number;
+  salt: string;
+  revealEnd?: number | null;
+  commitEnd?: number | null;
+}) => BidRecord;
+const bidState = bidStateJs as (args: {
+  auction: Bounds;
+  record?: BidRecord | null;
+  onChain?: OnChainBid;
+  head: number;
+}) => Derived;
+const classifyRevert = classifyRevertJs as (e: unknown) => Classified;
+const configure = configureJs as (next: { rpc?: string; book?: string; explorer?: string }) => unknown;
+const explainRevert = explainRevertJs as (e: unknown) => string;
+const exportSecret = exportSecretJs as (orderHash: string, bidder?: string | null) => string | null;
+const hasProvider = hasProviderJs as () => boolean;
+const listBids = listBidsJs as (bidder?: string | null) => BidRecord[];
+const pendingBid = pendingBidJs as (orderHash: string, bidder?: string | null) => BidRecord | null;
+const placeBid = placeBidJs as (
+  args: { maker: string; orderHash: string; bps: number },
+  options?: { acceptUnstoredSecret?: boolean; skipPreflight?: boolean },
+) => Promise<{ txHash: string; salt: string; bps: number; record: BidRecord }>;
+const revealBid = revealBidJs as (
+  args: { maker: string; orderHash: string; bps?: number | null; salt?: string | null },
+  options?: { skipPreflight?: boolean; gas?: string },
+) => Promise<{ txHash: string; bps: number }>;
 
 // The board's `?rpc=` override (a local Anvil fork of Base -- see app/providers.tsx) has to
 // reach bid.js as well. Its pre-flight `eth_call`, its `auctions()` read and its `bids()`
@@ -175,7 +224,7 @@ function boundsFromRecord(r: BidRecord) {
 
 /** One sentence, plus the raw material a bug report needs, and never a bare selector. */
 function describe(e: unknown) {
-  const sentence = explainRevert(e) as string;
+  const sentence = explainRevert(e);
   const c = classifyRevert(e) as { name: string | null; selector: string | null; raw: string | null };
   const err = e as { code?: unknown; revert?: { name?: string } } | null;
   const code = typeof err?.code === "string" ? err.code : null;
@@ -240,7 +289,7 @@ function CopySecret({ orderHash, bidder }: { orderHash: string; bidder: string }
   const [copied, setCopied] = useState(false);
 
   const copy = useCallback(() => {
-    const secret = exportSecret(orderHash, bidder) as string | null;
+    const secret = exportSecret(orderHash, bidder);
     if (!secret) return;
     const fallback = () => setShown(secret);
     try {
@@ -350,10 +399,10 @@ function RevealButton({
       // At one or two blocks left a 1.5 s simulation costs a block, and the simulation is
       // worth less than the block: bid.js sends anyway on anything it cannot decode, so the
       // only thing skipping it loses is a decoded error we would show after the fact.
-      const res = (await revealBid(
+      const res = await revealBid(
         { maker: record.maker, orderHash: record.orderHash },
         { skipPreflight: !headUnknown && left <= 2 },
-      )) as { txHash: string };
+      );
       setTx(res.txHash);
       setStage("sent");
       announceRecords();
@@ -564,9 +613,7 @@ function BidForm({ auction, st, head, headUnknown }: { auction: Auction; st: Der
     }, 120);
 
     try {
-      const res = (await placeBid({ maker: auction.maker, orderHash: auction.orderHash, bps: parsed })) as {
-        txHash: string;
-      };
+      const res = await placeBid({ maker: auction.maker, orderHash: auction.orderHash, bps: parsed });
       setTx(res.txHash);
       setStage("sent");
       announceRecords();
@@ -694,20 +741,20 @@ export function BidPanel({ auction, head }: { auction: Auction | null; head: num
   const headUnknown = !Number.isFinite(head) || head <= 0;
 
   const mine = useMemo<BidRecord | null>(
-    () => (mounted && auction && me ? (pendingBid(auction.orderHash, me) as BidRecord | null) : null),
+    () => (mounted && auction && me ? pendingBid(auction.orderHash, me) : null),
     // `tick` is a deliberate dependency: localStorage is not reactive.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [mounted, auction?.orderHash, me, tick],
   );
   const anyRecord = useMemo<BidRecord | null>(
-    () => (mounted && auction ? (pendingBid(auction.orderHash) as BidRecord | null) : null),
+    () => (mounted && auction ? pendingBid(auction.orderHash) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [mounted, auction?.orderHash, tick],
   );
 
   const onChain = onChainBidFor(auction, me);
   const st: Derived | null =
-    mounted && auction ? (bidState({ auction, record: mine, onChain, head }) as Derived) : null;
+    mounted && auction ? bidState({ auction, record: mine, onChain, head }) : null;
 
   if (!auction) {
     return (
@@ -734,7 +781,7 @@ export function BidPanel({ auction, head }: { auction: Auction | null; head: num
 
   // --- a bid of ours exists, on chain or in this browser ------------------------------
   if (st.committed || mine) {
-    const record = mine ?? (anyRecord as BidRecord | null);
+    const record = mine ?? anyRecord;
 
     // Committed on chain, but the secret is not in this browser. The bid is not lost -- it
     // is one browser away -- and the sentence says which browser and offers the way back.
@@ -909,11 +956,11 @@ export function RevealStrip({ head, auctions = [] }: { head: number; auctions?: 
   const due = useMemo(() => {
     if (!mounted || !me) return [] as { record: BidRecord; st: Derived }[];
     const rows: { record: BidRecord; st: Derived }[] = [];
-    for (const record of listBids(me) as BidRecord[]) {
+    for (const record of listBids(me)) {
       const board = auctions.find((a) => a.orderHash?.toLowerCase() === record.orderHash);
       const auction = board ?? boundsFromRecord(record);
       if (!auction) continue; // a typed secret with no boundaries: the card handles it
-      const st = bidState({ auction, record, onChain: onChainBidFor(board, me), head }) as Derived;
+      const st = bidState({ auction, record, onChain: onChainBidFor(board, me), head });
       if (st.revealed) continue;
       // "Reveal due" here is the same weak predicate the button uses: due when the chain
       // could still accept it, plus the case where we have no head to judge with at all.

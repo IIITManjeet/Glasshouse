@@ -71,7 +71,7 @@ export function WalletBar({ className = "" }: { className?: string }) {
   useEffect(() => {
     const err = connectError ?? switchError;
     if (!err) return;
-    setNote(explainRevert(err) as string);
+    setNote(explainRevert(err));
     const t = setTimeout(() => {
       setNote(null);
       resetConnect();

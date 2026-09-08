@@ -554,6 +554,7 @@ function prune(now = Date.now()) {
  * always carries `bidder`, so the caller must compare it before arming a Reveal button:
  * revealing from the wrong account is a guaranteed NoCommitment revert (:190).
  */
+/** @param {string} orderHash @param {string|null} [bidder] */
 export function pendingBid(orderHash, bidder = null) {
   prune();
   const h = String(orderHash || "").toLowerCase();
@@ -574,6 +575,7 @@ export function pendingBid(orderHash, bidder = null) {
 }
 
 /** Every live record in this browser, newest first. The sticky strip's input. */
+/** @param {string|null} [bidder] */
 export function listBids(bidder = null) {
   prune();
   const who = bidder ? String(bidder).toLowerCase() : null;
@@ -590,6 +592,7 @@ export function listBids(bidder = null) {
  * "forget" that reaches across accounts would be a way to destroy a bid the visitor still
  * needs to reveal.
  */
+/** @param {string} orderHash @param {string|null} [bidder] */
 export function forgetBid(orderHash, bidder = null) {
   const s = storage();
   if (!s) return false;
@@ -604,6 +607,7 @@ export function forgetBid(orderHash, bidder = null) {
 }
 
 /** What `Copy bid secret` copies. Enough to reveal from any other browser. */
+/** @param {string} orderHash @param {string|null} [bidder] */
 export function exportSecret(orderHash, bidder = null) {
   const r = pendingBid(orderHash, bidder);
   if (!r) return null;
@@ -960,6 +964,7 @@ async function requireConnectedOnBase() {
  * `phase` comes from site/phase.js and is not re-derived here.
  * `canReveal` is the contract's own predicate (:185-186), nothing softer.
  */
+/** @param {{auction: any, record?: any, onChain?: any, head: number}} args */
 export function bidState({ auction, record = null, onChain = null, head }) {
   const p = phase(auction, head);
   const n = Number(head);

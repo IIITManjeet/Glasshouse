@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useAuctions, livePhase, type Auction } from "@/lib/useAuctions";
 import { SourceChip, PhaseTrack, BidCards, Stats, ReplayCheck } from "@/components/Auction";
+import { WalletBar } from "@/components/WalletBar";
+import { BidPanel, RevealStrip } from "@/components/BidPanel";
 
 const num = (n: number) => n.toLocaleString("en-US");
 
@@ -43,6 +45,7 @@ export default function Home() {
       </section>
 
       <section id="live">
+        <WalletBar className="mb-4" />
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-display text-xl font-normal">Live on Base</h2>
           {head > 0 && <SourceChip source={source} head={head} isFork={isFork} />}
@@ -88,6 +91,13 @@ export default function Home() {
             <Stats a={featured} head={head} />
             <ReplayCheck a={featured} />
 
+            {/* The whole point of the product: a visitor can join the round they are
+                watching. BidPanel decides for itself which of connect / bid / reveal /
+                closed applies -- the branching lives with the rules, in bid.js, not here. */}
+            <div className="mt-5 border-t border-rule pt-4">
+              <BidPanel auction={featured} head={head} />
+            </div>
+
             <p className="mt-4 border-t border-rule pt-3 text-[0.78rem] leading-relaxed text-ink-faint">
               <strong className="font-medium text-ink-soft">What produced this:</strong> the{" "}
               <code className="font-mono">GlasshouseBook</code> contract on Base, read at block{" "}
@@ -106,6 +116,10 @@ export default function Home() {
           </p>
         )}
       </section>
+
+      {/* Sticky, and the only sticky thing on the page. A reveal the bidder cannot see
+          is a reveal they will miss, and missing it costs them the bid. */}
+      <RevealStrip head={head} auctions={auctions} />
     </main>
   );
 }
