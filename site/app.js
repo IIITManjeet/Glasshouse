@@ -15,6 +15,7 @@
 // `node --test`. One implementation, three consumers, no forks.
 
 import { phase, canSettle } from "./phase.js";
+import { fromChain } from "./chain.js";
 
 // Set this once the subgraph is published; until then the page runs on the snapshot and
 // says so. Empty is a supported state, not a broken one.
@@ -97,6 +98,17 @@ function fromSnapshot() {
 
 /** Live, then cache, then snapshot. Never silently: the caller renders the tag. */
 async function load() {
+  // CHAIN FIRST while the subgraph is unpublished: it is the only source that can see a
+  // round the keeper opened a minute ago. Once the subgraph is published it takes over
+  // history, but the live card stays on the chain either way -- polling an indexer every
+  // 12 s does not fit inside Studio's daily cap, and for a ticking phase the chain is
+  // fresher anyway.
+  try {
+    const chain = await fromChain({ rpc: RPC, book: BOOK, manifest: window.GLASSHOUSE_ROUNDS });
+    if (chain) return chain;
+  } catch (e) {
+    console.warn("[glasshouse] chain read failed:", e.message);
+  }
   try {
     const live = await fromSubgraph();
     if (live) {
@@ -133,7 +145,8 @@ const PHASE_LABEL = { commit: "commit", reveal: "reveal", exclusive: "exclusive"
 
 function sourceChip(state) {
   const bits = ["Source"];
-  if (state.source === "base") bits.push("Base mainnet · indexed", `as of block ${num(state.head)}`);
+  if (state.source === "chain") bits.push("Base mainnet · read from the contract", `block ${num(state.head)}`);
+  else if (state.source === "base") bits.push("Base mainnet · indexed", `as of block ${num(state.head)}`);
   else if (state.source === "cache") bits.push("Cached", `as of block ${num(state.head)}`);
   else bits.push("Snapshot in repo", `as of block ${num(state.head)}`);
   return bits.join(" · ");
