@@ -100,6 +100,56 @@ for (const [re, name] of FORBIDDEN) {
   if (m) failures.push(`${name} appears at line ${lineOf(m.index)}: the page must not present a toy market as a market`);
 }
 
+// ---------------------------------------------------------------------------------
+// Contrast, computed rather than eyeballed.
+//
+// A visual-design review found --ink-faint at 3.15:1 on the light ground -- below WCAG
+// AA for normal text, and the colour of every provenance caption, source chip and note.
+// The layer that exists to make the page honest was the hardest thing on it to read.
+// Both themes pass now; this keeps them passing, because a palette drifts one hex at a
+// time and nobody notices until somebody cannot read it.
+//
+// Small text only: these tokens are used at 0.66-0.9rem, nowhere near the 18.66px that
+// would let the 3:1 large-text threshold apply.
+const srgb = (h) => h.replace("#", "").match(/../g).map((x) => parseInt(x, 16) / 255);
+const linear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+const luminance = (h) => {
+  const [r, g, b] = srgb(h).map(linear);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const contrast = (x, y) => {
+  const [hi, lo] = [luminance(x), luminance(y)].sort((a, b) => b - a);
+  return (hi + 0.05) / (lo + 0.05);
+};
+
+/** Tokens from one :root block, so light and dark are judged separately. */
+function tokensIn(source) {
+  const out = {};
+  for (const t of source.matchAll(/--([a-z-]+):\s*(#[0-9A-Fa-f]{6})/g)) out[t[1]] = t[2];
+  return out;
+}
+
+const LIGHT = /:root \{[\s\S]*?\n  \}/.exec(html);
+const DARK = /prefers-color-scheme: dark[\s\S]*?\n    \}/.exec(html);
+const AA = 4.5;
+for (const [theme, m] of [["light", LIGHT], ["dark", DARK]]) {
+  if (!m) continue;
+  const t = tokensIn(m[0]);
+  if (!t.ground) continue;
+  for (const fg of ["ink", "ink-soft", "ink-faint", "glass", "amber", "brick"]) {
+    for (const bg of ["ground", "raised"]) {
+      if (!t[fg] || !t[bg]) continue;
+      const r = contrast(t[fg], t[bg]);
+      if (r < AA) {
+        failures.push(
+          `${theme} theme: --${fg} (${t[fg]}) on --${bg} (${t[bg]}) is ${r.toFixed(2)}:1, below ` +
+          `WCAG AA ${AA}:1 for the small text these tokens are used at`,
+        );
+      }
+    }
+  }
+}
+
 const figures = (html.match(/<figure\b/g) ?? []).length;
 if (failures.length > 0) {
   console.error(`\nFAIL: ${failures.length} provenance problem(s) in site/index.html\n`);
