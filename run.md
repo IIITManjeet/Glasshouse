@@ -922,6 +922,62 @@ paraphrase in F-44** and settles the question of what may be removed from the re
 - **F-143** ✅ **`AI-DISCLOSURE.md` rewritten to satisfy the second clause**, which asks
   for *specific files*, not a general statement. It now carries a per-path table.
 
+### 3.6u "Why not an AVS?" - the answer, prepared (2026-09-08)
+
+- **F-161** 🔑 **A judge will ask why this is not built on restaking, and the answer is
+  that there is nothing here to secure.** Prompted by EigenAuction, which removes LVR for
+  Uniswap v4 LPs: its operators compute the auction winner OFF-CHAIN each block and commit
+  it through a BLS-signed quorum, with a challenge window and EigenLayer slashing behind
+  it. That is the correct design **for that problem**, and choosing an AVS over a multisig
+  is right: a committed winner is an unverifiable assertion, and assertions need economic
+  backing.
+
+  **It is forced by latency, not by sophistication.** LVR is a per-block phenomenon and a
+  commit-reveal auction cannot resolve inside one block, so their auction MUST run off
+  chain. Taker priority on a resting order is not per-block; Glasshouse can afford 150
+  seconds, and for that price the winner is computed on chain from revealed bids.
+  `outcome()` is a view function over state written permissionlessly by `commit` and
+  `reveal` (`GlasshouseBook.sol:213-231`), with no owner, no admin and no upgrade path.
+  **Nobody makes a claim, so there is no claim to challenge.** Adding an AVS would mean
+  introducing a trusted party in order to then buy machinery to constrain it.
+
+  **The general rule to state on stage:** verify on chain when you can afford the latency;
+  secure economically off chain when you cannot. The question is always "can I afford to
+  be slow?" - they cannot, we can.
+
+  **Where defection IS possible we already use capital at risk**, which is the same
+  principle applied one layer over: `claimForfeit` (winner does not fill, maker takes the
+  bond, `:306`), `claimUnrevealed` (bidder withholds a reveal, `:329`), `claimBond` for the
+  honest (`:284`).
+
+  **Two counters to have ready if pushed on "restaking is more secure".** A challenge
+  window is a LIVENESS assumption - someone must be watching and willing to pay gas, and
+  an unchallenged bad commitment simply stands. And slashing punishes without
+  compensating: the burned stake does not reach the LP who ate the LVR. Redistributable
+  slashing would fix that and per **F-55** it barely exists in production in this space.
+
+- **F-162** ✅ **We already ship the equivalent of the challenge, and it is strictly
+  stronger in one respect.** `settlementMatchesDerivation` (`subgraph/src/book.ts:503-506`,
+  and now `scripts/make-snapshot.mjs` too) replays the contract's own top-2 rule over the
+  raw reveals and compares the result against what `settle()` emitted. It is a check, not
+  an echo: the emitted values are never copied over the derived ones. A mismatch is
+  logged and surfaced rather than patched.
+
+  **The property a challenge window does not have: no deadline.** A challenge period is
+  final once it closes; miss it and a bad commitment stands forever. This replay is a pure
+  function of permanent public data, so anyone can recompute it at any time, indefinitely.
+  There is no "someone must be watching this week" assumption because there is no window
+  to miss. Now rendered on the page under each auction.
+
+- **F-163** ⚠️ **A real asymmetry the question surfaced, and it is ours, not theirs.**
+  Bidders post bonds; **the maker posts nothing**. A maker can open an auction against an
+  order they never ship, and every bidder burns gas on an auction that can never fill. The
+  contract already acknowledges the blind spot - `settle()` refuses to mark a winner
+  forfeited without positive evidence someone else filled, precisely because it cannot
+  distinguish a no-show from a maker who wired the hook wrong (`:271-277`). A maker-side
+  bond is the right fix. **v2 only:** `GlasshouseBook` has no upgrade path by design, so it
+  means a new deployment.
+
 ### 3.6t Subgraph deployed to Studio (2026-09-07)
 
 - **F-157** ✅ **Deployed.** `Qmc9Ah4ow5mXD7599hi3ewze7Fg77x1GivAqaCSAmmpK7E`, version label

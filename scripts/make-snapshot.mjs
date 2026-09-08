@@ -100,6 +100,10 @@ async function main() {
         settled: false,
         settledAtBlock: null,
         winnerForfeited: null,
+        // The same independent-replay check the subgraph runs. Null until settled.
+        settlementMatchesDerivation: null,
+        settledWinner: null,
+        settledClearingBps: null,
         bids: [],
       });
     }
@@ -145,12 +149,32 @@ async function main() {
         a.amountIn = e.args.amountIn.toString();
         a.amountOut = e.args.amountOut.toString();
         break;
-      case "AuctionSettled":
+      case "AuctionSettled": {
         a.settled = true;
         a.settledAtBlock = n;
         a.winnerForfeited = e.args.winnerForfeited;
-        if (a.bestBidder) a.clearingBps = Number(e.args.clearingBps);
+        a.settledWinner = e.args.winner.toLowerCase();
+        a.settledClearingBps = Number(e.args.clearingBps);
+
+        // INDEPENDENT REPLAY, not a read-back.
+        //
+        // The emitted values are NOT copied over the derived ones. The point is that
+        // this file computed the winner and clearing price itself, from the raw reveals,
+        // using the contract's own top-2 rule -- so comparing them is a real check and
+        // not a tautology. Same check the subgraph mapping runs (subgraph/src/book.ts:503).
+        // A disagreement is left visible, never patched over.
+        const derivedWinner = a.bestBidder ?? "0x0000000000000000000000000000000000000000";
+        const derivedClearing = a.bestBidder ? (a.clearingBps ?? 0) : 0;
+        a.settlementMatchesDerivation =
+          derivedWinner.toLowerCase() === a.settledWinner && derivedClearing === a.settledClearingBps;
+        if (!a.settlementMatchesDerivation) {
+          console.error(
+            `  MISMATCH on ${a.orderHash}: emitted ${a.settledWinner} at ${a.settledClearingBps} bps, ` +
+            `derived ${derivedWinner} at ${derivedClearing} bps`,
+          );
+        }
         break;
+      }
       default:
         break;
     }
@@ -160,7 +184,8 @@ async function main() {
   for (const a of list) {
     console.log(
       `  auction ${short(a.orderHash)}  opened ${a.openedAtBlock}  commits ${a.committedCount}  ` +
-      `reveals ${a.revealedCount}  filled ${a.filled}  settled ${a.settled}`,
+      `reveals ${a.revealedCount}  filled ${a.filled}  settled ${a.settled}` +
+      (a.settlementMatchesDerivation === null ? "" : `  replay=${a.settlementMatchesDerivation ? "matches" : "MISMATCH"}`),
     );
   }
 

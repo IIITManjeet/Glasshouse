@@ -222,6 +222,36 @@ function renderStats(a, p) {
   return wrap;
 }
 
+/**
+ * THE SETTLEMENT, INDEPENDENTLY RE-DERIVED.
+ *
+ * The indexer does not read the winner and clearing price back out of the AuctionSettled
+ * event and display them. It replays the contract's own top-2 rule over the raw reveals,
+ * computes its own answer, and compares. So this line is a check, not an echo.
+ *
+ * This is the honest answer to "how do we know the auctioneer did not cheat", and it is
+ * why this design needs no operator set, no staking and no challenge window: there is no
+ * off-chain claim to challenge. The winner is a pure function of public on-chain state,
+ * so anyone can recompute it -- and unlike a challenge window, that never expires. A
+ * challenge period is final once it closes; this can be re-run in ten years.
+ */
+function renderReplayCheck(a) {
+  const line = el("p", "replay");
+  if (a.settlementMatchesDerivation === true) {
+    line.classList.add("ok");
+    line.textContent = "Settlement matches an independent replay of the reveals \u2713";
+  } else if (a.settlementMatchesDerivation === false) {
+    // Shown, not hidden. A mismatch would be the single most important thing on the page.
+    line.classList.add("bad");
+    line.textContent =
+      `Settlement DISAGREES with an independent replay: emitted ${a.settledClearingBps} bps, ` +
+      "re-derived a different result. This is a defect and is shown rather than hidden.";
+  } else {
+    line.textContent = "Not settled yet \u2014 the replay check runs at settlement.";
+  }
+  return line;
+}
+
 function renderAuction(a, state, hc) {
   const hi = state.head;
   const root = el("figure", "fig auction");
@@ -237,6 +267,7 @@ function renderAuction(a, state, hc) {
   root.appendChild(track);
   root.appendChild(renderBids(a));
   root.appendChild(renderStats(a, p));
+  root.appendChild(renderReplayCheck(a));
 
   const cap = el("figcaption", "made");
   cap.innerHTML =
