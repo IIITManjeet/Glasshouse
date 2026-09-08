@@ -24,3 +24,8 @@ ignition/deployments/*/build-info/
 web/node_modules/
 web/.next/
 web/out/
+
+# Generated from site/ by web/scripts/sync-assets.mjs on every build.
+# Committing them would fork the argument and the snapshot.
+web/public/argument.html
+web/public/data/

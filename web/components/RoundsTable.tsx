@@ -105,7 +105,13 @@ export function RoundsTable({ auctions, head }: { auctions: Auction[]; head: num
             // blocks left to use; labelling it "unrevealed" this early would accuse someone
             // of an omission they have not committed yet.
             const revealWindowClosed = a.settled === true || head > a.revealEnd;
-            const missingReveals = a.committedCount - a.revealedCount;
+            // revealedCount is null when the log scan failed. "Not read" and "nobody
+            // revealed" are different claims; only one of them is defensible.
+            const revealsRead = a.revealedCount !== null && a.revealedCount !== undefined;
+            const missingReveals = revealsRead ? a.committedCount - (a.revealedCount as number) : 0;
+            // A bond can only be forfeited if there is one. Every keeper round runs with
+            // bond = 0 (scripts/keeper.ts:58), so claiming otherwise is simply false.
+            const hasBond = a.bond !== undefined && a.bond !== "0";
 
             return (
               <tr key={a.orderHash} className="border-b border-rule last:border-b-0 hover:bg-raised">
@@ -115,7 +121,7 @@ export function RoundsTable({ auctions, head }: { auctions: Auction[]; head: num
                   <PhaseChip a={a} head={head} />
                 </td>
                 <td className="tnum px-3 py-2 text-ink-soft">
-                  {a.revealedCount} of {a.committedCount}
+                  {revealsRead ? `${a.revealedCount} of ${a.committedCount}` : `not read, ${a.committedCount} committed`}
                   {missingReveals > 0 && revealWindowClosed ? (
                     <span className="ml-1.5 whitespace-nowrap text-[0.72rem] text-brick">
                       {missingReveals} unrevealed · bond forfeitable

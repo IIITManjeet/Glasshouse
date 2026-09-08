@@ -1,0 +1,41 @@
+#!/usr/bin/env node
+// Copy the shared assets into web/public before every build.
+//
+// WHY THIS EXISTS RATHER THAN A COMMITTED COPY. An architecture review found two forks
+// waiting to happen: site/index.html was hand-copied to public/argument.html, and
+// site/data/*.js was copied to public/data/ while scripts/make-snapshot.mjs writes only to
+// site/data/. Both would have drifted at the next regeneration, silently, and the app
+// would have served a stale argument and a stale snapshot while the repo held current
+// ones.
+//
+// So the copies are GENERATED and gitignored. site/ is the single source; this runs on
+// prebuild and predev, and the app never contains a second editable copy of anything.
+
+import { copyFileSync, mkdirSync, existsSync } from "node:fs";
+
+const from = (p) => new URL(`../../${p}`, import.meta.url);
+const to = (p) => new URL(`../public/${p}`, import.meta.url);
+
+mkdirSync(new URL("../public/data/", import.meta.url), { recursive: true });
+
+const assets = [
+  // The written argument, served as a plain file so the product's "why" link resolves.
+  ["site/index.html", "argument.html"],
+  // The round manifest: which order hashes the keeper will open. Without it the board
+  // cannot ask the chain about anything.
+  ["site/data/rounds.js", "data/rounds.js"],
+  // The cold fallback, for when the chain cannot be reached at all.
+  ["site/data/snapshot.js", "data/snapshot.js"],
+];
+
+let copied = 0;
+for (const [src, dest] of assets) {
+  const s = from(src);
+  if (!existsSync(s)) {
+    console.error(`sync-assets: ${src} is missing. Run scripts/make-snapshot.mjs from the repo root.`);
+    process.exit(1);
+  }
+  copyFileSync(s, to(dest));
+  copied++;
+}
+console.log(`sync-assets: ${copied} file(s) copied from site/ into web/public/`);

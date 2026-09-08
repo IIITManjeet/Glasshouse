@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "subgraph-mcp": {
+      "type": "sse",
+      "url": "https://subgraphs.mcp.thegraph.com/sse",
+      "headers": {
+        "Authorization": "Bearer ${GRAPH_API_KEY}"
+      }
+    }
+  }
+}

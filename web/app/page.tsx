@@ -40,7 +40,7 @@ export default function Home() {
         <p className="mt-3 text-sm text-ink-faint">
           <Link href="/rounds" className="text-glass underline underline-offset-2">Every round so far</Link>
           {" · "}
-          <a href="/argument" className="text-glass underline underline-offset-2">Why the alternatives are worse</a>
+          <a href="/argument.html" className="text-glass underline underline-offset-2">Why the alternatives are worse</a>
         </p>
       </section>
 

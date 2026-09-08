@@ -746,15 +746,23 @@ export function BidPanel({ auction, head }: { auction: Auction | null; head: num
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [mounted, auction?.orderHash, me, tick],
   );
-  const anyRecord = useMemo<BidRecord | null>(
-    () => (mounted && auction ? pendingBid(auction.orderHash) : null),
+  // THE WALK-AWAY CASE. A visitor who sealed a bid, closed the tab and came back has no
+  // connected account until the wallet re-authorises, which may be never -- and their reveal
+  // deadline is running the whole time. With no account to key on, the unambiguous record
+  // this browser holds for the round IS theirs in the only sense that matters, so it is
+  // shown and the control tells them which account to connect. When an account IS connected
+  // this falls back to null, because another account's record is not theirs to reveal and
+  // `pendingBid(hash, me)` has already said so.
+  const browserRecord = useMemo<BidRecord | null>(
+    () => (mounted && auction && !me ? pendingBid(auction.orderHash) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [mounted, auction?.orderHash, tick],
+    [mounted, auction?.orderHash, me, tick],
   );
 
+  const record = mine ?? browserRecord;
   const onChain = onChainBidFor(auction, me);
   const st: Derived | null =
-    mounted && auction ? bidState({ auction, record: mine, onChain, head }) : null;
+    mounted && auction ? bidState({ auction, record, onChain, head }) : null;
 
   if (!auction) {
     return (
@@ -780,9 +788,7 @@ export function BidPanel({ auction, head }: { auction: Auction | null; head: num
   const bounds = { commitEnd: auction.commitEnd, revealEnd: auction.revealEnd };
 
   // --- a bid of ours exists, on chain or in this browser ------------------------------
-  if (st.committed || mine) {
-    const record = mine ?? anyRecord;
-
+  if (st.committed || record) {
     // Committed on chain, but the secret is not in this browser. The bid is not lost -- it
     // is one browser away -- and the sentence says which browser and offers the way back.
     if (!record) {
@@ -954,8 +960,13 @@ export function RevealStrip({ head, auctions = [] }: { head: number; auctions?: 
   const headUnknown = !Number.isFinite(head) || head <= 0;
 
   const due = useMemo(() => {
-    if (!mounted || !me) return [] as { record: BidRecord; st: Derived }[];
+    if (!mounted) return [] as { record: BidRecord; st: Derived }[];
     const rows: { record: BidRecord; st: Derived }[] = [];
+    // Keyed to the connected account when there is one. When there is not -- a reload during
+    // the reveal window, before the wallet has re-authorised the origin -- every record in
+    // this browser is shown instead, because the deadline does not wait for a reconnect and
+    // a strip that appears only after connecting is a strip that appears too late. The
+    // button in each row names the account that has to sign.
     for (const record of listBids(me)) {
       const board = auctions.find((a) => a.orderHash?.toLowerCase() === record.orderHash);
       const auction = board ?? boundsFromRecord(record);

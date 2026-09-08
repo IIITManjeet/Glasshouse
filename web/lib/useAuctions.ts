@@ -24,17 +24,20 @@ export type Auction = {
   reserveBps: number;
   maxBps: number;
   committedCount: number;
-  revealedCount: number;
+  /** null when the log scan failed: "not read", which is not "nobody revealed". */
+  revealedCount: number | null;
   bestBidder: string | null;
   bestBps: number;
   secondBps: number;
   clearingBps: number | null;
+  bond?: string;
   filled: boolean;
   filledBy: string | null;
   settled: boolean;
   winnerForfeited: boolean;
   settlementMatchesDerivation: boolean | null;
-  bids: Bid[];
+  /** null when the log scan failed. Never render this as an empty list. */
+  bids: Bid[] | null;
 };
 
 export type Source = "chain" | "snapshot" | "none";
@@ -93,6 +96,8 @@ export function useAuctions(): Board {
     const rpc = rpcUrl();
 
     async function tick() {
+      let latest: Auction[] = [];
+      let latestHead = 0;
       if (typeof document !== "undefined" && document.hidden) {
         timer.current = setTimeout(tick, 12_000);
         return;
@@ -103,8 +108,10 @@ export function useAuctions(): Board {
         if (cancelled) return;
 
         if (got) {
-          setAuctions(got.auctions as Auction[]);
-          setHead(got.head);
+          latest = got.auctions as Auction[];
+          latestHead = got.head;
+          setAuctions(latest);
+          setHead(latestHead);
           setSource("chain");
           setError(null);
         } else {
@@ -112,8 +119,10 @@ export function useAuctions(): Board {
           // -- never presented as live.
           const snap = (window as any).GLASSHOUSE_SNAPSHOT;
           if (snap) {
-            setAuctions(snap.auctions as Auction[]);
-            setHead(snap.head);
+            latest = snap.auctions as Auction[];
+            latestHead = snap.head;
+            setAuctions(latest);
+            setHead(latestHead);
             setSource("snapshot");
           } else {
             setSource("none");
@@ -127,9 +136,14 @@ export function useAuctions(): Board {
       }
 
       if (cancelled) return;
-      const anyLive = auctionsRef.current.some(
-        (a) => livePhase(a, headRef.current) !== "open",
-      );
+      // Scheduled from what THIS tick fetched, not from the refs.
+      //
+      // The refs are assigned during render, which has not happened yet at this point, so
+      // on the first tick they are still empty -- anyLive came out false and the next poll
+      // was 120 s away. That is 60 blocks. A bidder who committed with 40 blocks left would
+      // watch a frozen countdown through their entire reveal window under the advocated
+      // 30/30 config, and have nothing to click. Found by an architecture review.
+      const anyLive = latest.some((a) => livePhase(a, latestHead) !== "open");
       timer.current = setTimeout(tick, anyLive ? 12_000 : 120_000);
     }
 

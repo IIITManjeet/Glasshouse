@@ -125,8 +125,11 @@ export function deriveAccount(address: string, auctions: Auction[], headBlock: n
     const asMaker = eq(a.maker, address);
     if (asMaker) auctionsOpened++;
 
-    const rawBid = (a.bids ?? []).find((b) => eq(b.bidder, address)) as
-      | Provenanced<Auction["bids"][number]>
+    // (a.bids ?? []) would silently treat an unread scan as "this address did not bid".
+    // Skipping the round is the honest answer: we do not know either way.
+    if (a.bids == null) continue;
+    const rawBid = a.bids.find((b) => eq(b.bidder, address)) as
+      | Provenanced<NonNullable<Auction["bids"]>[number]>
       | undefined;
 
     let bidOutcome: RoundOutcome["bid"] = null;

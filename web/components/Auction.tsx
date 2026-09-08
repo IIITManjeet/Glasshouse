@@ -64,7 +64,10 @@ export function PhaseTrack({ a, head }: { a: Auction; head: number }) {
         // The contract collapses the exclusive window to nothing when nobody revealed, so
         // the diagram says that rather than drawing a window that will never exist.
         const isVoid = c.key === "exclusive" && !a.bestBidder;
-        const left = isActive && c.end ? Math.max(0, c.end - head + 1) : 0;
+        // commit() accepts while block.number <= commitEnd (GlasshouseBook.sol:159), so at
+        // head == commitEnd there is ONE block left, not two. The +1 disagreed with
+        // bid.js and printed a different countdown beside the same deadline.
+        const left = isActive && c.end ? Math.max(0, c.end - head) : 0;
         return (
           <div
             key={c.key}
@@ -92,7 +95,16 @@ export function PhaseTrack({ a, head }: { a: Auction; head: number }) {
 
 /** A sealed bid exists and cannot be read yet. Hatching says that; a spinner would lie. */
 export function BidCards({ a }: { a: Auction }) {
-  if (!a.bids?.length) {
+  // null means the log scan FAILED. That is not "no bids" -- rendering it as none is how
+  // a rate-limited request turns into an accusation that nobody bid.
+  if (a.bids == null) {
+    return (
+      <p className="mt-4 text-sm text-amber">
+        Bids could not be read from the chain just now. This says nothing about whether any were placed.
+      </p>
+    );
+  }
+  if (!a.bids.length) {
     return <p className="mt-4 text-sm text-ink-faint">No bids committed yet.</p>;
   }
   return (
@@ -135,8 +147,11 @@ export function Stats({ a, head }: { a: Auction; head: number }) {
     ["clearing", a.clearingBps === null ? "—" : `${a.clearingBps} bps · ${state}`],
     // Both numbers, never a percentage. A ratio without its denominator is a claim the
     // data does not support -- subgraph/README.md's refusals list.
-    ["reveals", `${a.revealedCount} of ${a.committedCount}`],
-    ["winner", a.bestBidder ? short(a.bestBidder) : "no reveals"],
+    ["reveals", a.revealedCount == null ? `not read, ${a.committedCount} committed` : `${a.revealedCount} of ${a.committedCount}`],
+    // "winner" only once settled: until then a higher reveal can still displace them.
+    // Profile.tsx already said "leading, not settled"; three views disagreeing about one
+    // address is worse than any single one being wrong.
+    [a.settled ? "winner" : "leading", a.bestBidder ? short(a.bestBidder) : "no reveals"],
     ["reserve · max", `${a.reserveBps} · ${a.maxBps} bps`],
   ];
   if (a.filled) items.push(["filled by", short(a.filledBy)]);

@@ -14,7 +14,7 @@ import {
 } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
-wimport { basePublicClient, baseTransport, waitForBlock, rpc } from "./lib/chain.ts";
+import { basePublicClient, baseTransport, waitForBlock, rpc } from "./lib/chain.ts";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 
