@@ -19,3 +19,8 @@ ignition/deployments/*/build-info/
 
 # Keeper round state, including the house bid salts it must be able to reveal with
 .keeper-state.json
+
+# Next.js build output and deps
+web/node_modules/
+web/.next/
+web/out/

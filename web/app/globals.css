@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+/* The design tokens are carried over from site/index.html rather than reinvented, because
+   they were chosen deliberately and their contrast was verified: ui-spec.md section 2, and
+   scripts/lint-provenance.mjs computes WCAG ratios for every one of them against both
+   grounds. --ink-faint here is the corrected 5.08:1 value, not the 3.15:1 it shipped with.
+
+   Exposed as Tailwind v4 theme variables so `text-ink-faint` and `bg-raised` work directly
+   and nothing has to remember a hex. */
+@theme {
+  --color-ground: #f1f4f3;
+  --color-raised: #fafcfb;
+  --color-sunk: #e7ecea;
+  --color-ink: #0f1a18;
+  --color-ink-soft: #4a5c58;
+  --color-ink-faint: #5a6b67;
+  --color-rule: #d2dcd9;
+  --color-glass: #1f6f66;
+  --color-glass-soft: #e0edea;
+  --color-brick: #9c3b2c;
+  --color-brick-soft: #f6e5e1;
+  --color-amber: #8a5a14;
+  --color-amber-soft: #f7eedc;
+
+  --font-display: Newsreader, Georgia, "Times New Roman", serif;
+  --font-sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* Dark is a token swap, not a separate stylesheet. Every colour is defined in the light
+   block first so nothing can be defined ONLY inside a media query and vanish. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-ground: #0b1513;
+    --color-raised: #121f1d;
+    --color-sunk: #081110;
+    --color-ink: #e5eeeb;
+    --color-ink-soft: #92a6a1;
+    --color-ink-faint: #7b8f8a;
+    --color-rule: #21332f;
+    --color-glass: #5cc0b1;
+    --color-glass-soft: #14302b;
+    --color-brick: #db7660;
+    --color-brick-soft: #2c1714;
+    --color-amber: #d6a94a;
+    --color-amber-soft: #33280f;
+  }
+}
+
+html {
+  background: var(--color-ground);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Every number that came from a chain, a test or a computation is monospace with tabular
+   figures, so columns of them line up and a changing digit does not shift the ones beside
+   it. That rule is from ui-spec section 2.1 and it is why this is global rather than a
+   utility somebody has to remember. */
+.tnum {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A sealed bid is a value that EXISTS and cannot be read yet. Hatching says that. A
+   spinner would say "loading", which is a different and false claim. */
+.hatch {
+  background-image: repeating-linear-gradient(
+    135deg,
+    var(--color-sunk) 0 6px,
+    var(--color-raised) 6px 12px
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -394,22 +394,6 @@
     </div>
   </header>
 
-  <p id="data-banner" class="banner" hidden></p>
-
-  <section id="live">
-    <h2>Live on Base right now</h2>
-    <div class="spine">
-      <p>Every auction below is a real one on Base mainnet, read from the chain. The phase is
-      computed against the block the data describes &mdash; the contract stores no phase, it
-      compares <code>block.number</code> to boundaries written when the auction opened, so any
-      honest reader has to do the same.</p>
-    </div>
-    <div id="live-auctions">
-      <p class="needs-http muted">This section reads live data and needs to be served over
-      http. Opened straight from a file, the argument below still works.</p>
-    </div>
-  </section>
-
   <section>
     <div class="spine">
       <h2>The order is already spoken for</h2>
@@ -610,6 +594,3 @@ ctx.swap.balanceIn =
 
 </div>
 
-<script src="./data/rounds.js"></script>
-<script src="./data/snapshot.js"></script>
-<script type="module" src="./app.js"></script>

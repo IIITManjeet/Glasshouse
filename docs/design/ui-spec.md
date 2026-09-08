@@ -476,7 +476,11 @@ Budget: Tue 09 full day + Wed 10 morning ≈ **12 implementation hours** for the
 3. Open the hosted URL with the network blocked in devtools: the banner reads `Showing cached data as of block N` and every instrument figure carries the `cache` tag; then clear site data and reload: `snapshot` tag and banner.
 4. Open `site/index.html` from `file://`: the argument, comparison, phase track and parameter table render; instrument sections show the `needs-http` notice; no console errors.
 5. During a live auction run with `run-auction.ts`, S3 shows: sealed cards appearing within one poll of the commit tx; the phase cell flipping at `commitEnd + 1` against the indexed head; cards unsealing on reveal; `running` → `final` at `revealEnd + 1`; `settled ✓` and the receipt after `settle()`.
-6. Every address on the page has a `TEAM` / `INVITED` / `UNLISTED` chip and the legend appears under S2 and S5. The string "external" does not occur in `site/`.
+6. Every address on the page carries a `TEAM` / `INVITED` / `UNLISTED` chip **when the data source can actually say**, and the legend appears under S2 and S5. The word "external" is never a claim ABOUT an address; it may appear only inside the legend that denies it.
+
+   > ⚠️ **Corrected 2026-09-09.** This item used to read *"The string \"external\" does not occur in `site/`"*, which contradicts §3.4 of this same document four hundred lines above: the legend §3.4 mandates verbatim is *"It does not mean external, and we do not know who it is."* An honest denial has to name the thing it denies, so a blanket grep forbids the correct text. What actually matters is that we never assert an address IS external, which is what this now says.
+
+   > A second correction in the same area: a chip is rendered only when the source carried a provenance value. `chain.js` and the snapshot return bare addresses — provenance is a subgraph-computed field the contract does not store — so defaulting to `UNLISTED` would claim *"we checked our list and this is not on it"* when the truth is *"this source cannot say"*. Those are different statements and only one of them is true.
 7. `grep -ci "HHI\|market share\|solver\|concentration\|USD\|\$" site/index.html site/app.js` returns 0 (the `$` in the `cast` line is the one permitted match; assert it is the only one).
 8. Both themes: every tag, chip and the hatch pattern are legible; the lens SVG uses tokens only.
 9. Tab hidden → no requests in the network panel. Idle tab → Q1 every 120 s, nothing else.
