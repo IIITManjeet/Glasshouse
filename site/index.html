@@ -278,6 +278,68 @@
   .track .locked { background: var(--sunk); }
   .track .open { background: var(--glass-soft); }
 
+  /* ---- the instrument: live auctions ----
+     Reuses .track from the diagram above on purpose. The static diagram and the live
+     one are the same object at different times; drawing them differently would suggest
+     they are different things. */
+  .banner {
+    max-width: var(--wide);
+    margin: 1.5rem auto 0;
+    padding: 0.7rem 0.9rem;
+    background: var(--amber-soft);
+    border-left: 2px solid var(--amber);
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+  }
+  .muted { color: var(--ink-faint); font-size: 0.9rem; }
+
+  .auction { border-top: 1px solid var(--rule); padding-top: 1.25rem; }
+  .auction-head { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.9rem; }
+  .auction-head h3 { font-family: var(--mono); font-size: 0.9rem; font-weight: 500; margin: 0; }
+
+  .chip {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 0.15rem 0.5rem;
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+  }
+  .chip-commit    { background: var(--sunk); }
+  .chip-reveal    { background: var(--amber-soft); border-color: var(--amber); color: var(--amber); }
+  .chip-exclusive { background: var(--glass-soft); border-color: var(--glass); color: var(--glass); }
+  .chip-open      { background: var(--raised); }
+  .chip-settled   { background: var(--glass-soft); color: var(--glass); border-color: var(--glass); }
+
+  /* The active phase is the only cell that carries a countdown, so it is the only one
+     that needs emphasis. Everything else is context. */
+  .track .cell.is-active { background: var(--glass-soft); }
+  .track .cell.is-void   { background: var(--sunk); opacity: 0.65; }
+  .track .count { font-family: var(--mono); font-size: 0.78rem; color: var(--glass); display: block; margin-top: 0.3rem; }
+  .track .note  { font-size: 0.76rem; color: var(--ink-faint); display: block; margin-top: 0.3rem; }
+
+  .bids { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 1.1rem 0 0; }
+  .bid {
+    flex: 1 1 13rem;
+    border: 1px solid var(--rule);
+    background: var(--raised);
+    padding: 0.7rem 0.8rem;
+    font-size: 0.85rem;
+  }
+  .bid .idx  { font-family: var(--mono); font-size: 0.7rem; color: var(--ink-faint); display: block; }
+  .bid .bps  { font-family: var(--mono); font-size: 1.15rem; color: var(--ink); display: block; margin: 0.15rem 0; }
+  .bid .who  { font-family: var(--mono); font-size: 0.78rem; color: var(--ink-soft); display: block; }
+  .bid .note { font-size: 0.76rem; color: var(--ink-faint); display: block; margin-top: 0.2rem; }
+  /* A sealed bid is a value that EXISTS and cannot be read yet. Hatching says that;
+     a spinner would say "loading", which is a different and false claim. */
+  .bid.is-sealed { background: repeating-linear-gradient(135deg, var(--sunk) 0 6px, var(--raised) 6px 12px); }
+  .bid .seal { font-family: var(--mono); font-size: 1.15rem; color: var(--ink-faint); display: block; margin: 0.15rem 0; letter-spacing: 0.1em; }
+
+  .stats { display: flex; flex-wrap: wrap; gap: 1.5rem; margin: 1.1rem 0 0; }
+  .stats .stat .k { font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); display: block; }
+  .stats .stat .v { font-family: var(--mono); font-size: 0.9rem; color: var(--ink); display: block; margin-top: 0.2rem; }
+
   /* ---- parameters ---- */
 
   .params { margin-top: 1.5rem; }
@@ -328,6 +390,22 @@
       </div>
     </div>
   </header>
+
+  <p id="data-banner" class="banner" hidden></p>
+
+  <section id="live">
+    <h2>Live on Base right now</h2>
+    <div class="spine">
+      <p>Every auction below is a real one on Base mainnet, read from the chain. The phase is
+      computed against the block the data describes &mdash; the contract stores no phase, it
+      compares <code>block.number</code> to boundaries written when the auction opened, so any
+      honest reader has to do the same.</p>
+    </div>
+    <div id="live-auctions">
+      <p class="needs-http muted">This section reads live data and needs to be served over
+      http. Opened straight from a file, the argument below still works.</p>
+    </div>
+  </section>
 
   <section>
     <div class="spine">
@@ -528,3 +606,6 @@ ctx.swap.balanceIn =
   </footer>
 
 </div>
+
+<script src="./data/snapshot.js"></script>
+<script type="module" src="./app.js"></script>
