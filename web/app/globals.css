@@ -104,14 +104,14 @@ html {
    gradient is simply dropped, which costs a background and breaks nothing. */
 .atmo-mesh {
   background:
-    radial-gradient(60rem 32rem at 8% -10%, color-mix(in srgb, var(--color-glass) 13%, transparent), transparent 70%),
-    radial-gradient(48rem 28rem at 92% 4%, color-mix(in srgb, var(--color-amber) 9%, transparent), transparent 70%);
+    radial-gradient(60rem 32rem at 8% -10%, color-mix(in srgb, var(--color-glass) 22%, transparent), transparent 70%),
+    radial-gradient(48rem 28rem at 92% 4%, color-mix(in srgb, var(--color-amber) 15%, transparent), transparent 70%);
 }
 
 /* The field has to stop before the instrument starts. Anything textured behind a table of
    block numbers makes them harder to read, and legibility outranks atmosphere here. */
 .atmo-fade {
-  background: linear-gradient(to bottom, transparent 30%, var(--color-ground) 100%);
+  background: linear-gradient(to bottom, transparent 42%, var(--color-ground) 100%);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -66,7 +66,7 @@ export function Atmosphere() {
         {/* Oversized and offset so the drift never exposes an edge. Two layers at
             different sizes and speeds read as depth without a shadow anywhere. */}
         <rect
-          className="atmo-drift-far opacity-[0.10]"
+          className="atmo-drift-far opacity-[0.22]"
           x="-120"
           y="-120"
           width="200%"
@@ -74,7 +74,7 @@ export function Atmosphere() {
           fill="url(#atmo-far)"
         />
         <rect
-          className="atmo-drift-near opacity-[0.14]"
+          className="atmo-drift-near opacity-[0.30]"
           x="-120"
           y="-120"
           width="200%"
