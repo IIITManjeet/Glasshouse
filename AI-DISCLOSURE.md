@@ -28,12 +28,12 @@ which are in the repository for exactly that reason.
 These are in the repository because the rules require them, and they are the record of
 how the AI was directed rather than a summary written afterwards:
 
-- **[`run.md`](./run.md)** — the primary artifact. 140+ numbered facts, each with the
+- **[`run.md`](./docs/archive/run.md)** — the primary artifact. 140+ numbered facts, each with the
   source it was checked against; a decision log giving the options considered and why one
   was chosen; adversarial review rounds with their verdicts and the corrections they
   forced; and a change log. Where a conclusion was later falsified, the original is kept
   and marked superseded, so the reasoning can be audited rather than taken on trust.
-- **[`DESIGN.md`](./DESIGN.md)** — product and UI design, including its open questions.
+- **[`DESIGN.md`](./docs/archive/DESIGN.md)** — product and UI design, including its open questions.
 - **[`docs/design/`](./docs/design/)** — HLD and LLD.
 
 ## Meaningful contribution

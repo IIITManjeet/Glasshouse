@@ -1,5 +1,19 @@
 # run.md — ETHOnline 2026 Project Run Log
 
+> **This is the raw planning log, frozen at the 10 Sep 2026 build freeze.** Its content is
+> unedited: nothing has been softened, removed or corrected after the fact. Only this
+> preface, the "frozen" line in the status table, and four relative link paths broken by
+> the move into this directory have been touched. ETHOnline requires planning artifacts to ship with the submission and
+> `AI-DISCLOSURE.md` names this file as the primary one, so it is preserved rather than
+> tidied. It contains prize-track research, self-scoring against the judging criteria, and
+> several decisions later reversed — because that is what a hackathon plan contains, and
+> editing those out after the fact would make it a worse record, not a better one.
+>
+> **The readable version is [`../../DECISIONS.md`](../../DECISIONS.md).** Nothing here
+> should be read as describing what shipped; see [`README.md`](README.md) in this
+> directory.
+
+
 > **Purpose.** Single source of truth for this project's context. Any model or human
 > picking up this repo should be able to read *only this file* and know what we're
 > building, why, what's decided, what's open, and what's next.
@@ -1419,7 +1433,7 @@ sealed bids. **Never cut:** the two-run comparison + the opcode + a deployed rou
 | Reserve price | **Do not pick one - test the range** | User: *"we can show all these cases and cover a lot more broader scope as well and can also test our logics and mechanisms are working fine or not"* |
 
 **Simulation result -> `exclusiveBlocks = 15`.** Full analysis in
-[`docs/design/window-sizing.md`](./docs/design/window-sizing.md); reproduce with
+[`docs/design/window-sizing.md`](../design/window-sizing.md); reproduce with
 `node scripts/simulate-window.mjs`.
 
 The window turned out not to be execution time. It is a **free American call granted to
@@ -1533,7 +1547,7 @@ by F-145 and the fork fill, which already ran the whole sequence against real Ba
 
 ## 5. Architecture
 
-✅ **Written: [`ARCHITECTURE.md`](./ARCHITECTURE.md)** (2026-09-03).
+✅ **Written: [`ARCHITECTURE.md`](../design/HLD.md)** (2026-09-03).
 
 ⚠️ **Authored by the main agent, not Fable.** Fable was dispatched as intended but hit a
 session rate limit (resets 03:30 IST) before writing the file. **Fable should review and

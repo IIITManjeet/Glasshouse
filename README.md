@@ -313,14 +313,19 @@ Deployment to mainnet is [`DEPLOY.md`](./DEPLOY.md).
 
 ## Documentation
 
-[`docs/design/HLD.md`](./docs/design/HLD.md) — components, trust boundaries, lifecycle flows ·
-[`LLD.md`](./docs/design/LLD.md) — storage layout, encoding, error and event catalogues ·
-[`ui-flow.md`](./docs/design/ui-flow.md) and
-[`frontend-architecture.md`](./docs/design/frontend-architecture.md) — the product decisions and
-why there are two artifacts over one data plane ·
-[`DECISIONS.md`](./DECISIONS.md) — every judgment call, in order, in plain language ·
-[`run.md`](./run.md) — the research dossier, every fact with its source ·
+**Start here:** [`DECISIONS.md`](./DECISIONS.md) — every judgment call, in order, in plain
+language. Then [`docs/design/HLD.md`](./docs/design/HLD.md) — components, trust boundaries,
+lifecycle flows.
+
+Also: [`LLD.md`](./docs/design/LLD.md) — storage layout, encoding, error and event
+catalogues · [`subgraph-design.md`](./docs/design/subgraph-design.md) — the schema, the
+settlement replay, and what it refuses to compute ·
+[`window-sizing.md`](./docs/design/window-sizing.md) — where the auction windows came from ·
 [`CHANGELOG.md`](./CHANGELOG.md) · index at [`docs/`](./docs/README.md).
+
+The raw planning log and the superseded UI design chain are in
+[`docs/archive/`](./docs/archive/README.md), kept because the event rules require planning
+artifacts to ship. Nothing in there describes what shipped.
 
 ## Licence and AI disclosure
 

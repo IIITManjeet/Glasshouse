@@ -6,7 +6,7 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Because this is an ETHOnline 2026 submission built inside the event window, releases are
 cut at the project's own milestones rather than on a calendar. The decision record behind
-each one is in [`run.md`](./run.md).
+each one is in [`run.md`](./docs/archive/run.md).
 
 ## [Unreleased]
 

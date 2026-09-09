@@ -8,8 +8,8 @@ this document; upstream citations are relative to `node_modules/@1inch/swap-vm/`
 Section 12 lists what could not be verified.
 
 Companion documents: [`../../README.md`](../../README.md) (the argument),
-[`../../ARCHITECTURE.md`](../../ARCHITECTURE.md) (the reviewed design),
-[`../../run.md`](../../run.md) (research and decision log).
+the reviewed design (since folded into this document and `LLD.md`),
+[`../../run.md`](../archive/run.md) (research and decision log).
 
 ---
 
@@ -186,7 +186,7 @@ dependency on SwapVM's `Context`**. That was a deliberate choice with three cons
 3. **It can be wrapped by more than one caller.** Today it is wrapped by
    `GlasshouseAuction.exec` (`src/instructions/GlasshouseAuction.sol:64-67`), which is in
    turn dispatched by two routers: the deployable `GlasshouseRouter` and the test-only
-   `GlasshouseTestRouter`. `ARCHITECTURE.md` §5.3 specifies a second wrapper, a
+   `GlasshouseTestRouter`. the reviewed design specified a second wrapper, a
    `GlasshouseExtruction` target that would run the same mechanism on the official 1inch
    router with no redeployment. **That second wrapper does not exist in the tree yet**
    (see §12).
@@ -775,7 +775,7 @@ Stated explicitly rather than smoothed over.
   attributed to the comparison in §9.1 are read from the test source, not from its
   output, and the bps figures it produced are recorded in `CHANGELOG.md` under
   `[0.2.0]` rather than repeated here.
-- **`GlasshouseExtruction` (Path B) does not exist in the tree.** `ARCHITECTURE.md` §5.3
+- **`GlasshouseExtruction` (Path B) does not exist in the tree.** the reviewed design
   specifies it; `src/` contains no `extruction/` directory. The "wrapped twice" property
   of `GlasshouseAuctionLib` is currently a property of its *interface* (it takes no
   `Context`), not of two shipped wrappers.
