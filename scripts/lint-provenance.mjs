@@ -13,11 +13,19 @@
 //
 //   node scripts/lint-provenance.mjs
 //
-// Deliberately a text scan with no dependencies and no DOM: the page is one static file
+// IT NOW CHECKS TWO PAGES. The written argument is still site/index.html, hand-written and
+// build-free. The product is the Next app, whose figures -- the comparison, the latency
+// lens, the reserve advisor, the receipt -- are TSX and reach the reader as the exported
+// HTML in web/out/. Checking only the essay would have left the rule enforced on the page
+// that carries the fewest numbers. The app's pages are checked only if they have been
+// built; a missing web/out/ is reported, not failed, because the contracts test suite runs
+// this and must not require a front-end build.
+//
+// Deliberately a text scan with no dependencies and no DOM: the essay is one static file
 // with no build step, and a linter that needed a toolchain would be the first thing to
 // break on submission day.
 
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 
 const PAGE = new URL("../site/index.html", import.meta.url);
 const html = readFileSync(PAGE, "utf8");
@@ -31,59 +39,83 @@ const NEEDS_SOURCE = [
 ];
 
 const failures = [];
-const lineOf = (index) => html.slice(0, index).split("\n").length;
 
-/** The figure enclosing `index`, or null. Figures do not nest on this page, so tracking
- *  the last unclosed open is enough and avoids pulling in a parser. */
-function enclosingFigure(index) {
-  let depth = 0;
-  let openAt = -1;
-  const tag = /<figure\b|<\/figure>/g;
-  let m;
-  while ((m = tag.exec(html)) !== null) {
-    if (m.index >= index) break;
-    if (m[0] === "</figure>") {
-      depth = Math.max(0, depth - 1);
-      if (depth === 0) openAt = -1;
-    } else {
-      if (depth === 0) openAt = m.index;
-      depth++;
+/**
+ * The structural rule, over one document.
+ *
+ * Parameterised over how a caption and a source chip are RECOGNISED, because the two
+ * documents mark them differently and neither marking is wrong: the essay uses hand-
+ * written `class="made"` / `class="src"`, and the app's components are Tailwind, where a
+ * semantic class name would exist only to be grepped by this file. What both must have is
+ * the same: a <figure> with a data-src, a chip, and the words "What produced this".
+ */
+function scanStructure(source, { label, captionRe, chipRe, chipName }) {
+  const found = [];
+  const lineOf = (index) => source.slice(0, index).split("\n").length;
+
+  /** The figure enclosing `index`, or null. Figures do not nest in either document, so
+   *  tracking the last unclosed open is enough and avoids pulling in a parser. */
+  function enclosingFigure(index) {
+    let depth = 0;
+    let openAt = -1;
+    const tag = /<figure\b|<\/figure>/g;
+    let m;
+    while ((m = tag.exec(source)) !== null) {
+      if (m.index >= index) break;
+      if (m[0] === "</figure>") {
+        depth = Math.max(0, depth - 1);
+        if (depth === 0) openAt = -1;
+      } else {
+        if (depth === 0) openAt = m.index;
+        depth++;
+      }
+    }
+    if (depth === 0 || openAt === -1) return null;
+    const close = source.indexOf("</figure>", index);
+    return close === -1 ? null : { openAt, close };
+  }
+
+  for (const { re, what } of NEEDS_SOURCE) {
+    re.lastIndex = 0;
+    let m;
+    while ((m = re.exec(source)) !== null) {
+      const where = `${label} line ${lineOf(m.index)}`;
+      const fig = enclosingFigure(m.index);
+      if (!fig) {
+        found.push(`${what} at ${where} is not inside a <figure>`);
+        continue;
+      }
+      const openTag = source.slice(fig.openAt, source.indexOf(">", fig.openAt) + 1);
+      if (!/\bdata-src="[a-z]+"/.test(openTag)) {
+        found.push(`${what} at ${where} is in a <figure> with no data-src`);
+      }
+      const body = source.slice(fig.openAt, fig.close);
+      if (!captionRe.test(body)) {
+        found.push(`${what} at ${where} is in a <figure> with no "What produced this" caption`);
+      }
+      if (chipRe && !chipRe.test(body)) {
+        found.push(`${what} at ${where} is in a <figure> with no ${chipName}`);
+      }
     }
   }
-  if (depth === 0 || openAt === -1) return null;
-  const close = html.indexOf("</figure>", index);
-  return close === -1 ? null : { openAt, close };
+  return found;
 }
 
-for (const { re, what } of NEEDS_SOURCE) {
-  re.lastIndex = 0;
-  let m;
-  while ((m = re.exec(html)) !== null) {
-    const line = lineOf(m.index);
-    const fig = enclosingFigure(m.index);
-    if (!fig) {
-      failures.push(`${what} at line ${line} is not inside a <figure>`);
-      continue;
-    }
-    const openTag = html.slice(fig.openAt, html.indexOf(">", fig.openAt) + 1);
-    if (!/\bdata-src="[a-z]+"/.test(openTag)) {
-      failures.push(`${what} at line ${line} is in a <figure> with no data-src`);
-    }
-    const body = html.slice(fig.openAt, fig.close);
-    if (!/class="made"/.test(body)) {
-      failures.push(`${what} at line ${line} is in a <figure> with no "What produced this" caption`);
-    }
-    if (!/class="src"/.test(body)) {
-      failures.push(`${what} at line ${line} is in a <figure> with no source chip`);
-    }
-  }
-}
+failures.push(
+  ...scanStructure(html, {
+    label: "site/index.html",
+    captionRe: /class="made"/,
+    chipRe: /class="src"/,
+    chipName: "source chip",
+  }),
+);
 
 // Every caption must actually say the words. A <figcaption> that describes the figure
 // instead of its provenance passes the structural check and fails the reader.
 for (const m of html.matchAll(/class="made"[^>]*>([\s\S]*?)<\/figcaption>/g)) {
+  const line = html.slice(0, m.index).split("\n").length;
   if (!/What produced this:/.test(m[1])) {
-    failures.push(`a .made caption at line ${lineOf(m.index)} does not begin "What produced this:"`);
+    failures.push(`a .made caption at site/index.html line ${line} does not begin "What produced this:"`);
   }
 }
 
@@ -95,9 +127,47 @@ const FORBIDDEN = [
   [/solver concentration/i, '"solver concentration"'],
   [/\bTVL\b/, "TVL"],
 ];
-for (const [re, name] of FORBIDDEN) {
-  const m = re.exec(html);
-  if (m) failures.push(`${name} appears at line ${lineOf(m.index)}: the page must not present a toy market as a market`);
+function scanForbidden(source, label) {
+  const found = [];
+  for (const [re, name] of FORBIDDEN) {
+    const m = re.exec(source);
+    if (m) {
+      const line = source.slice(0, m.index).split("\n").length;
+      found.push(`${name} appears at ${label} line ${line}: the page must not present a toy market as a market`);
+    }
+  }
+  return found;
+}
+failures.push(...scanForbidden(html, "site/index.html"));
+
+// ---------------------------------------------------------------------------------
+// The exported app.
+//
+// Prerendered HTML, so what is checked is what a visitor is served before any script
+// runs -- which is also what a crawler and a screenshot see. Figures that only appear
+// after a fetch (the receipt) are not in here, and this does not pretend to cover them;
+// the shape test covers their data and the components carry their captions inline.
+const APP_PAGES = ["index.html", "rounds/index.html", "account/index.html"];
+const appRoot = new URL("../web/out/", import.meta.url);
+let appChecked = 0;
+let appFigures = 0;
+
+for (const page of APP_PAGES) {
+  const file = new URL(page, appRoot);
+  if (!existsSync(file)) continue;
+  const source = readFileSync(file, "utf8");
+  appChecked++;
+  appFigures += (source.match(/<figure\b/g) ?? []).length;
+  failures.push(
+    ...scanStructure(source, {
+      label: `web/out/${page}`,
+      // The app has no class="made": the caption is a paragraph that begins with the
+      // words, which is the thing that actually matters to a reader.
+      captionRe: /What produced this/,
+      chipRe: null,
+    }),
+  );
+  failures.push(...scanForbidden(source, `web/out/${page}`));
 }
 
 // ---------------------------------------------------------------------------------
@@ -108,6 +178,10 @@ for (const [re, name] of FORBIDDEN) {
 // The layer that exists to make the page honest was the hardest thing on it to read.
 // Both themes pass now; this keeps them passing, because a palette drifts one hex at a
 // time and nobody notices until somebody cannot read it.
+//
+// Both palettes are checked. They are separate files -- site/index.html's :root and the
+// app's @theme -- and a token corrected in one and not the other is exactly the drift
+// this is here to catch.
 //
 // Small text only: these tokens are used at 0.66-0.9rem, nowhere near the 18.66px that
 // would let the 3:1 large-text threshold apply.
@@ -122,29 +196,39 @@ const contrast = (x, y) => {
   return (hi + 0.05) / (lo + 0.05);
 };
 
-/** Tokens from one :root block, so light and dark are judged separately. */
+/** Tokens from one block, so light and dark are judged separately. The app names them
+ *  `--color-ground` because Tailwind's @theme requires the prefix; strip it so one set
+ *  of rules covers both files. */
 function tokensIn(source) {
   const out = {};
-  for (const t of source.matchAll(/--([a-z-]+):\s*(#[0-9A-Fa-f]{6})/g)) out[t[1]] = t[2];
+  for (const t of source.matchAll(/--(?:color-)?([a-z-]+):\s*(#[0-9A-Fa-f]{6})/g)) out[t[1]] = t[2];
   return out;
 }
 
-const LIGHT = /:root \{[\s\S]*?\n  \}/.exec(html);
-const DARK = /prefers-color-scheme: dark[\s\S]*?\n    \}/.exec(html);
 const AA = 4.5;
-for (const [theme, m] of [["light", LIGHT], ["dark", DARK]]) {
-  if (!m) continue;
-  const t = tokensIn(m[0]);
-  if (!t.ground) continue;
-  for (const fg of ["ink", "ink-soft", "ink-faint", "glass", "amber", "brick"]) {
-    for (const bg of ["ground", "raised"]) {
-      if (!t[fg] || !t[bg]) continue;
-      const r = contrast(t[fg], t[bg]);
-      if (r < AA) {
-        failures.push(
-          `${theme} theme: --${fg} (${t[fg]}) on --${bg} (${t[bg]}) is ${r.toFixed(2)}:1, below ` +
-          `WCAG AA ${AA}:1 for the small text these tokens are used at`,
-        );
+const PALETTES = [["site/index.html", html]];
+
+const globalsCss = new URL("../web/app/globals.css", import.meta.url);
+if (existsSync(globalsCss)) PALETTES.push(["web/app/globals.css", readFileSync(globalsCss, "utf8")]);
+
+for (const [file, source] of PALETTES) {
+  const light = /(?::root|@theme) \{[\s\S]*?\n\s*\}/.exec(source);
+  const dark = /prefers-color-scheme: dark[\s\S]*?\n\s*\}\n\}/.exec(source)
+    ?? /prefers-color-scheme: dark[\s\S]*?\n    \}/.exec(source);
+  for (const [theme, m] of [["light", light], ["dark", dark]]) {
+    if (!m) continue;
+    const t = tokensIn(m[0]);
+    if (!t.ground) continue;
+    for (const fg of ["ink", "ink-soft", "ink-faint", "glass", "amber", "brick"]) {
+      for (const bg of ["ground", "raised"]) {
+        if (!t[fg] || !t[bg]) continue;
+        const r = contrast(t[fg], t[bg]);
+        if (r < AA) {
+          failures.push(
+            `${file}, ${theme} theme: --${fg} (${t[fg]}) on --${bg} (${t[bg]}) is ${r.toFixed(2)}:1, below ` +
+            `WCAG AA ${AA}:1 for the small text these tokens are used at`,
+          );
+        }
       }
     }
   }
@@ -152,10 +236,16 @@ for (const [theme, m] of [["light", LIGHT], ["dark", DARK]]) {
 
 const figures = (html.match(/<figure\b/g) ?? []).length;
 if (failures.length > 0) {
-  console.error(`\nFAIL: ${failures.length} provenance problem(s) in site/index.html\n`);
+  console.error(`\nFAIL: ${failures.length} provenance problem(s)\n`);
   for (const f of failures) console.error(`  - ${f}`);
   console.error("\nSee docs/design/ui-spec.md section 3.\n");
   process.exit(1);
 }
 
-console.log(`PASS: ${figures} figures, each with a source chip and a "What produced this" caption.`);
+console.log(
+  `PASS: ${figures} figures in site/index.html and ${appFigures} in ${appChecked} exported app page(s), ` +
+    `each with a source tag and a "What produced this" caption.`,
+);
+if (appChecked === 0) {
+  console.log("      web/out/ is not built, so the app's own figures were not checked (npm --prefix web run build).");
+}
