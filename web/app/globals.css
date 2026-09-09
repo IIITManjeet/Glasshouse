@@ -22,9 +22,13 @@
   --color-amber: #8a5a14;
   --color-amber-soft: #f7eedc;
 
-  --font-display: Newsreader, Georgia, "Times New Roman", serif;
-  --font-sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* The `--font-*-loaded` variables are declared by next/font in app/layout.tsx and
+     land on <html>. Naming the family after them as well keeps the stack working if the
+     layout ever stops loading a face -- the page degrades to the same fallbacks it has
+     been quietly using all along rather than to nothing. */
+  --font-display: var(--font-newsreader), Newsreader, Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-plex-sans), "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-mono: var(--font-plex-mono), "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 /* Dark is a token swap, not a separate stylesheet. Every colour is defined in the light
