@@ -12,19 +12,20 @@
     "prebuild": "npm run sync"
   },
   "dependencies": {
+    "@tanstack/react-query": "5.90.2",
+    "motion": "^13.2.0",
     "next": "16.3.4",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "viem": "2.56.3",
-    "wagmi": "3.7.7",
-    "@tanstack/react-query": "5.90.2"
+    "wagmi": "3.7.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.3.3",
-    "tailwindcss": "4.3.3",
-    "typescript": "5.9.3",
     "@types/node": "24.7.0",
     "@types/react": "19.2.2",
-    "@types/react-dom": "19.2.1"
+    "@types/react-dom": "19.2.1",
+    "tailwindcss": "4.3.3",
+    "typescript": "5.9.3"
   }
 }
