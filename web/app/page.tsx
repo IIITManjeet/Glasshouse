@@ -1,44 +1,42 @@
 "use client";
 
 import Link from "next/link";
-import { useAuctions, livePhase, type Auction } from "@/lib/useAuctions";
-import { SourceChip, PhaseTrack, BidCards, Stats, ReplayCheck } from "@/components/Auction";
-import { WalletBar } from "@/components/WalletBar";
-import { BidPanel, RevealStrip } from "@/components/BidPanel";
+import { livePhase } from "@/lib/useAuctions";
+import { useBoard } from "@/components/BoardProvider";
 import { Mechanism } from "@/components/Mechanism";
 import { Atmosphere } from "@/components/Atmosphere";
 import { Reveal } from "@/components/Reveal";
-import { Feature, Plate } from "@/components/Feature";
-import { SketchSealed, SketchSecondPrice, SketchReplay, SketchClock } from "@/components/Sketch";
+import { LoadingBar, Swap } from "@/components/Loading";
 
 const num = (n?: number | null) =>
   n === null || n === undefined || Number.isNaN(n) ? "—" : n.toLocaleString("en-US");
 
 /**
- * The landing page.
+ * The front door, and only the front door.
  *
- * STRUCTURED AS A LANDING PAGE RATHER THAN AS AN INSTRUMENT WITH A HEADING. It opens with
- * the claim, shows the product working, then makes one claim per band with the real
- * component beside it, and closes on where it is deployed.
+ * It used to be the landing page AND the live board AND four feature bands AND the
+ * mechanism, which meant neither job could be done properly: the pitch could not be short
+ * because the tool was inside it, and the tool could not be deep because the pitch was on
+ * top of it. There was also no URL that meant "here is the thing running".
  *
- * The visuals in those bands are the product's own components, not screenshots. That is
- * the one form of "product shot" this page can carry honestly: a screenshot goes stale the
- * day the component changes and nothing catches it, while these cannot -- and anything
- * showing data is either live or wearing the rehearsal's label.
+ * Now: the claim, proof that it is alive, how it works, and three doors. The instrument is
+ * at /board, the evidence at /evidence, the history at /rounds.
  *
- * The evidence still lives at /proof and /why. This page's job is to make a stranger want
- * to open them.
+ * The live strip here is deliberately READ-ONLY -- a pulse, not a panel. It exists to show
+ * a stranger the mechanism is running before asking them to care, and it links to the board
+ * rather than trying to be one. Bidding, phase tracks and reveal deadlines belong where a
+ * participant is, not where a visitor arrives.
  */
 export default function Home() {
-  const { auctions, head, source, isFork, loading, error, demo, setDemo } = useAuctions();
+  const { auctions, head, source, loading, demo, setDemo } = useBoard();
 
   const live = auctions.find((a) => livePhase(a, head) !== "open");
-  const featured: Auction | undefined = live ?? auctions[0];
+  const featured = live ?? auctions[0];
+  const phase = featured ? livePhase(featured, head) : null;
 
   return (
     <main>
-      {/* ---- HERO ------------------------------------------------------------------ */}
-      <section className="relative -mx-5 px-5 pt-12 pb-16 sm:pt-20 sm:pb-20">
+      <section className="relative -mx-5 px-5 pt-10 pb-16 sm:pt-16 sm:pb-20">
         <Atmosphere />
 
         <p className="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-ink-faint">
@@ -72,209 +70,67 @@ export default function Home() {
           ))}
         </div>
 
-        <div className="mt-11 flex flex-wrap items-center gap-3">
-          <a
-            href="#live"
-            className="border border-glass bg-glass-soft px-5 py-3 font-mono text-[0.72rem] uppercase tracking-[0.12em] text-glass transition-colors hover:bg-glass hover:text-raised"
-          >
-            Watch a round →
-          </a>
-          <button
-            type="button"
-            onClick={() => setDemo(true)}
-            className="border border-rule px-5 py-3 font-mono text-[0.72rem] uppercase tracking-[0.12em] text-ink-soft transition-colors hover:border-glass hover:text-glass"
-          >
-            Run the rehearsal
-          </button>
-        </div>
-      </section>
-
-      {/* ---- THE PRODUCT, WORKING -------------------------------------------------- */}
-      <section id="live" className="scroll-mt-6 border-t border-rule pt-12">
-        <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="font-mono text-[0.68rem] uppercase tracking-[0.14em] text-glass">
-              Happening now
-            </p>
-            <h2 className="mt-2 font-display text-2xl font-light sm:text-3xl">Live on Base</h2>
-          </div>
-          {head > 0 && <SourceChip source={source} head={head} isFork={isFork} />}
-        </div>
-
-        <WalletBar className="mb-4" />
-
-        {isFork && (
-          <p className="mb-4 border-l-2 border-amber bg-amber-soft px-3 py-2 text-sm text-ink-soft">
-            Pointed at a local fork of Base, not mainnet. Real contracts and real state, but
-            the money is not real.
-          </p>
-        )}
-
-        {loading && <p className="text-sm text-ink-faint">Reading the Book…</p>}
-
-        {error && (
-          <p className="border-l-2 border-brick bg-brick-soft px-3 py-2 text-sm text-ink-soft">
-            Could not reach the chain: {error}
-          </p>
-        )}
-
-        {!loading && !featured && (
-          <div className="border border-rule bg-raised p-6">
-            <p className="text-ink-soft">No round has been opened on this Book yet.</p>
-            <p className="mt-2 text-sm text-ink-faint">
-              The keeper opens a fresh round every couple of minutes when it is running. Until
-              then there is nothing to watch, and this says so rather than showing a spinner.{" "}
-              <button type="button" onClick={() => setDemo(true)} className="text-glass underline underline-offset-2">
-                Watch a simulated round instead
-              </button>
-              .
-            </p>
-          </div>
-        )}
-
-        {featured && (
-          <article className="border border-rule bg-raised p-5 sm:p-6">
-            <header className="mb-4 flex flex-wrap items-baseline gap-3">
-              <h3 className="tnum text-base font-medium">
-                Round {featured.round ?? "—"} · {featured.orderHash.slice(0, 10)}…
-              </h3>
-              <PhaseChip phase={livePhase(featured, head)} settled={featured.settled} />
-              {!live && <span className="text-xs text-ink-faint">most recent — nothing is live right now</span>}
-            </header>
-
-            <PhaseTrack a={featured} head={head} />
-            <BidCards a={featured} />
-            <Stats a={featured} head={head} />
-            <ReplayCheck a={featured} />
-
-            {/* Bidding is cut out entirely during the rehearsal: a commitment is
-                hash(bps, salt, ORDER HASH) and a synthetic hash names no auction in the
-                Book, so it would bind to nothing and could never be revealed. A disabled
-                button still invites the click. */}
-            <div className="mt-5 border-t border-rule pt-4">
-              {demo ? (
-                <div className="border border-amber bg-amber-soft px-3 py-2.5 text-sm text-ink-soft">
-                  <strong className="font-medium text-amber">Bidding is off during the rehearsal.</strong>{" "}
-                  A sealed bid commits to a hash of your bid, your salt and this round&rsquo;s{" "}
-                  <em>order hash</em> — and the rehearsal&rsquo;s order hashes name no auction in the Book,
-                  so the commitment would bind to nothing and could never be revealed.{" "}
-                  <button type="button" onClick={() => setDemo(false)} className="text-glass underline underline-offset-2">
-                    Switch to the real chain
-                  </button>{" "}
-                  to bid on a live round.
-                </div>
-              ) : (
-                <BidPanel auction={featured} head={head} />
-              )}
-            </div>
-
-            <p className="mt-4 border-t border-rule pt-3 text-[0.78rem] leading-relaxed text-ink-faint">
-              <strong className="font-medium text-ink-soft">What produced this:</strong>{" "}
-              {demo ? (
-                <>
-                  <code className="font-mono">web/lib/simulate.ts</code>, stepping one scripted round
-                  forward a block every 0.4 s. The phase, the clearing price and the winner are computed
-                  from the block shown by the same functions the live board uses — the simulation supplies
-                  the reveals, not the rules.
-                </>
-              ) : (
-                <>
-                  the <code className="font-mono">GlasshouseBook</code> contract on Base, read at block{" "}
-                  <span className="tnum">{num(head)}</span>. The phase is computed here against that same
-                  block — the contract stores no phase, it compares{" "}
-                  <code className="font-mono">block.number</code> against boundaries written when the round
-                  opened, so any honest reader has to do the same.
-                </>
-              )}
-            </p>
-          </article>
-        )}
-      </section>
-
-      {/* ---- FEATURE BANDS --------------------------------------------------------- */}
-
-      <Feature
-        eyebrow="Sealed, then opened"
-        title={<>A bid nobody can read cannot be <em className="text-glass">front-run</em>.</>}
-        visual={
-          <Plate className="flex items-center justify-center">
-            <SketchSealed className="w-full max-w-[19rem]" />
-          </Plate>
-        }
-      >
-        <p>
-          You commit to a hash of your bid, a salt and the order. It sits on chain in public and
-          says nothing — not to a searcher, not to the maker, not to us.
-        </p>
-        <p>
-          When the commit window closes you open it. The contract checks the hash matches and only
-          then learns what you offered, which is far too late for anyone to bid against you.
-        </p>
-      </Feature>
-
-      <Feature
-        eyebrow="Second price"
-        title={<>The winner pays what the <em className="text-glass">runner-up</em> offered.</>}
-        flip
-        visual={
-          <Plate className="flex items-center justify-center">
-            <SketchSecondPrice className="w-full max-w-[19rem]" />
-          </Plate>
-        }
-      >
-        <p>
-          Bid 400 and win against a 250, and you pay 250. What you bid decides <em>whether</em> you
-          win; it does not decide what it costs you.
-        </p>
-        <p>
-          That is what makes bidding your true value safe, and it is the difference — 150 bps here —
-          that goes to the maker rather than to whoever had the fastest connection.
-        </p>
-      </Feature>
-
-      <Feature
-        eyebrow="No operator to trust"
-        title={<>You can re-derive the settlement <em className="text-glass">yourself</em>.</>}
-        visual={
-          <Plate className="flex items-center justify-center">
-            <SketchReplay className="w-full max-w-[19rem]" />
-          </Plate>
-        }
-      >
-        <p>
-          The reveals are on chain. Anyone can replay the contract&rsquo;s own top-two rule over them
-          and compare the answer to what was settled — and if the two ever disagree, this page shows
-          it rather than hiding it.
-        </p>
-        <p>
-          That is why this needs no operator set and no challenge window. There is no off-chain claim
-          to challenge, and unlike a challenge period the check has no deadline.
-        </p>
-      </Feature>
-
-      <Feature
-        eyebrow="Why not a clock"
-        title={<>A falling price is still a <em className="text-glass">race</em>.</>}
-        flip
-        visual={
-          <Plate className="flex items-center justify-center">
-            <SketchClock className="w-full max-w-[19rem]" />
-          </Plate>
-        }
-      >
-        <p>
-          A Dutch auction shows every bidder in a block the same number, so the tie breaks on
-          transaction order — and order on chain is sold to whoever pays the builder most.
-        </p>
-        <p>
-          The fill goes to the fastest participant regardless of what it is worth to them.{" "}
-          <Link href="/why" className="text-glass underline underline-offset-2">
-            The three gates, run on one order →
+        {/* The pulse. Read-only by design: it says "this is running", then gets out of the
+            way and sends you to the tool. */}
+        <div className="mt-11 max-w-2xl border border-rule bg-raised">
+          <Link href="/board" className="group block px-5 py-4">
+            <Swap showing={loading && !featured ? "loading" : featured ? "live" : "empty"}>
+            {loading && !featured ? (
+              <span className="flex flex-col gap-2">
+                <span className="font-mono text-[0.7rem] uppercase tracking-[0.12em] text-ink-faint">
+                  Reading the Book
+                </span>
+                <LoadingBar className="max-w-[14rem]" />
+              </span>
+            ) : featured ? (
+              <span className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <span
+                  className={[
+                    "border px-2 py-0.5 font-mono text-[0.64rem] uppercase tracking-[0.12em]",
+                    phase === "commit" ? "border-rule bg-sunk text-ink-soft"
+                      : phase === "reveal" ? "border-amber bg-amber-soft text-amber"
+                        : phase === "exclusive" ? "border-glass bg-glass-soft text-glass"
+                          : "border-rule text-ink-faint",
+                  ].join(" ")}
+                >
+                  {phase}
+                </span>
+                <span className="tnum text-sm text-ink">
+                  Round {num(featured.round)}
+                </span>
+                <span className="tnum text-sm text-ink-faint">
+                  {featured.committedCount} sealed
+                  {featured.revealedCount !== null && ` · ${featured.revealedCount} opened`}
+                  {featured.clearingBps !== null && (
+                    <span className="text-glass"> · clearing {featured.clearingBps} bps</span>
+                  )}
+                </span>
+                <span className="ml-auto text-sm text-glass group-hover:underline">
+                  Open the board →
+                </span>
+              </span>
+            ) : (
+              <span className="flex flex-wrap items-center gap-3 text-sm">
+                <span className="text-ink-soft">No round is open right now.</span>
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); setDemo(true); }}
+                  className="text-glass underline underline-offset-2"
+                >
+                  Watch a simulated one
+                </button>
+              </span>
+            )}
+            </Swap>
           </Link>
-        </p>
-      </Feature>
+          <p className="border-t border-rule px-5 py-2.5 text-[0.74rem] text-ink-faint">
+            {source === "sim"
+              ? "Simulated — the status line above says so on every page."
+              : "Read from the GlasshouseBook contract on Base. Phase computed here, against the block in the status line."}
+          </p>
+        </div>
+      </section>
 
-      {/* ---- HOW A ROUND RUNS ------------------------------------------------------ */}
       <Reveal>
         <section className="border-t border-rule py-14 sm:py-16">
           <p className="font-mono text-[0.68rem] uppercase tracking-[0.14em] text-glass">
@@ -287,50 +143,30 @@ export default function Home() {
         </section>
       </Reveal>
 
-      {/* ---- CLOSING --------------------------------------------------------------- */}
       <Reveal>
         <section className="border-t border-rule py-14">
           <h2 className="max-w-2xl font-display text-2xl leading-snug font-light sm:text-3xl">
-            Deployed, and open to read.
+            Three ways in.
           </h2>
-          <div className="mt-7 flex flex-wrap gap-x-14 gap-y-6">
+          <div className="mt-8 grid gap-px border border-rule bg-rule sm:grid-cols-3">
             {[
-              ["the receipt", "What a finished round produced", "/proof"],
-              ["the argument", "Why the alternatives are worse", "/why"],
-              ["the history", "Every round so far", "/rounds"],
-            ].map(([label, note, href]) => (
-              <Link key={href} href={href} className="group">
-                <div className="font-mono text-[0.66rem] uppercase tracking-[0.12em] text-ink-faint">
-                  {label}
+              ["/board", "The board", "Watch a round run, and bid in it if one is open."],
+              ["/evidence", "The evidence", "A finished receipt, the three gates compared, the reserve advisor."],
+              ["/rounds", "The history", "Every round this Book has opened, newest first."],
+            ].map(([href, title, note]) => (
+              <Link key={href} href={href} className="group bg-raised p-5 hover:bg-glass-soft">
+                <div className="font-display text-xl font-light text-ink group-hover:text-glass">
+                  {title}
                 </div>
-                <div className="mt-1.5 text-ink group-hover:text-glass">
-                  {note} <span className="text-glass">→</span>
+                <p className="mt-2 text-sm text-ink-soft">{note}</p>
+                <div className="mt-4 font-mono text-[0.66rem] uppercase tracking-[0.12em] text-glass">
+                  Open →
                 </div>
               </Link>
             ))}
           </div>
         </section>
       </Reveal>
-
-      <RevealStrip head={head} auctions={demo ? [] : auctions} />
     </main>
-  );
-}
-
-function PhaseChip({ phase, settled }: { phase: string; settled: boolean }) {
-  const tone =
-    phase === "commit" ? "bg-sunk text-ink-soft border-rule"
-      : phase === "reveal" ? "bg-amber-soft text-amber border-amber"
-        : phase === "exclusive" ? "bg-glass-soft text-glass border-glass"
-          : "bg-raised text-ink-faint border-rule";
-  return (
-    <span className="flex gap-2">
-      <span className={`border px-2 py-0.5 font-mono text-[0.66rem] uppercase tracking-[0.12em] ${tone}`}>{phase}</span>
-      {settled && (
-        <span className="border border-glass bg-glass-soft px-2 py-0.5 font-mono text-[0.66rem] uppercase tracking-[0.12em] text-glass">
-          settled
-        </span>
-      )}
-    </span>
   );
 }

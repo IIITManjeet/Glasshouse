@@ -1,0 +1,107 @@
+"use client";
+
+import Link from "next/link";
+import { useAccount } from "wagmi";
+import { useBoard } from "./BoardProvider";
+import { useDemoMode } from "@/lib/useAuctions";
+import { useIdentity } from "./Identity";
+
+/**
+ * The provenance line, promoted to page chrome.
+ *
+ * The source chip used to live inside each figure, which meant a visitor learned where the
+ * numbers came from only on the pages that had figures, and a screenshot of any other page
+ * carried no provenance at all. DESIGN.md section 2 wants every number labelled; this makes
+ * the label a property of the PAGE, so it is in every screenshot by construction.
+ *
+ * THE REHEARSAL TOGGLE LIVES HERE, not in the nav, and that placement is the argument: it
+ * is not a destination, it is a statement about where the numbers come from. Putting the
+ * control that changes the source on the line that names the source means the two can never
+ * be read apart -- and when it is on, the whole bar turns amber, so the page cannot look
+ * live while showing simulated data.
+ *
+ * The connected address lives here too, and IS the link to its own profile. That single
+ * placement fixes the bug the user hit: there was no way to reach /account from anywhere in
+ * the product.
+ */
+
+const num = (n: number) => n.toLocaleString("en-US");
+const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
+
+export function StatusBar() {
+  const { head, source, isFork, loading } = useBoard();
+  const { demo, setDemo } = useDemoMode();
+  const { address, isConnected } = useAccount();
+  const { name } = useIdentity(isConnected ? address : null);
+
+  const where =
+    source === "sim"
+      ? "SIMULATED"
+      : source === "chain"
+        ? isFork
+          ? "LOCAL FORK"
+          : "BASE MAINNET"
+        : source === "snapshot"
+          ? "SNAPSHOT IN REPO"
+          : loading
+            ? "READING…"
+            : "NO SOURCE";
+
+  return (
+    <div
+      className={[
+        "mb-8 flex flex-wrap items-center gap-x-5 gap-y-2 border-y px-3 py-2",
+        "font-mono text-[0.66rem] tracking-[0.1em] uppercase",
+        demo ? "border-amber bg-amber-soft text-amber" : "border-rule bg-sunk text-ink-faint",
+      ].join(" ")}
+    >
+      <span className={demo ? "" : source === "chain" && !isFork ? "text-glass" : "text-amber"}>
+        {where}
+      </span>
+
+      {head > 0 && (
+        <span className="tnum">
+          head <span className={demo ? "" : "text-ink-soft"}>{num(head)}</span>
+          {source === "sim" && <span className="ml-1 normal-case">(synthetic)</span>}
+        </span>
+      )}
+
+      <span className="hidden sm:inline">
+        phase computed here, against that block
+      </span>
+
+      <span className="ml-auto flex items-center gap-4">
+        <button
+          type="button"
+          onClick={() => setDemo(!demo)}
+          aria-pressed={demo}
+          className={[
+            "border px-2 py-0.5 tracking-[0.1em] uppercase transition-colors",
+            demo
+              ? "border-amber text-amber hover:bg-amber hover:text-raised"
+              : "border-rule text-ink-faint hover:border-glass hover:text-glass",
+          ].join(" ")}
+        >
+          Rehearsal {demo ? "on" : "off"}
+        </button>
+
+        {isConnected && address ? (
+          <Link
+            href={`/profile/${address}`}
+            title={address}
+            className={demo ? "underline underline-offset-2" : "text-glass underline underline-offset-2"}
+          >
+            {name ?? short(address)}
+          </Link>
+        ) : (
+          <Link
+            href="/account"
+            className={demo ? "underline underline-offset-2" : "hover:text-glass"}
+          >
+            Accounts
+          </Link>
+        )}
+      </span>
+    </div>
+  );
+}

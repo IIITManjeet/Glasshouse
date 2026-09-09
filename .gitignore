@@ -29,3 +29,6 @@ web/out/
 # Committing them would fork the argument and the snapshot.
 web/public/argument.html
 web/public/data/
+
+.vercel
+.env*

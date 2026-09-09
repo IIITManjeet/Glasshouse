@@ -72,5 +72,27 @@
         }
       ]
     }
+  ],
+  "redirects": [
+    {
+      "source": "/proof",
+      "destination": "/evidence",
+      "permanent": true
+    },
+    {
+      "source": "/proof/",
+      "destination": "/evidence",
+      "permanent": true
+    },
+    {
+      "source": "/why",
+      "destination": "/evidence",
+      "permanent": true
+    },
+    {
+      "source": "/why/",
+      "destination": "/evidence",
+      "permanent": true
+    }
   ]
 }

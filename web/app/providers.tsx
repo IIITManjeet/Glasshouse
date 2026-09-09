@@ -4,6 +4,7 @@ import { WagmiProvider, createConfig, http } from "wagmi";
 import { base, mainnet } from "wagmi/chains";
 import { injected } from "wagmi/connectors";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BoardProvider } from "@/components/BoardProvider";
 import { type ReactNode, useState } from "react";
 
 /**
@@ -62,7 +63,11 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <WagmiProvider config={config}>
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        {/* Inside the query client, because the board's ENS lookups and wagmi hooks need
+            it. One board for the whole tree: see components/BoardProvider.tsx. */}
+        <BoardProvider>{children}</BoardProvider>
+      </QueryClientProvider>
     </WagmiProvider>
   );
 }

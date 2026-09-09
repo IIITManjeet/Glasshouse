@@ -5,34 +5,13 @@ import { useDemoMode } from "@/lib/useAuctions";
 /**
  * The control and the warning for the rehearsal.
  *
- * Two components rather than one because they sit in different places: the switch belongs
- * in the nav with the other ways to move around, and the warning belongs above the content
- * it is warning about. Both read the same shared flag (`useAuctions`), so they cannot
- * disagree about whether the rehearsal is running.
+ * The banner, and only the banner. The switch that used to live beside it moved into
+ * components/StatusBar.tsx, because it is not a destination -- it is a statement about
+ * where the numbers come from, and it belongs on the line that names the source.
  *
- * These are the only two pieces of UI in the product that exist to tell the visitor the
- * page is lying to them on purpose. They are written to be impossible to miss and
- * impossible to dismiss.
+ * This is the piece of UI that exists to tell a visitor the page is lying to them on
+ * purpose. It is written to be impossible to miss and impossible to dismiss.
  */
-
-export function DemoToggle() {
-  const { demo, setDemo } = useDemoMode();
-  return (
-    <button
-      type="button"
-      onClick={() => setDemo(!demo)}
-      aria-pressed={demo}
-      className={[
-        "border px-2 py-1 font-mono text-[0.7rem] uppercase tracking-[0.12em] transition-colors",
-        demo
-          ? "border-amber bg-amber-soft text-amber"
-          : "border-rule text-ink-faint hover:border-glass hover:text-glass",
-      ].join(" ")}
-    >
-      {demo ? "Rehearsal · on" : "Rehearsal"}
-    </button>
-  );
-}
 
 export function DemoBanner() {
   const { demo, setDemo } = useDemoMode();

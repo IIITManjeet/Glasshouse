@@ -161,8 +161,8 @@ failures.push(...scanForbidden(html, "site/index.html"));
 // the shape test covers their data and the components carry their captions inline.
 const APP_PAGES = [
   "index.html",
-  "proof/index.html",
-  "why/index.html",
+  "board/index.html",
+  "evidence/index.html",
   "rounds/index.html",
   "account/index.html",
 ];

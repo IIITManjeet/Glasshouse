@@ -3,10 +3,11 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useAuctions } from "@/lib/useAuctions";
+import { useBoard } from "@/components/BoardProvider";
 import { SourceChip } from "@/components/Auction";
 import { Profile } from "@/components/Profile";
 import { IdentityCard } from "@/components/Identity";
+import { Loading } from "@/components/Loading";
 
 // Static export (next.config.mjs: output: "export") means no dynamic route segment can
 // exist -- there is no server at request time to resolve `/account/[address]` against, only
@@ -58,7 +59,7 @@ function AddressForm({ initial }: { initial: string }) {
 function AccountView() {
   const params = useSearchParams();
   const raw = params.get("a");
-  const { auctions, head, source, isFork, loading, error } = useAuctions();
+  const { auctions, head, source, isFork, loading, error } = useBoard();
 
   if (!raw) {
     return (
@@ -105,7 +106,10 @@ function AccountView() {
       </div>
 
       {loading && auctions.length === 0 ? (
-        <p className="text-sm text-ink-soft">Reading rounds from the chain…</p>
+        <Loading
+          what="Reading this address&rsquo;s rounds"
+          detail="Every round on the board is scanned for commitments and reveals from this address. Nothing about it is stored anywhere; it is derived from the chain each time."
+        />
       ) : error && auctions.length === 0 ? (
         <p className="border border-brick bg-brick-soft px-3 py-2 text-sm text-brick">
           Could not read any round: {error}

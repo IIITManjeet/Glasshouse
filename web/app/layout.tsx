@@ -4,8 +4,8 @@ import Link from "next/link";
 import { Newsreader, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
-import { DemoToggle, DemoBanner } from "@/components/DemoMode";
-import { ProfileLink } from "@/components/ProfileLink";
+import { DemoBanner } from "@/components/DemoMode";
+import { StatusBar } from "@/components/StatusBar";
 
 /**
  * The three faces ui-spec.md section 2.1 specifies, actually loaded.
@@ -93,23 +93,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/" className="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-ink-faint hover:text-glass">
                 Glasshouse <span className="text-glass">/</span> 1inch SwapVM <span className="text-glass">/</span> opcode 0x2e
               </Link>
-              <nav className="flex flex-wrap items-center gap-x-5 gap-y-2 font-mono text-[0.7rem] uppercase tracking-[0.12em] text-ink-faint">
-                <Link href="/" className="hover:text-glass">Live</Link>
-                <Link href="/proof" className="hover:text-glass">Proof</Link>
-                <Link href="/why" className="hover:text-glass">Why</Link>
+              <nav className="flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[0.7rem] uppercase tracking-[0.12em] text-ink-faint">
+                <Link href="/board" className="hover:text-glass">Board</Link>
                 <Link href="/rounds" className="hover:text-glass">Rounds</Link>
-                <ProfileLink className="hover:text-glass" />
-                <a href="https://basescan.org/address/0xc4ea91Fe700918220423ac307C6B1c59650FFbfe" target="_blank" rel="noopener" className="hover:text-glass">
-                  Contract ↗
-                </a>
-                <a href="https://github.com/IIITManjeet/Glasshouse" target="_blank" rel="noopener" className="hover:text-glass">
-                  Code ↗
-                </a>
-                <DemoToggle />
+                <Link href="/evidence" className="hover:text-glass">Evidence</Link>
               </nav>
             </header>
-            {/* Not dismissible, and above everything. ui-spec.md section 3.5 rule 3: a
-                data state that is not live raises a banner, not just a chip. */}
+            {/* The provenance line, on every page, so any screenshot carries it. The
+                rehearsal toggle and the connected address live in it -- the control that
+                changes the source belongs on the line that names the source. */}
+            <StatusBar />
+            {/* Not dismissible. ui-spec.md 3.5 rule 3: a data state that is not live
+                raises a banner, not just a chip. */}
             <DemoBanner />
             {children}
             <footer className="mt-16 border-t border-rule pt-5 font-mono text-[0.72rem] leading-relaxed text-ink-faint">
