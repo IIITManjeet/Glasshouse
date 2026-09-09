@@ -160,6 +160,26 @@
   p { margin: 0 0 1.1rem; }
   p:last-child { margin-bottom: 0; }
   a { color: var(--glass); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  /* THE WAY BACK TO THE PRODUCT.
+     This page linked to Basescan, to Google Fonts and to GitHub, and never once to the
+     thing it is an argument for -- so a reader who arrived here first had no way to reach
+     the live board at all. The instrument is the front door and the essay is supporting
+     material, which only works if the support points back. */
+  .toboard {
+    display: inline-block;
+    margin-top: 1.5rem;
+    padding: 0.55rem 0.9rem;
+    border: 1px solid var(--glass);
+    color: var(--glass);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-decoration: none;
+  }
+  .toboard:hover,
+  .toboard:focus-visible { background: var(--glass-soft); }
   code {
     font-family: var(--mono);
     font-size: 0.88em;
@@ -375,6 +395,8 @@
     <h1>Every auction on chain is won by the <em>fastest</em> bidder, not the highest one.</h1>
     <p class="standfirst">SwapVM already ships two ways to decide who may fill an order. One asks who you are. The other asks what time it is. Neither asks what the fill is worth to you.</p>
 
+    <a class="toboard" href="/">Watch it run &rarr;</a>
+
     <div class="strip">
       <div>
         <span class="by">by identity</span>
@@ -588,6 +610,7 @@ ctx.swap.balanceIn =
       GlasshouseRouter <a href="https://basescan.org/address/0x5c3baE054e8b4915a13726B397b1AeA864247DBf">0x5c3baE054e8b4915a13726B397b1AeA864247DBf</a><br>
       Aqua verified live on Base at 0x1111113ccf1426a8e30e2bff5e005d929bf6a90a<br>
       <br>
+      <a href="/">The live board</a> &nbsp;&middot;&nbsp;
       <a href="https://github.com/IIITManjeet/Glasshouse">github.com/IIITManjeet/Glasshouse</a>
     </p>
   </footer>
