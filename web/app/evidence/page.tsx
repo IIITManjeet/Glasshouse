@@ -49,11 +49,9 @@ export default function EvidencePage() {
   return (
     <main>
       <section className="mb-8 max-w-3xl">
-        <p className="font-mono text-[0.68rem] uppercase tracking-[0.14em] text-glass">
-          The evidence
-        </p>
-        <h1 className="mt-3 font-display text-3xl leading-tight font-light sm:text-4xl">
-          Everything here is <em className="text-glass">checkable</em>, and says how.
+        <p className="panel-id">GH 03 · Evidence · 5 panels</p>
+        <h1 className="mt-2">
+          Everything here is <em className="text-glass not-italic">checkable</em>, and says how.
         </h1>
         <p className="mt-4 text-ink-soft">
           Some of this was read from Base and some came from a unit test with mock tokens and
@@ -78,7 +76,8 @@ export default function EvidencePage() {
 
       <Reveal>
         <section id="receipt" className="mb-14 scroll-mt-6">
-          <h2 className="mb-1 font-display text-2xl font-light">Did it work</h2>
+          <p className="panel-id">GH 04 · Did it work</p>
+          <h2 className="mt-1.5 mb-1 font-display text-2xl font-light">Did it work</h2>
           <p className="mb-5 max-w-2xl text-sm text-ink-soft">
             The claim in one card: what the winner bid, what the winner paid, and the gap between
             them that went to the maker.
@@ -121,7 +120,8 @@ export default function EvidencePage() {
 
       <Reveal>
         <section id="bidders" className="mb-14 scroll-mt-6">
-          <h2 className="mb-1 font-display text-2xl font-light">Who is bidding</h2>
+          <p className="panel-id">GH 05 · Who is bidding</p>
+          <h2 className="mt-1.5 mb-1 font-display text-2xl font-light">Who is bidding</h2>
           <p className="mb-5 max-w-2xl text-sm text-ink-soft">
             Counts, never shares. A round is only counted as won once it has settled, because
             until then a later reveal can still take it away.
@@ -132,7 +132,8 @@ export default function EvidencePage() {
 
       <Reveal>
         <section id="comparison" className="mb-14 scroll-mt-6">
-          <h2 className="mb-1 font-display text-2xl font-light">Is it actually better</h2>
+          <p className="panel-id">GH 06 · Is it actually better</p>
+          <h2 className="mt-1.5 mb-1 font-display text-2xl font-light">Is it actually better</h2>
           <p className="mb-5 max-w-2xl text-sm text-ink-soft">
             The same order, three ways. Every number in this section came from a unit test — mock
             tokens, assigned valuations, nothing observed on a network.
@@ -143,7 +144,8 @@ export default function EvidencePage() {
 
       <Reveal>
         <section id="lens" className="mb-14 scroll-mt-6">
-          <h2 className="mb-1 font-display text-2xl font-light">Why not a clock</h2>
+          <p className="panel-id">GH 07 · Why not a clock</p>
+          <h2 className="mt-1.5 mb-1 font-display text-2xl font-light">Why not a clock</h2>
           <p className="mb-5 max-w-2xl text-sm text-ink-soft">
             The same three bidders under both rules. Only the rule for choosing among them
             differs — and the axis each rule ignores is drawn, not deleted.
@@ -154,7 +156,8 @@ export default function EvidencePage() {
 
       <Reveal>
         <section id="reserve" className="mb-14 scroll-mt-6">
-          <h2 className="mb-1 font-display text-2xl font-light">What happens next</h2>
+          <p className="panel-id">GH 08 · What happens next</p>
+          <h2 className="mt-1.5 mb-1 font-display text-2xl font-light">What happens next</h2>
           <p className="mb-5 max-w-2xl text-sm text-ink-soft">
             There is no maker dashboard. The advisor reads the rounds that already happened and
             prints the command, with the reason it recommends what it does.

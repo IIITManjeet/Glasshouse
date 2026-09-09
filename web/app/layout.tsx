@@ -6,6 +6,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 import { DemoBanner } from "@/components/DemoMode";
 import { StatusBar } from "@/components/StatusBar";
+import { Theme } from "@/components/Theme";
 
 /**
  * The three faces ui-spec.md section 2.1 specifies, actually loaded.
@@ -88,6 +89,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Script src="/data/rounds.js" strategy="beforeInteractive" />
         <Script src="/data/snapshot.js" strategy="beforeInteractive" />
         <Providers>
+          <Theme>
           <div className="mx-auto max-w-6xl px-5 py-6">
             <header className="mb-8 flex flex-wrap items-baseline justify-between gap-4 border-b border-rule pb-4">
               <Link href="/" className="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-ink-faint hover:text-glass">
@@ -125,6 +127,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </p>
             </footer>
           </div>
+          </Theme>
         </Providers>
       </body>
     </html>

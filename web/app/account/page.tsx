@@ -24,9 +24,11 @@ function AddressForm({ initial }: { initial: string }) {
       onSubmit={(e) => {
         e.preventDefault();
         const next = value.trim();
-        // The pretty URL. vercel.json rewrites /profile/0x... to this same page, so the
-        // shareable link never has to expose the query parameter the static export needs.
-        if (next) router.push(`/profile/${encodeURIComponent(next)}`);
+        // A full navigation, not router.push. /profile/<addr> is a Vercel edge rewrite
+        // rather than an exported route, and the client router cannot resolve it -- it
+        // would 404 without making a request. The reload is the cost of the pretty URL,
+        // and this is a deliberate lookup action rather than idle navigation.
+        if (next) window.location.assign(`/profile/${encodeURIComponent(next)}`);
       }}
       className="mt-4 flex flex-wrap gap-2"
     >

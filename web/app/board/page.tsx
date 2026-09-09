@@ -36,11 +36,9 @@ export default function BoardPage() {
     <main>
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="font-mono text-[0.68rem] uppercase tracking-[0.14em] text-glass">
-            The instrument
-          </p>
-          <h1 className="mt-2 font-display text-3xl font-light sm:text-4xl">The board</h1>
-          <p className="mt-2 max-w-xl text-sm text-ink-soft">
+          <p className="panel-id">GH 01 · Book 0xc4ea…FFbf · Base 8453</p>
+          <h1 className="mt-2">The board</h1>
+          <p className="mt-3 max-w-xl text-ink-soft">
             The round happening right now, and the panel to join it. Phases are counted in
             blocks, because blocks are what the contract enforces — seconds are an estimate.
           </p>
@@ -81,7 +79,12 @@ export default function BoardPage() {
 
       {featured && (
         <Swap showing={`${featured.orderHash}-${livePhase(featured, head)}`}>
-        <article className="border border-rule bg-raised p-5 sm:p-6">
+        <article className="border border-rule bg-raised">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-rule px-4 py-2">
+            <span className="panel-id">GH 02 · Live round</span>
+            <span className="panel-id">Commit 30 / Reveal 30 / Exclusive 15</span>
+          </div>
+          <div className="p-4 sm:p-5">
           <header className="mb-4 flex flex-wrap items-baseline gap-3">
             <h2 className="tnum text-base font-medium">
               Round {featured.round ?? "—"} · {featured.orderHash.slice(0, 10)}…
@@ -135,6 +138,7 @@ export default function BoardPage() {
               </>
             )}
           </p>
+          </div>
         </article>
         </Swap>
       )}

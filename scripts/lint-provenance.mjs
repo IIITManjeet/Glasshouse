@@ -224,26 +224,52 @@ function tokensIn(source) {
 }
 
 const AA = 4.5;
-const PALETTES = [["site/index.html", html]];
+
+/**
+ * Every palette on the site, named.
+ *
+ * A palette that is not in this list is a palette nobody is checking, which is how
+ * --ink-faint shipped at 3.15:1 in the first place. THE TAPE is the reason this became a
+ * list rather than two regexes: /board and /evidence got their own register -- dark-first,
+ * with the light variant in a media query, the inverse of every other block here -- and it
+ * went in entirely unchecked. A brand-new palette is exactly where contrast regresses,
+ * because nobody has looked at it yet.
+ */
+const PALETTES = [];
+
+{
+  const l = /:root \{[\s\S]*?\n  \}/.exec(html);
+  const d = /prefers-color-scheme: dark[\s\S]*?\n    \}/.exec(html);
+  if (l) PALETTES.push(["site/index.html light", l[0]]);
+  if (d) PALETTES.push(["site/index.html dark", d[0]]);
+}
 
 const globalsCss = new URL("../web/app/globals.css", import.meta.url);
-if (existsSync(globalsCss)) PALETTES.push(["web/app/globals.css", readFileSync(globalsCss, "utf8")]);
+if (existsSync(globalsCss)) {
+  const css = readFileSync(globalsCss, "utf8");
+  const theme = /@theme \{[\s\S]*?\n\}/.exec(css);
+  const dark = /@media \(prefers-color-scheme: dark\) \{[\s\S]*?\n\}/.exec(css);
+  const tapeDark = /\.tape \{[\s\S]*?\n\}/.exec(css);
+  const tapeLight = /@media \(prefers-color-scheme: light\) \{\s*\.tape \{[\s\S]*?\n  \}/.exec(css);
+  if (theme) PALETTES.push(["globals.css light", theme[0]]);
+  if (dark) PALETTES.push(["globals.css dark", dark[0]]);
+  if (tapeDark) PALETTES.push([".tape dark (board, evidence)", tapeDark[0]]);
+  if (tapeLight) PALETTES.push([".tape light (board, evidence)", tapeLight[0]]);
+}
 
-for (const [file, source] of PALETTES) {
-  const light = /(?::root|@theme) \{[\s\S]*?\n\s*\}/.exec(source);
-  const dark = /prefers-color-scheme: dark[\s\S]*?\n\s*\}\n\}/.exec(source)
-    ?? /prefers-color-scheme: dark[\s\S]*?\n    \}/.exec(source);
-  for (const [theme, m] of [["light", light], ["dark", dark]]) {
-    if (!m) continue;
-    const t = tokensIn(m[0]);
+for (const [theme, block] of PALETTES) {
+  {
+    const t = tokensIn(block);
     if (!t.ground) continue;
-    for (const fg of ["ink", "ink-soft", "ink-faint", "glass", "amber", "brick"]) {
+    // `label` is the token The Tape added for column heads and panel ids. It is text, so it
+    // is measured like any other text colour rather than trusted because it looks bright.
+    for (const fg of ["ink", "ink-soft", "ink-faint", "glass", "amber", "brick", "label"]) {
       for (const bg of ["ground", "raised"]) {
         if (!t[fg] || !t[bg]) continue;
         const r = contrast(t[fg], t[bg]);
         if (r < AA) {
           failures.push(
-            `${file}, ${theme} theme: --${fg} (${t[fg]}) on --${bg} (${t[bg]}) is ${r.toFixed(2)}:1, below ` +
+            `${theme}: --${fg} (${t[fg]}) on --${bg} (${t[bg]}) is ${r.toFixed(2)}:1, below ` +
             `WCAG AA ${AA}:1 for the small text these tokens are used at`,
           );
         }

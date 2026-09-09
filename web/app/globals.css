@@ -21,6 +21,9 @@
   --color-brick-soft: #f6e5e1;
   --color-amber: #8a5a14;
   --color-amber-soft: #f7eedc;
+  /* Labels only: column heads, panel ids, eyebrows. NEVER a value. Distinct from amber,
+     which ui-spec 2.2 reserves for "pending / provisional / stale" and nothing else. */
+  --color-label: #6b5300;
 
   /* The `--font-*-loaded` variables are declared by next/font in app/layout.tsx and
      land on <html>. Naming the family after them as well keeps the stack working if the
@@ -48,6 +51,7 @@
     --color-brick-soft: #2c1714;
     --color-amber: #d6a94a;
     --color-amber-soft: #33280f;
+    --color-label: #e9b036;
   }
 }
 
@@ -127,4 +131,91 @@ html {
   .atmo-drift-far {
     animation: none !important;
   }
+}
+
+
+/* ================================================================================
+   "THE TAPE" -- the theme for the tool pages, scoped.
+   ================================================================================
+
+   /board and /evidence are instruments; / is an argument. They were rendering in one
+   register, which is why the site read as the same page four times over. This is the
+   second register, and it is deliberately NOT global: the landing page keeps the quiet
+   editorial look, and the tool pages look like a terminal, so moving between them feels
+   like moving between two different kinds of thing -- which is what they are.
+
+   DARK-FIRST, inverting the rest of the site. A terminal's default is dark, so the base
+   block here is the dark one and the LIGHT variant lives in the media query -- the
+   opposite of :root above. Someone on a light system still gets a coherent page ("paper
+   tape") rather than a dark panel pasted into a light document.
+
+   Mono is promoted to the primary face rather than a new font being loaded. IBM Plex Mono
+   is already the token that means "this value came from a machine"; making it the body
+   face of the instrument pages says the whole surface is machine output, which is exactly
+   the claim. It also avoids a second build-time font fetch.
+
+   Colour is strictly semantic here: --color-label is the ONLY thing amber-ish, and it
+   never touches a value. Green is ours/won/live, red is revert/forfeit, everything else is
+   greyscale. Contrast for every token is checked by scripts/lint-provenance.mjs, which
+   reads this block by name.
+*/
+.tape {
+  --color-ground: #0a0c10;
+  --color-raised: #11151b;
+  --color-sunk: #06080b;
+  --color-ink: #e6ebf0;
+  --color-ink-soft: #9aa5b1;
+  --color-ink-faint: #778390;
+  --color-rule: #232a33;
+  --color-glass: #3fd18f;
+  --color-glass-soft: #0d2b1f;
+  --color-brick: #ff6b5b;
+  --color-brick-soft: #2b1310;
+  --color-amber: #e9b036;
+  --color-amber-soft: #2b2210;
+  --color-label: #e9b036;
+
+  background: var(--color-ground);
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+@media (prefers-color-scheme: light) {
+  .tape {
+    --color-ground: #f5f5f0;
+    --color-raised: #ffffff;
+    --color-sunk: #ecece6;
+    --color-ink: #15181d;
+    --color-ink-soft: #454c55;
+    --color-ink-faint: #5e6670;
+    --color-rule: #d3d6d2;
+    --color-glass: #0e6e46;
+    --color-glass-soft: #dbeee5;
+    --color-brick: #b3261e;
+    --color-brick-soft: #f7e2e0;
+    --color-amber: #7a5000;
+    --color-amber-soft: #f4ecd9;
+    --color-label: #7a5000;
+  }
+}
+
+/* A panel id, top-left of every panel: "GH 04 - RECEIPT". Wayfinding, and it makes any
+   screenshot of a single panel say which panel it is -- the same job the source tag does
+   for data, applied to structure. */
+.tape .panel-id {
+  color: var(--color-label);
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* The display face survives, but only at the top of a tool page. Everything below the
+   heading is machine output and is set in mono. */
+.tape h1 {
+  font-family: var(--font-display);
+  font-size: clamp(1.9rem, 4vw, 2.6rem);
+  font-weight: 300;
+  line-height: 1.12;
 }

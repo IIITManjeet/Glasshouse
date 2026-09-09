@@ -86,13 +86,24 @@ export function StatusBar() {
         </button>
 
         {isConnected && address ? (
-          <Link
+          // A PLAIN <a>, NOT next/link, and that distinction is the whole bug.
+          //
+          // /profile/<addr> is a Vercel edge rewrite onto /account/?a=<addr>. It is not a
+          // route in the exported app, because `output: "export"` cannot resolve a dynamic
+          // segment with no server to resolve it against. next/link routes on the CLIENT:
+          // it looks the path up in the routes this build produced, does not find one, and
+          // renders 404 without ever making a request.
+          //
+          // curl, which makes a real request, gets 200 from the rewrite. That gap is
+          // exactly why this shipped broken and tested clean, and why the check for a
+          // rewritten path has to be a browser navigation rather than a status code.
+          <a
             href={`/profile/${address}`}
             title={address}
             className={demo ? "underline underline-offset-2" : "text-glass underline underline-offset-2"}
           >
             {name ?? short(address)}
-          </Link>
+          </a>
         ) : (
           <Link
             href="/account"
