@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!--
+    The mark is the mechanism, not a monogram.
+
+    Three bars are three bids, ascending. The horizontal rule crosses at the SECOND bar's
+    height, because that is what the winner pays -- the tallest bar wins and the price is
+    set one below it. At 16px it reads as a small chart; at any size it is the only thing
+    this project actually claims.
+
+    Teal is --glass, the token that means "ours / won / surplus to the maker" everywhere
+    else in the palette. No fill behind it, so it sits on light and dark tabs alike.
+  -->
+  <g fill="none" stroke="#1F6F66" stroke-width="3.4" stroke-linecap="square">
+    <line x1="6"  y1="26" x2="6"  y2="20" />
+    <line x1="16" y1="26" x2="16" y2="14" />
+    <line x1="26" y1="26" x2="26" y2="6" />
+  </g>
+  <line x1="2" y1="14" x2="30" y2="14" stroke="#8A5A14" stroke-width="1.6" stroke-dasharray="3 2.5" />
+</svg>
