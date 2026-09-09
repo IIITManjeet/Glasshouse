@@ -5,36 +5,25 @@ import { useAuctions, livePhase, type Auction } from "@/lib/useAuctions";
 import { SourceChip, PhaseTrack, BidCards, Stats, ReplayCheck } from "@/components/Auction";
 import { WalletBar } from "@/components/WalletBar";
 import { BidPanel, RevealStrip } from "@/components/BidPanel";
-import { Receipt } from "@/components/Receipt";
-import { Comparison } from "@/components/Comparison";
-import { LatencyLens } from "@/components/Lens";
-import { ReservePanel } from "@/components/Reserve";
 import { Mechanism } from "@/components/Mechanism";
+import { Atmosphere } from "@/components/Atmosphere";
+import { Reveal } from "@/components/Reveal";
 
 const num = (n?: number | null) =>
   n === null || n === undefined || Number.isNaN(n) ? "—" : n.toLocaleString("en-US");
 
-const SECTIONS = [
-  ["live", "live round"],
-  ["receipt", "receipt"],
-  ["comparison", "comparison"],
-  ["lens", "why not a clock"],
-  ["reserve", "next auction"],
-] as const;
-
 /**
  * The front door.
  *
- * A short hero, then the live auction immediately below it -- above the fold, moving. The
- * written argument lives on the static page at site/index.html and is a link away, because
- * this is a product and the first thing a visitor should meet is the mechanism working,
- * not an essay about it.
+ * IT USED TO BE A WALL. Six full-width figures stacked in one column, each with a long
+ * prose caption, and a visitor had to scroll past all of it to learn what the thing was.
+ * The provenance captions are not the problem -- they are the point -- but putting every
+ * one of them on the first page a stranger sees was.
  *
- * Everything below the live round is the evidence, in the order a sceptic asks for it:
- * what a finished round looks like (the receipt), whether the alternatives are actually
- * worse (the comparison), why a clock cannot do this (the lens), and what the maker does
- * next (the reserve). Each is a figure carrying its own source, and none of them needs the
- * network -- so the page below the fold is the same whether the chain answers or not.
+ * So this page now answers three questions and stops: what is the claim (hero), how does
+ * it work (the diagram), and is it actually running (the live round). The evidence moved
+ * to /proof and the argument to /why, each a link a visitor chooses to follow. Nothing was
+ * deleted; the front door just stopped being an archive.
  */
 export default function Home() {
   const { auctions, head, source, isFork, loading, error, demo, setDemo } = useAuctions();
@@ -45,56 +34,79 @@ export default function Home() {
   const live = auctions.find((a) => livePhase(a, head) !== "open");
   const featured: Auction | undefined = live ?? auctions[0];
 
-  // The receipt is about a round that FINISHED, which is rarely the one on the board.
-  //
-  // The newest settled round with a WINNER, not simply the newest settled round: a round
-  // where nobody opened an envelope settles with no winner, no clearing price and no fill,
-  // and a receipt for it is four dashes. Those rounds are not hidden -- they are on the
-  // board above, in the rounds table, and counted in the reserve window below -- but the
-  // section that exists to show what a completed round looks like should show one.
-  const settledRounds = auctions.filter((a) => a.settled);
-  const settled = settledRounds.find((a) => a.bestBidder) ?? settledRounds[0];
-  const skipped = settled ? settledRounds.indexOf(settled) : 0;
-
   return (
     <main>
-      <section className="mb-8 max-w-3xl">
-        <h1 className="font-display text-3xl leading-tight font-light sm:text-4xl">
-          Who fills your order should be decided by <em className="text-glass">what it is worth</em>, not by who is fastest.
+      {/* `relative` so the atmosphere can absolutely position itself against the hero and
+          nothing else. It is behind the content at -z-10 and ignores the pointer. */}
+      <section className="relative -mx-5 mb-14 px-5 pt-10 pb-16 sm:pt-16">
+        <Atmosphere />
+
+        <p className="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-ink-faint">
+          A custom 1inch SwapVM instruction · live on Base
+        </p>
+
+        <h1 className="mt-5 max-w-4xl font-display text-4xl leading-[1.12] font-light sm:text-5xl">
+          Who fills your order should be decided by{" "}
+          <em className="text-glass">what it is worth</em>, not by who is fastest.
         </h1>
-        <p className="mt-4 text-ink-soft">
+
+        <p className="mt-6 max-w-2xl text-lg leading-relaxed text-ink-soft">
           SwapVM ships two ways to allocate the right to fill an order. One asks who you are.
           The other asks what time it is. Glasshouse asks what you will pay — a sealed-bid,
-          second-price auction, settled on chain. The winner pays the runner-up&rsquo;s price and
-          the difference goes to the maker.
+          second-price auction, settled on chain.
         </p>
-        <p className="mt-3 text-sm text-ink-faint">
-          <Link href="/rounds" className="text-glass underline underline-offset-2">Every round so far</Link>
-          {" · "}
-          <a href="/argument.html" className="text-glass underline underline-offset-2">Why the alternatives are worse</a>
-        </p>
+
+        {/* The claim, as three numbers, because the mechanism is more persuasive than any
+            adjective available to describe it. The same three the link card carries. */}
+        <div className="mt-9 flex flex-wrap gap-x-10 gap-y-5">
+          {[
+            ["highest bid", "400 bps", "wins the right to fill", "text-glass"],
+            ["pays", "250 bps", "the runner-up's bid", "text-amber"],
+            ["to the maker", "150 bps", "the difference", "text-ink"],
+          ].map(([label, value, note, tone]) => (
+            <div key={label}>
+              <div className="font-mono text-[0.66rem] uppercase tracking-[0.12em] text-ink-faint">
+                {label}
+              </div>
+              <div className={`tnum mt-1.5 text-3xl ${tone}`}>{value}</div>
+              <div className="mt-1 text-[0.82rem] text-ink-faint">{note}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-10 flex flex-wrap items-center gap-3">
+          <a
+            href="#live"
+            className="border border-glass bg-glass-soft px-4 py-2.5 font-mono text-[0.72rem] uppercase tracking-[0.12em] text-glass hover:bg-glass hover:text-raised"
+          >
+            Watch a round →
+          </a>
+          <Link
+            href="/proof"
+            className="border border-rule px-4 py-2.5 font-mono text-[0.72rem] uppercase tracking-[0.12em] text-ink-soft hover:border-glass hover:text-glass"
+          >
+            See the proof
+          </Link>
+          <Link
+            href="/why"
+            className="border border-rule px-4 py-2.5 font-mono text-[0.72rem] uppercase tracking-[0.12em] text-ink-soft hover:border-glass hover:text-glass"
+          >
+            Why not a clock
+          </Link>
+        </div>
       </section>
 
       {/* The whole round at once, above the instrument that can only ever show one phase
           of it. A visitor landing during the commit window sees three hatched cards and a
           countdown; without this they have no way to know what it counts down TO. */}
-      <section className="mb-12">
+      <Reveal className="mb-14">
         <Mechanism />
-      </section>
-
-      {/* One line of anchors, no sticky bar. ui-spec.md section 2.3. */}
-      <nav className="mb-10 flex flex-wrap gap-x-4 gap-y-1 border-y border-rule py-2 font-mono text-[0.68rem] uppercase tracking-[0.12em] text-ink-faint">
-        {SECTIONS.map(([id, label]) => (
-          <a key={id} href={`#${id}`} className="hover:text-glass">
-            {label}
-          </a>
-        ))}
-      </nav>
+      </Reveal>
 
       <section id="live" className="scroll-mt-6">
         <WalletBar className="mb-4" />
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-display text-xl font-normal">Live on Base</h2>
+          <h2 className="font-display text-2xl font-normal">Live on Base</h2>
           {head > 0 && <SourceChip source={source} head={head} isFork={isFork} />}
         </div>
 
@@ -190,78 +202,19 @@ export default function Home() {
           </article>
         )}
 
-        {auctions.length > 1 && (
-          <p className="mt-4 text-sm">
-            <Link href="/rounds" className="text-glass underline underline-offset-2">
-              See all {auctions.length} rounds →
-            </Link>
-          </p>
-        )}
-      </section>
-
-      <section id="receipt" className="mt-14 scroll-mt-6">
-        <h2 className="mb-1 font-display text-xl font-normal">What a finished round looks like</h2>
-        <p className="mb-4 max-w-2xl text-sm text-ink-soft">
-          The claim in one card: what the winner bid, what the winner paid, and the gap between
-          them that went to the maker instead.
-        </p>
-        {settled ? (
-          <>
-            <Receipt a={settled} source={source} />
-            {skipped > 0 && (
-              <p className="mt-2 text-[0.8rem] text-ink-faint">
-                {skipped} more recent round{skipped === 1 ? "" : "s"} settled with no winner — every
-                commitment stayed sealed, so there is no price and no fill to print.{" "}
-                <Link href="/rounds" className="text-glass underline underline-offset-2">
-                  They are in the rounds table
-                </Link>
-                .
-              </p>
-            )}
-          </>
-        ) : (
-          <div className="border border-rule bg-raised p-6">
-            <p className="text-ink-soft">No round on this Book has settled yet.</p>
-            <p className="mt-2 max-w-2xl text-sm text-ink-faint">
-              A receipt needs a reveal window that has closed with at least one envelope opened.
-              This build has not seen one, and inventing a plausible receipt is exactly the thing
-              this page refuses to do.{" "}
-              <button type="button" onClick={() => setDemo(true)} className="text-glass underline underline-offset-2">
-                Run the rehearsal
-              </button>{" "}
-              to see the same card filled in from a simulated round — labelled as one.
-            </p>
-          </div>
-        )}
-      </section>
-
-      <section id="comparison" className="mt-14 scroll-mt-6">
-        <h2 className="mb-1 font-display text-xl font-normal">The same order, three ways</h2>
-        <p className="mb-4 max-w-2xl text-sm text-ink-soft">
-          Every number in this section came from a unit test with mock tokens and assigned
-          valuations. Nothing in it was observed on a network, and it is labelled that way
-          throughout.
-        </p>
-        <Comparison />
-      </section>
-
-      <section id="lens" className="mt-14 scroll-mt-6">
-        <h2 className="mb-1 font-display text-xl font-normal">Why a clock cannot do this</h2>
-        <p className="mb-4 max-w-2xl text-sm text-ink-soft">
-          A falling price is still a race. It sorts bidders by when they arrive, and arrival on
-          chain is sold to whoever pays the builder most — so the fill goes to the fastest
-          participant, whatever the fill is worth to them.
-        </p>
-        <LatencyLens />
-      </section>
-
-      <section id="reserve" className="mt-14 scroll-mt-6">
-        <h2 className="mb-1 font-display text-xl font-normal">What the maker does next</h2>
-        <p className="mb-4 max-w-2xl text-sm text-ink-soft">
-          There is no maker dashboard. The advisor reads the rounds that already happened and
-          prints the command, with the reserve it recommends and the reason it recommends it.
-        </p>
-        <ReservePanel auctions={auctions} source={source} />
+        <nav className="mt-8 border-t border-rule pt-5 text-sm">
+          <Link href="/proof" className="text-glass underline underline-offset-2">
+            What a finished round produced →
+          </Link>
+          {" · "}
+          <Link href="/why" className="text-glass underline underline-offset-2">
+            Why the alternatives are worse
+          </Link>
+          {" · "}
+          <Link href="/rounds" className="text-glass underline underline-offset-2">
+            Every round so far
+          </Link>
+        </nav>
       </section>
 
       {/* Sticky, and the only sticky thing on the page. A reveal the bidder cannot see

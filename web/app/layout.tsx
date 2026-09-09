@@ -94,8 +94,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </Link>
               <nav className="flex flex-wrap items-center gap-x-5 gap-y-2 font-mono text-[0.7rem] uppercase tracking-[0.12em] text-ink-faint">
                 <Link href="/" className="hover:text-glass">Live</Link>
+                <Link href="/proof" className="hover:text-glass">Proof</Link>
+                <Link href="/why" className="hover:text-glass">Why</Link>
                 <Link href="/rounds" className="hover:text-glass">Rounds</Link>
-                <a href="/argument.html" className="hover:text-glass">Argument</a>
                 <a href="https://basescan.org/address/0xc4ea91Fe700918220423ac307C6B1c59650FFbfe" target="_blank" rel="noopener" className="hover:text-glass">
                   Contract ↗
                 </a>
