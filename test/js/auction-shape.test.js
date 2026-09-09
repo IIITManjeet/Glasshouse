@@ -112,3 +112,85 @@ test("an unopened round decodes as null, not as an auction of zeros", () => {
   assert.equal(decodeAuction("0x"), null);
   assert.equal(decodeAuction(undefined), null);
 });
+
+/**
+ * THE SIMULATOR IS THE THIRD DATA PATH.
+ *
+ * web/lib/simulate.js feeds the same components as the chain read and the snapshot, so it
+ * is bound by the same contract, and it is the path most likely to drift: it is the only
+ * one not derived from an ABI or a generator, so nothing but this test stops a field being
+ * renamed in it alone.
+ */
+test("every simulated round carries every field the page reads", async () => {
+  const { simulate, SIM_WARM_START_MS } = await import("../../web/lib/simulate.js");
+  const board = simulate(SIM_WARM_START_MS);
+  assert.ok(board.auctions.length > 0, "the warm start lands mid-flight, not on an empty board");
+  for (const a of board.auctions) {
+    for (const key of REQUIRED) {
+      assert.ok(key in a, `simulated round ${a.round} is missing "${key}"`);
+    }
+  }
+});
+
+test("the simulation clears at the runner-up's bid, which is the whole claim", async () => {
+  const { simulate, SIM_WARM_START_MS } = await import("../../web/lib/simulate.js");
+  const board = simulate(SIM_WARM_START_MS);
+  const contested = board.auctions.find((a) => a.simKey === "contested");
+  assert.ok(contested, "the script's contested round is in the window");
+  assert.equal(contested.bestBps, 400);
+  assert.equal(contested.secondBps, 250);
+  // Not the winner's own bid, and not the reserve: the runner-up's.
+  assert.equal(contested.clearingBps, 250);
+  assert.equal(contested.committedCount, 3);
+  assert.equal(contested.revealedCount, 2, "one envelope is never opened, on purpose");
+});
+
+test("a sole reveal clears at the reserve, and a round with none has no winner", async () => {
+  const { simulate, SIM_WARM_START_MS, SIM_RESERVE_BPS } = await import("../../web/lib/simulate.js");
+  const board = simulate(SIM_WARM_START_MS);
+
+  const sole = board.auctions.find((a) => a.simKey === "sole");
+  assert.equal(sole.revealedCount, 1);
+  assert.equal(sole.secondBps, 0, "there is no runner-up");
+  assert.equal(sole.clearingBps, SIM_RESERVE_BPS, "so the reserve stands in for one");
+
+  const empty = board.auctions.find((a) => a.simKey === "empty");
+  assert.equal(empty.revealedCount, 0);
+  assert.equal(empty.bestBidder, null);
+  // Null, not zero. "Nobody won" is not "the price was nothing" -- the receipt and the
+  // stats line both branch on this and would print 0 bps as a cleared price.
+  assert.equal(empty.clearingBps, null);
+  assert.equal(empty.filled, false);
+});
+
+test("the simulation is a pure function of the block, so it never runs backwards", async () => {
+  const { simulate, SIM_MS_PER_BLOCK, SIM_WARM_START_MS } = await import("../../web/lib/simulate.js");
+  const at = (ms) => simulate(ms).auctions.find((a) => a.simKey === "contested");
+  const early = at(SIM_WARM_START_MS);
+  const later = at(SIM_WARM_START_MS + 40 * SIM_MS_PER_BLOCK);
+
+  assert.deepEqual(at(SIM_WARM_START_MS), early, "same input, same output");
+  assert.ok(later.revealedCount >= early.revealedCount, "reveals never un-happen");
+  assert.ok(later.committedCount >= early.committedCount, "commitments never un-happen");
+});
+
+test("the reserve window drops unreadable rows rather than scoring them as no-reveal", async () => {
+  const { reserveWindow } = await import("../../web/lib/reserve-window.js");
+  const rows = [
+    // Settled, two reveals, winner 400 over a runner-up at 250.
+    { settled: true, revealedCount: 2, committedCount: 3, bestBidder: "0xa", bestBps: 400, secondBps: 250, reserveBps: 50, round: 1 },
+    // Settled, but eth_getLogs failed. NOT a zero-reveal auction.
+    { settled: true, revealedCount: null, committedCount: 2, bestBidder: null, bestBps: 0, secondBps: 0, reserveBps: 50, round: 2 },
+    // Still running: a later reveal can still displace this winner.
+    { settled: false, revealedCount: 1, committedCount: 2, bestBidder: "0xb", bestBps: 300, secondBps: 0, reserveBps: 50, round: 3 },
+  ];
+  const w = reserveWindow(rows);
+  assert.equal(w.rows.length, 1, "one settled, readable round");
+  assert.equal(w.unreadable, 1);
+  assert.equal(w.rows[0].competition, "CONTESTED");
+  assert.equal(w.rows[0].clearingBps, 250);
+  assert.equal(w.rows[0].winnerMarginBps, 150);
+  // isThin: CONTESTED and margin > clearing. 150 is not greater than 250.
+  assert.equal(w.rows[0].thin, false);
+  assert.equal(w.rows[0].unrevealedCount, 1);
+});
