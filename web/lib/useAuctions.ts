@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // declaration file -- a .d.ts would be a second place for the shape to drift.
 import { fromChain } from "./chain.js";
 import { phase as computePhase } from "./phase.js";
+import { simulate, SIM_MS_PER_BLOCK, SIM_WARM_START_MS } from "./simulate.js";
 
 export type Bid = {
   bidder: string;
@@ -40,7 +41,7 @@ export type Auction = {
   bids: Bid[] | null;
 };
 
-export type Source = "chain" | "snapshot" | "none";
+export type Source = "chain" | "snapshot" | "sim" | "none";
 
 export type Board = {
   auctions: Auction[];
@@ -50,7 +51,66 @@ export type Board = {
   loading: boolean;
   error: string | null;
   refresh: () => void;
+  /** Rehearsal mode: `lib/simulate.js` drives the board instead of the chain. */
+  demo: boolean;
+  setDemo: (on: boolean) => void;
 };
+
+/**
+ * Whether the rehearsal is running, held outside React.
+ *
+ * It has to be shared: the header toggle and the board are different subtrees, and the
+ * /rounds page reads it too. A context provider would work, but this is one boolean with
+ * two writers, and the store is nine lines against a provider's thirty.
+ *
+ * It is NOT persisted. A visitor who lands on this page gets the chain, always -- a demo
+ * flag that survives a reload is how someone ends up reading simulated numbers as live
+ * ones a week later, which is the exact failure DESIGN.md section 2 exists to prevent.
+ * The URL carries it (`?demo=1`) so a link into the rehearsal is still shareable, and a
+ * link is a thing a person chose to click.
+ */
+let demoOn = false;
+const demoListeners = new Set<() => void>();
+function setDemoGlobal(on: boolean) {
+  if (demoOn === on) return;
+  demoOn = on;
+  if (typeof window !== "undefined") {
+    const url = new URL(window.location.href);
+    if (on) url.searchParams.set("demo", "1");
+    else url.searchParams.delete("demo");
+    window.history.replaceState(null, "", url);
+  }
+  for (const fn of demoListeners) fn();
+}
+
+/**
+ * Subscribe to the flag WITHOUT subscribing to the board.
+ *
+ * The nav switch and the banner need to know whether the rehearsal is on; they do not
+ * need auctions. Calling useAuctions() for the flag alone would mount a second and third
+ * copy of the polling effect below -- three independent pollers against Base's public
+ * endpoint, which rate-limits (-32016) and has already cost this project a day once.
+ */
+export function useDemoMode(): { demo: boolean; setDemo: (on: boolean) => void } {
+  const [demo, setDemo] = useDemoFlag();
+  return { demo, setDemo };
+}
+
+function useDemoFlag(): [boolean, (on: boolean) => void] {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    // Read the URL on mount, not during render: the server render of this static export
+    // has no location, and disagreeing with it is a hydration mismatch.
+    if (new URLSearchParams(window.location.search).get("demo") === "1") demoOn = true;
+    const sync = () => setOn(demoOn);
+    demoListeners.add(sync);
+    sync();
+    return () => {
+      demoListeners.delete(sync);
+    };
+  }, []);
+  return [on, setDemoGlobal];
+}
 
 const BOOK = "0xc4ea91Fe700918220423ac307C6B1c59650FFbfe";
 
@@ -89,9 +149,52 @@ export function useAuctions(): Board {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [nonce, setNonce] = useState(0);
 
+  const [demo, setDemo] = useDemoFlag();
+
   const refresh = useCallback(() => setNonce((n) => n + 1), []);
 
+  /**
+   * The rehearsal. One interval, no network, and it starts part-way through a round so the
+   * first frame a visitor sees is a live phase rather than an empty board they have to
+   * wait thirty seconds to understand.
+   *
+   * Separate from the chain effect rather than a branch inside it, so that turning the
+   * rehearsal off leaves no timer behind and the chain effect's own scheduling -- which is
+   * tiered and easy to get wrong -- is not made conditional on anything.
+   */
   useEffect(() => {
+    if (!demo) return;
+    const startedAt = Date.now();
+    const paint = () => {
+      const board = simulate(SIM_WARM_START_MS + (Date.now() - startedAt));
+      setAuctions(board.auctions as Auction[]);
+      setHead(board.head);
+      setSource("sim");
+      setError(null);
+      setLoading(false);
+    };
+    paint();
+    const id = setInterval(paint, SIM_MS_PER_BLOCK);
+    return () => {
+      clearInterval(id);
+      // Clear the board on the way out. Without this, switching back to the chain leaves
+      // the simulated rounds on screen for as long as the first eth_call takes -- the
+      // banner already gone, because that follows the flag -- and simulated numbers under
+      // a heading that no longer says they are simulated is the one state this whole
+      // module exists to prevent.
+      setAuctions([]);
+      setHead(0);
+      setSource("none");
+      setLoading(true);
+    };
+  }, [demo]);
+
+  useEffect(() => {
+    // The rehearsal owns the board while it is on. Returning before the first fetch is
+    // what keeps a real chain read from landing mid-demo and overwriting it with a
+    // half-second of live data -- which would put unlabelled real numbers under a
+    // SIMULATED chip, the one mislabelling worse than either state alone.
+    if (demo) return;
     let cancelled = false;
     const rpc = rpcUrl();
 
@@ -160,7 +263,7 @@ export function useAuctions(): Board {
       if (timer.current) clearTimeout(timer.current);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [nonce]);
+  }, [nonce, demo]);
 
   // Refs so the scheduler can read the latest values without re-subscribing every tick.
   const auctionsRef = useRef<Auction[]>([]);
@@ -171,5 +274,5 @@ export function useAuctions(): Board {
   const isFork =
     typeof window !== "undefined" && /127\.0\.0\.1|localhost/.test(rpcUrl());
 
-  return { auctions, head, source, isFork, loading, error, refresh };
+  return { auctions, head, source, isFork, loading, error, refresh, demo, setDemo };
 }

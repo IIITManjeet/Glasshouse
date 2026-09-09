@@ -24,7 +24,12 @@ export function SourceChip({ source, head, isFork }: { source: Source; head: num
         : `Source · Base mainnet · read from the contract · block ${num(head)}`
       : source === "snapshot"
         ? `Source · Snapshot in repo · as of block ${num(head)}`
-        : "Source · none";
+        : source === "sim"
+          ? // Longest chip on the page, deliberately. It is the one a screenshot can do the
+            // most damage with, so it names the file and refuses the word "block" without
+            // "synthetic" in front of it.
+            `Source · SIMULATED by lib/simulate.js · nothing on any chain · synthetic block ${num(head)}`
+          : "Source · none";
   const tone =
     source === "chain" && !isFork
       ? "text-glass border-glass"
