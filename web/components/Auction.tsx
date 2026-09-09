@@ -99,7 +99,20 @@ export function PhaseTrack({ a, head }: { a: Auction; head: number }) {
   );
 }
 
-/** A sealed bid exists and cannot be read yet. Hatching says that; a spinner would lie. */
+/**
+ * A sealed bid exists and cannot be read yet. Hatching says that; a spinner would lie.
+ *
+ * THE HOUSE BID IS LABELLED, and it has to be. The keeper opens every round AND bids in it
+ * (scripts/keeper.ts), and it does so from the MAKER'S OWN ADDRESS -- so the maker is a
+ * bidder in its own auction. Meanwhile the argument for sealing bids is precisely that an
+ * open second-price auction lets a maker insert a bid just under the top.
+ *
+ * That is defensible: the house commits at index 0, before any visitor can have acted, it
+ * cannot read a sealed rival, and it never reveals early -- so it functions as a randomised
+ * hidden reserve that supplies liquidity for the demo. What is not defensible is leaving it
+ * unlabelled and letting a reader discover it themselves. A card whose bidder is the maker
+ * now says so on the card, not in a caption somewhere else.
+ */
 export function BidCards({ a }: { a: Auction }) {
   // null means the log scan FAILED. That is not "no bids" -- rendering it as none is how
   // a rate-limited request turns into an accusation that nobody bid.
@@ -118,17 +131,44 @@ export function BidCards({ a }: { a: Auction }) {
       {a.bids.map((b) => {
         const sealed = b.bps === null || b.bps === undefined;
         const leading = a.bestBidder && b.bidder?.toLowerCase() === a.bestBidder.toLowerCase();
+        const isHouse = Boolean(a.maker && b.bidder?.toLowerCase() === a.maker.toLowerCase());
+        const tx = b.revealTx ?? b.commitTx ?? null;
         return (
           <div
             key={`${b.bidder}-${b.commitIdx}`}
             className={`min-w-[13rem] flex-1 border border-rule p-3 ${sealed ? "hatch" : "bg-raised"}`}
           >
-            <div className="tnum text-[0.7rem] text-ink-faint">#{b.commitIdx}</div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="tnum text-[0.7rem] text-ink-faint">#{b.commitIdx}</span>
+              {isHouse && (
+                <span
+                  title="The keeper bids from the maker's own address, always first, and cannot read a sealed rival."
+                  className="border border-amber px-1.5 py-0.5 font-mono text-[0.58rem] uppercase tracking-[0.1em] text-amber"
+                >
+                  house · the maker
+                </span>
+              )}
+            </div>
             {sealed ? (
               <>
                 <div className="tnum my-1 text-lg tracking-[0.1em] text-ink-faint">▨▨▨▨▨▨</div>
                 <div className="tnum text-[0.78rem] text-ink-soft">{short(b.bidder)}</div>
-                <div className="mt-1 text-[0.76rem] text-ink-faint">sealed · block {num(b.committedAtBlock)}</div>
+                <div className="mt-1 text-[0.76rem] text-ink-faint">
+                  sealed · block {num(b.committedAtBlock)}
+                  {tx && (
+                    <>
+                      {" "}
+                      <a
+                        href={`https://basescan.org/tx/${tx}`}
+                        target="_blank"
+                        rel="noopener"
+                        className="text-glass hover:underline"
+                      >
+                        tx ↗
+                      </a>
+                    </>
+                  )}
+                </div>
               </>
             ) : (
               <>
@@ -136,6 +176,19 @@ export function BidCards({ a }: { a: Auction }) {
                 <div className="tnum text-[0.78rem] text-ink-soft">{short(b.bidder)}</div>
                 <div className={`mt-1 text-[0.76rem] ${leading ? "text-glass" : "text-ink-faint"}`}>
                   {leading ? "leading" : b.bps === a.secondBps ? "sets the price" : "outbid"}
+                  {tx && (
+                    <>
+                      {" · "}
+                      <a
+                        href={`https://basescan.org/tx/${tx}`}
+                        target="_blank"
+                        rel="noopener"
+                        className="text-glass hover:underline"
+                      >
+                        tx ↗
+                      </a>
+                    </>
+                  )}
                 </div>
               </>
             )}

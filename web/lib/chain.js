@@ -127,11 +127,22 @@ export async function bidsFor(rpc, book, orderHash, fromBlock, toBlock) {
           commitIdx: byBidder.size,
           committedAtBlock: Number(BigInt(l.blockNumber)),
           bps: null,
+          // KEPT, HAVING BEEN THROWN AWAY. Every log already carries the transaction that
+          // emitted it, and discarding it meant the page could say "a bid was committed at
+          // block N" while offering no way to go and look at it. On a page whose whole
+          // claim is that you do not have to trust it, an unlinked assertion is the weakest
+          // thing on screen. This one field is what turns the bid cards and the receipt
+          // from a report into something checkable on Basescan.
+          commitTx: l.transactionHash ?? null,
+          revealTx: null,
         });
       }
     } else if (l.topics[0] === TOPIC_REVEALED) {
       const b = byBidder.get(bidder);
-      if (b) b.bps = asInt(word(l.data, 0));
+      if (b) {
+        b.bps = asInt(word(l.data, 0));
+        b.revealTx = l.transactionHash ?? null;
+      }
     }
   }
   return [...byBidder.values()];

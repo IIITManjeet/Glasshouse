@@ -12,6 +12,11 @@ export type Bid = {
   commitIdx: number;
   committedAtBlock: number;
   bps: number | null;
+  /** The transactions that produced this bid, so the page can link rather than assert.
+   *  null from the simulator, which has no transactions, and from the snapshot, which
+   *  predates the field -- both render as no link rather than as a broken one. */
+  commitTx?: string | null;
+  revealTx?: string | null;
 };
 
 export type Auction = {

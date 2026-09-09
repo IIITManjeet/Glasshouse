@@ -96,6 +96,24 @@ the *Conditions & access guards* bank (`.../libs/OpcodeList.sol:67-68`) — gati
 - Sealed rather than open, for **shill resistance**: an open second-price auction lets the
   maker insert a bid just under the top.
 
+> **The demo maker bids in its own auctions, and it is labelled on the board.** The keeper
+> that keeps a live round on the page also places one bid per round, from the maker's own
+> address, so that a lone visitor sees a second price rather than the reserve — a
+> second-price auction with one bidder clears at the reserve and demonstrates nothing.
+> It commits at index 0, before any visitor can have acted; it cannot read a sealed rival;
+> it never reveals early; and its bond is 0. So it behaves as a randomised hidden reserve
+> drawn from 60–200 bps, well under `maxBps`, and any real bidder can outbid it. It is
+> marked `house · the maker` on its own bid card rather than explained away here. A
+> production maker would set `reserveBps` and not bid at all.
+
+**"Why not just omit the instruction?"** A maker who does not want an auction leaves `0x2e`
+out of the program, and nothing here applies to them — that is the point of it being an
+opcode rather than a protocol rule. The question only bites if you assume someone else
+composes the order; but the maker authors it, so omission is the maker choosing not to sell
+priority, which is a preference this design has no opinion about. What Glasshouse changes is
+the option available to a maker who *does* want the fill allocated by value: before, the
+only gates SwapVM shipped were identity and a clock.
+
 **Why this is not "a Dutch auction in disguise."** Dutch auctions are strategically
 equivalent to first-price sealed-bid auctions — in a *frictionless* model. On chain that
 equivalence breaks at exactly the two points visible in the source above: `block.timestamp`

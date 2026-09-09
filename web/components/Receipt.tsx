@@ -70,6 +70,12 @@ export function Receipt({ a, source }: { a: Auction; source: Source }) {
   // page that is a "gain", so it is stated as a difference of two bps figures that are
   // both printed beside it -- never as a lone improvement figure with nothing to check.
   const overReserve = won && clearing !== null ? clearing - a.reserveBps : null;
+  // The winner's own reveal transaction, if the log scan saw it. The SETTLE transaction is
+  // deliberately not linked: nothing scans for the Settled event, so the page does not have
+  // it, and inventing a link to a transaction it never read is exactly the kind of
+  // unchecked assertion the rest of this card exists to avoid.
+  const winnerTx =
+    a.bids?.find((b) => b.bidder?.toLowerCase() === a.bestBidder?.toLowerCase())?.revealTx ?? null;
   const margin = won && clearing !== null ? a.bestBps - clearing : null;
   const reserveBound = won && a.secondBps < a.reserveBps;
 
@@ -93,11 +99,28 @@ export function Receipt({ a, source }: { a: Auction; source: Source }) {
           <span className="tnum">after block {num(a.revealEnd)}</span>
           <span className="ml-2 text-ink-faint">reveal window closed</span>
         </Field>
-        <Field label={won ? "winner" : "winner"}>
+        <Field label="winner">
           {won ? (
             <>
-              <span className="tnum">{short(a.bestBidder)}</span>
+              <a
+                href={`https://basescan.org/address/${a.bestBidder}`}
+                target="_blank"
+                rel="noopener"
+                className="tnum text-glass hover:underline"
+              >
+                {short(a.bestBidder)}
+              </a>
               <Copy text={a.bestBidder!} label="winner address" />
+              {winnerTx && (
+                <a
+                  href={`https://basescan.org/tx/${winnerTx}`}
+                  target="_blank"
+                  rel="noopener"
+                  className="ml-2 font-mono text-[0.72rem] text-glass hover:underline"
+                >
+                  reveal tx ↗
+                </a>
+              )}
             </>
           ) : (
             <span className="text-ink-faint">none — nobody opened their envelope</span>
