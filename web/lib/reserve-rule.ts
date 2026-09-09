@@ -4,6 +4,11 @@
 // free so the page and the advisor run the identical function over the identical window
 // and can never quietly disagree about the number they show a maker.
 //
+// THAT CLAIM USED TO BE FALSE. There were two byte-identical copies of this file, and the
+// advisor imported `site/reserve-rule.js` while the page imported `web/lib/reserve-rule.js`.
+// Identical today, one `sed` away from not being, and nothing would have failed. One file
+// now, and both read it.
+//
 // The three regimes this rule leans on are test/ReserveMatrix.t.sol, not a guess:
 //   - five competitive bidders (400/250/100/60/30): clearing is 250 bps at every reserve
 //     tested, 0 through 200 (test_Competitive_SecondPriceDominatesTheReserve). The
@@ -36,33 +41,73 @@ export const NO_REVEALS = "NO_REVEALS";
 export const WINNER_BELOW_FLOOR = "WINNER_BELOW_FLOOR";
 export const THIN_COMPETITION = "THIN_COMPETITION";
 
+/** Why the rule landed where it did. A union, so a caller cannot gloss a code that does
+ *  not exist -- the page prints a sentence per code and a typo would have printed none. */
+export type ReserveReason =
+  | typeof NO_HISTORY
+  | typeof COMPETITION_PRICES
+  | typeof NO_REVEALS
+  | typeof WINNER_BELOW_FLOOR
+  | typeof THIN_COMPETITION;
+
+/** How many revealed. subgraph/src/helpers.ts:244 classifies it; this file only reads it. */
+export type CompetitionClass = "NONE" | "SOLE" | "CONTESTED";
+
 /**
- * window: rows shaped like the Q3 query result (subgraph-design.md section 7.2),
- *         ordered most-recent-settled-first (`orderBy: revealEnd, orderDirection: desc`).
- *         Each row needs: competition ("NONE"|"SOLE"|"CONTESTED"), thin (boolean),
- *         bestBps (integer), bestBidder (object/id, or null/undefined if nobody
- *         revealed), unrevealedCount, teamRevealed, invitedRevealed, unknownRevealed
- *         (integers).
- * opts.floorBps: the staleness floor (config/auction.json basis.reserveBps = 50). Never
- *         recommended below, because that is the number window-sizing.md derived from
- *         mid-price movement over the lockup, not from competition.
- * opts.maxBps:   config/auction.json advocated.maxBps = 500. A ceiling on the band; never
- *         a reason to recommend higher than the window supports.
- * opts.K: window size. The rule truncates `window` to the first K rows itself, so a
- *         caller that forgot `first: $k` in the query still gets the same answer as one
- *         that didn't - the truncation is part of the rule, not just the query.
- *
- * Returns { bps, band: [lo, hi], reason, n, empty, weak, strong, minBest, unrevealed,
- *           provenance: { team, invited, unknown } }.
+ * One row of the window, shaped like the Q3 query result
+ * (docs/design/subgraph-design.md section 7.2), ordered most-recent-settled-first
+ * (`orderBy: revealEnd, orderDirection: desc`).
  */
-export function recommendReserve(window, { floorBps = 50, maxBps = 500, K = 8 } = {}) {
+export interface ReserveRow {
+  competition: CompetitionClass;
+  thin: boolean;
+  bestBps: number;
+  /** null/undefined if nobody revealed. Only its presence is read. */
+  bestBidder?: string | { id: string } | null;
+  unrevealedCount?: number;
+  teamRevealed?: number;
+  invitedRevealed?: number;
+  unknownRevealed?: number;
+}
+
+export interface ReserveOptions {
+  /** The staleness floor (config/auction.json basis.reserveBps = 50). Never recommended
+   *  below, because that is the number window-sizing.md derived from mid-price movement
+   *  over the lockup, not from competition. */
+  floorBps?: number;
+  /** config/auction.json advocated.maxBps = 500. A ceiling on the band; never a reason to
+   *  recommend higher than the window supports. */
+  maxBps?: number;
+  /** Window size. The rule truncates `window` to the first K rows itself, so a caller that
+   *  forgot `first: $k` in the query still gets the same answer as one that didn't - the
+   *  truncation is part of the rule, not just the query. */
+  K?: number;
+}
+
+export interface ReserveAdvice {
+  bps: number;
+  band: [number, number];
+  reason: ReserveReason;
+  n: number;
+  empty: number;
+  weak: number;
+  strong: number;
+  minBest: number | null;
+  unrevealed: number;
+  provenance: { team: number; invited: number; unknown: number };
+}
+
+export function recommendReserve(
+  window: readonly ReserveRow[],
+  { floorBps = 50, maxBps = 500, K = 8 }: ReserveOptions = {},
+): ReserveAdvice {
   const rows = window.slice(0, K);
   const n = rows.length;
 
   let empty = 0;
   let weak = 0;
   let strong = 0;
-  let minBest; // undefined until a row with a winner is seen
+  let minBest: number | undefined; // undefined until a row with a winner is seen
   let unrevealed = 0;
   let team = 0;
   let invited = 0;
@@ -109,7 +154,7 @@ export function recommendReserve(window, { floorBps = 50, maxBps = 500, K = 8 } 
     // The reason stays COMPETITION_PRICES: it names why the recommendation is the
     // floor, which is still "competition set the price". WINNER_BELOW_FLOOR is the
     // thin arm's answer to a different question, where the band IS the recommendation.
-    const hi = Math.min(minBest - 1, maxBps);
+    const hi = Math.min((minBest as number) - 1, maxBps);
     if (hi < floorBps) {
       return { bps: floorBps, band: [floorBps, floorBps], reason: COMPETITION_PRICES, ...base };
     }
@@ -130,7 +175,17 @@ export function recommendReserve(window, { floorBps = 50, maxBps = 500, K = 8 } 
   // test_OneBidder_PaysExactlyTheReserve). The reserve is the price in this regime, so
   // raise it toward the lowest winning bid this window actually saw, minus one bps so
   // the recommendation would not have excluded that winner.
-  const hi = Math.min(minBest - 1, maxBps);
+  //
+  // The cast, and why this is NOT quietly fixed here. With well-formed rows minBest is
+  // always defined by this point: reaching this arm needs `empty * 2 <= n`, so at least
+  // one row is SOLE or CONTESTED, and both imply a winner. With MALFORMED rows -- a SOLE
+  // row carrying a null bestBidder, which the subgraph cannot emit but a hand-built
+  // window could -- `undefined - 1` is NaN and the band comes out `[50, NaN]`.
+  //
+  // That is a latent defect, and this is a type migration. Changing behaviour inside one
+  // is how a "no functional change" commit stops being one, so the JS behaviour is kept
+  // exactly and the edge is written down instead of patched in passing.
+  const hi = Math.min((minBest as number) - 1, maxBps);
   if (hi < floorBps) {
     return { bps: floorBps, band: [floorBps, floorBps], reason: WINNER_BELOW_FLOOR, ...base };
   }

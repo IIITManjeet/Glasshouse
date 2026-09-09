@@ -18,7 +18,7 @@
 import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 
-import { recommendReserve } from "../site/reserve-rule.js";
+import { recommendReserve } from "../web/lib/reserve-rule.ts";
 
 const MCP_URL = "https://subgraphs.mcp.thegraph.com/sse";
 const CHAIN_PARAMS = new URL("../ignition/parameters/chain-8453.json", import.meta.url);

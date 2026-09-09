@@ -14,15 +14,38 @@
 // the alternative is a reserve panel that cannot run at all, and the rule matters more to
 // a maker than the duplication does.
 
+import type { CompetitionClass, ReserveRow } from "./reserve-rule";
+import type { Auction } from "./useAuctions";
+
+/**
+ * A window row: everything `recommendReserve` reads, plus the three derived values the
+ * panel shows beside its recommendation. Declared as an extension rather than widened
+ * into ReserveRow itself, so the rule's own input stays exactly what the rule reads.
+ */
+export interface ReserveWindowRow extends ReserveRow {
+  clearingBps: number;
+  winnerMarginBps: number;
+  round: number;
+}
+
+/** What `reserveWindow` gives back: the rule's rows, plus what it could not see. */
+export interface ReserveWindow {
+  rows: ReserveWindowRow[];
+  /** Settled rounds dropped because their reveals could not be READ. */
+  unreadable: number;
+  /** A chain read cannot answer "was this bidder on our list"; the subgraph can. */
+  provenanceKnown: false;
+}
+
 /** subgraph/src/helpers.ts:244 */
-function classify(revealedCount) {
+function classify(revealedCount: number): CompetitionClass {
   if (revealedCount === 0) return "NONE";
   if (revealedCount === 1) return "SOLE";
   return "CONTESTED";
 }
 
 /** subgraph/src/helpers.ts:257. The factor of two is a threshold, labelled as one. */
-function isThin(competition, winnerMarginBps, clearingBps) {
+function isThin(competition: CompetitionClass, winnerMarginBps: number, clearingBps: number): boolean {
   if (competition === "SOLE") return true;
   return competition === "CONTESTED" && winnerMarginBps > clearingBps;
 }
@@ -40,8 +63,8 @@ function isThin(competition, winnerMarginBps, clearingBps) {
  * would push the rule toward its NO_REVEALS arm on the strength of a network error. The
  * count of dropped rows comes back so the panel can say how many it could not see.
  */
-export function reserveWindow(auctions) {
-  const rows = [];
+export function reserveWindow(auctions: readonly Auction[]): ReserveWindow {
+  const rows: ReserveWindowRow[] = [];
   let unreadable = 0;
 
   for (const a of auctions) {

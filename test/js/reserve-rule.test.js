@@ -8,7 +8,7 @@ import {
   NO_REVEALS,
   WINNER_BELOW_FLOOR,
   THIN_COMPETITION,
-} from "../../site/reserve-rule.js";
+} from "../../web/lib/reserve-rule.ts";
 
 // Row builders. Fields match the Q3 query in subgraph-design.md section 7.2, i.e. what
 // the subgraph actually computes per auction (section 5.3, 6.3) - this file only

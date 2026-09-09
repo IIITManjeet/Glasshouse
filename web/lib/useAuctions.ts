@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // Plain ESM, shared with the Node tests and the advisor. allowJs infers it, so no
 // declaration file -- a .d.ts would be a second place for the shape to drift.
 import { fromChain } from "./chain.js";
-import { phase as computePhase } from "./phase.js";
-import { simulate, SIM_MS_PER_BLOCK, SIM_WARM_START_MS } from "./simulate.js";
+import { phase as computePhase } from "./phase";
+import { simulate, SIM_MS_PER_BLOCK, SIM_WARM_START_MS } from "./simulate";
 
 export type Bid = {
   bidder: string;

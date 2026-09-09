@@ -122,7 +122,7 @@ test("an unopened round decodes as null, not as an auction of zeros", () => {
  * renamed in it alone.
  */
 test("every simulated round carries every field the page reads", async () => {
-  const { simulate, SIM_WARM_START_MS } = await import("../../web/lib/simulate.js");
+  const { simulate, SIM_WARM_START_MS } = await import("../../web/lib/simulate.ts");
   const board = simulate(SIM_WARM_START_MS);
   assert.ok(board.auctions.length > 0, "the warm start lands mid-flight, not on an empty board");
   for (const a of board.auctions) {
@@ -133,7 +133,7 @@ test("every simulated round carries every field the page reads", async () => {
 });
 
 test("the simulation clears at the runner-up's bid, which is the whole claim", async () => {
-  const { simulate, SIM_WARM_START_MS } = await import("../../web/lib/simulate.js");
+  const { simulate, SIM_WARM_START_MS } = await import("../../web/lib/simulate.ts");
   const board = simulate(SIM_WARM_START_MS);
   const contested = board.auctions.find((a) => a.simKey === "contested");
   assert.ok(contested, "the script's contested round is in the window");
@@ -146,7 +146,7 @@ test("the simulation clears at the runner-up's bid, which is the whole claim", a
 });
 
 test("a sole reveal clears at the reserve, and a round with none has no winner", async () => {
-  const { simulate, SIM_WARM_START_MS, SIM_RESERVE_BPS } = await import("../../web/lib/simulate.js");
+  const { simulate, SIM_WARM_START_MS, SIM_RESERVE_BPS } = await import("../../web/lib/simulate.ts");
   const board = simulate(SIM_WARM_START_MS);
 
   const sole = board.auctions.find((a) => a.simKey === "sole");
@@ -164,7 +164,7 @@ test("a sole reveal clears at the reserve, and a round with none has no winner",
 });
 
 test("the simulation is a pure function of the block, so it never runs backwards", async () => {
-  const { simulate, SIM_MS_PER_BLOCK, SIM_WARM_START_MS } = await import("../../web/lib/simulate.js");
+  const { simulate, SIM_MS_PER_BLOCK, SIM_WARM_START_MS } = await import("../../web/lib/simulate.ts");
   const at = (ms) => simulate(ms).auctions.find((a) => a.simKey === "contested");
   const early = at(SIM_WARM_START_MS);
   const later = at(SIM_WARM_START_MS + 40 * SIM_MS_PER_BLOCK);
@@ -175,7 +175,7 @@ test("the simulation is a pure function of the block, so it never runs backwards
 });
 
 test("the reserve window drops unreadable rows rather than scoring them as no-reveal", async () => {
-  const { reserveWindow } = await import("../../web/lib/reserve-window.js");
+  const { reserveWindow } = await import("../../web/lib/reserve-window.ts");
   const rows = [
     // Settled, two reveals, winner 400 over a runner-up at 250.
     { settled: true, revealedCount: 2, committedCount: 3, bestBidder: "0xa", bestBps: 400, secondBps: 250, reserveBps: 50, round: 1 },

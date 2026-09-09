@@ -37,7 +37,7 @@
 //
 // NO DOM. Not one line. The caller owns the DOM; this module owns the money.
 
-import { phase } from "./phase.js";
+import { phase } from "./phase";
 import { decodeAuction, chainHead } from "./chain.js";
 
 // --- configuration -----------------------------------------------------------------

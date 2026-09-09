@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { canSettle, phase } from "../../site/phase.js";
+import { canSettle, phase } from "../../web/lib/phase.ts";
 
 // Same boundary constants as test/ReserveMatrix.t.sol and test/GlasshouseBook.t.sol:
 // vm.roll(1000), commitBlocks = 30, revealBlocks = 30, exclusiveBlocks = 15.

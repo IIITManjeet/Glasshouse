@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import type { Auction, Source } from "@/lib/useAuctions";
-import { reserveWindow } from "@/lib/reserve-window.js";
-import { recommendReserve } from "@/lib/reserve-rule.js";
+import { reserveWindow } from "@/lib/reserve-window";
+import { recommendReserve } from "@/lib/reserve-rule";
 
 /**
  * The next auction's reserve. ui-spec.md section S5.

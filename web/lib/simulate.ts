@@ -77,7 +77,7 @@ const BIDDERS = [
  * the window, still on the board above it, and still counted by the reserve advisor below
  * -- ordering which one leads is not the same as hiding the rest.
  */
-const SCRIPT = [
+const SCRIPT: Script[] = [
   {
     key: "empty",
     note: "two sealed bids, neither opened; there is no winner and the page says so",
@@ -117,8 +117,32 @@ const SCRIPT = [
   },
 ];
 
+import type { Auction, Bid } from "./useAuctions";
+
+/** One scripted round. `commits` and `reveals` are block OFFSETS from the opening block. */
+interface Script {
+  key: "empty" | "sole" | "contested" | "close";
+  note: string;
+  commits: number[];
+  reveals: { at: number; bps: number }[];
+  fills: boolean;
+}
+
+/** The shared Auction shape, plus the two fields only the rehearsal has. Declared rather
+ *  than inlined so test/js/auction-shape.test.js and the components agree on one type. */
+export interface SimulatedAuction extends Auction {
+  simNote: string;
+  simKey: Script["key"];
+}
+
+export interface SimulatedBoard {
+  source: "sim";
+  head: number;
+  auctions: SimulatedAuction[];
+}
+
 /** FNV-1a, so a round index maps to a stable 32-byte-looking hash without a dependency. */
-function fakeHash(seed) {
+function fakeHash(seed: number): string {
   let out = "";
   for (let i = 0; i < 8; i++) {
     let h = (0x811c9dc5 ^ (seed * 2654435761 + i * 40503)) >>> 0;
@@ -136,7 +160,7 @@ function fakeHash(seed) {
  * the same comparison GlasshouseBook.sol makes, which is the same reason web/lib/phase.js
  * exists rather than the page trusting a phase field.
  */
-function roundAt(index, head) {
+function roundAt(index: number, head: number): SimulatedAuction | null {
   const script = SCRIPT[index % SCRIPT.length];
   const openedAtBlock = SIM_ORIGIN_BLOCK + index * CYCLE_BLOCKS;
   if (head < openedAtBlock) return null; // not opened yet
@@ -147,9 +171,9 @@ function roundAt(index, head) {
 
   // A commitment is visible once its block has passed. Before that the card does not
   // exist -- it is not a sealed card with nothing in it, it is a bid nobody has made.
-  const bids = script.commits
-    .filter((off) => head >= openedAtBlock + off)
-    .map((off, i) => {
+  const bids: Bid[] = script.commits
+    .filter((off: number) => head >= openedAtBlock + off)
+    .map((off: number, i: number) => {
       const reveal = script.reveals[i];
       const opened = reveal && head >= openedAtBlock + reveal.at;
       return {
@@ -162,7 +186,13 @@ function roundAt(index, head) {
       };
     });
 
-  const revealed = bids.filter((b) => b.bps !== null).sort((a, b) => b.bps - a.bps);
+  // A TYPE PREDICATE, not a plain filter. `Bid.bps` is `number | null` because null is
+  // how a sealed commitment is represented, and Array.filter does not narrow on its own --
+  // so without this the sort below compares two possibly-null numbers and `bestBps` has to
+  // be cast. Narrowing here once is what lets every use after it stay honest.
+  const revealed = bids
+    .filter((b): b is Bid & { bps: number } => b.bps !== null)
+    .sort((a, b) => b.bps - a.bps);
   const best = revealed[0] ?? null;
   const second = revealed[1] ?? null;
 
@@ -211,12 +241,12 @@ function roundAt(index, head) {
  * The board, at `elapsedMs` into the simulation. Newest first, same envelope `fromChain`
  * returns, so useAuctions can swap one for the other without a component knowing.
  */
-export function simulate(elapsedMs, limit = 6) {
+export function simulate(elapsedMs: number, limit = 6): SimulatedBoard {
   const blocks = Math.floor(elapsedMs / SIM_MS_PER_BLOCK);
   const head = SIM_ORIGIN_BLOCK + blocks;
   const newest = Math.floor(blocks / CYCLE_BLOCKS);
 
-  const auctions = [];
+  const auctions: SimulatedAuction[] = [];
   for (let i = newest; i >= 0 && auctions.length < limit; i--) {
     const a = roundAt(i, head);
     if (a) auctions.push(a);
