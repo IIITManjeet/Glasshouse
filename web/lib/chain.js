@@ -86,6 +86,10 @@ export function decodeAuction(data) {
     exclusiveEnd: revealEnd + asInt(word(data, 4)),
     reserveBps: asInt(word(data, 5)),
     maxBps: asInt(word(data, 6)),
+    // Word 7. Needed because the UI must not claim a bond is forfeitable on a round whose
+    // bond is zero -- which is every round the keeper opens (scripts/keeper.ts:58). A
+    // string, not a number: it is a uint128 and can exceed Number.MAX_SAFE_INTEGER.
+    bond: BigInt("0x" + word(data, 7)).toString(),
     bestBidder: isZero(best) ? null : asAddr(best),
     bestBps: asInt(word(data, 9)),
     secondBps: asInt(word(data, 11)),
