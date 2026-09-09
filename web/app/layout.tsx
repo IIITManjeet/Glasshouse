@@ -5,6 +5,7 @@ import { Newsreader, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { DemoToggle, DemoBanner } from "@/components/DemoMode";
+import { ProfileLink } from "@/components/ProfileLink";
 
 /**
  * The three faces ui-spec.md section 2.1 specifies, actually loaded.
@@ -97,6 +98,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Link href="/proof" className="hover:text-glass">Proof</Link>
                 <Link href="/why" className="hover:text-glass">Why</Link>
                 <Link href="/rounds" className="hover:text-glass">Rounds</Link>
+                <ProfileLink className="hover:text-glass" />
                 <a href="https://basescan.org/address/0xc4ea91Fe700918220423ac307C6B1c59650FFbfe" target="_blank" rel="noopener" className="hover:text-glass">
                   Contract ↗
                 </a>

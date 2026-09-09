@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuctions } from "@/lib/useAuctions";
 import { SourceChip } from "@/components/Auction";
 import { Profile } from "@/components/Profile";
+import { IdentityCard } from "@/components/Identity";
 
 // Static export (next.config.mjs: output: "export") means no dynamic route segment can
 // exist -- there is no server at request time to resolve `/account/[address]` against, only
@@ -22,7 +23,9 @@ function AddressForm({ initial }: { initial: string }) {
       onSubmit={(e) => {
         e.preventDefault();
         const next = value.trim();
-        if (next) router.push(`/account?a=${encodeURIComponent(next)}`);
+        // The pretty URL. vercel.json rewrites /profile/0x... to this same page, so the
+        // shareable link never has to expose the query parameter the static export needs.
+        if (next) router.push(`/profile/${encodeURIComponent(next)}`);
       }}
       className="mt-4 flex flex-wrap gap-2"
     >
@@ -90,6 +93,12 @@ function AccountView() {
 
   return (
     <>
+      {/* Who this is, before what they did. ENS is read from mainnet, where the registry
+          lives; an address with no name renders as the address, which is the truth. */}
+      <div className="mb-6 border border-rule bg-raised p-5 sm:p-6">
+        <IdentityCard address={raw} />
+      </div>
+
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         {head > 0 && <SourceChip source={source} head={head} isFork={isFork} />}
         <AddressForm initial={raw} />

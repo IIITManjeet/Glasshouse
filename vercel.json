@@ -6,7 +6,17 @@
   "outputDirectory": "web/out",
   "trailingSlash": true,
   "github": { "silent": true },
+  "rewrites": [
+    {
+      "source": "/profile/:address",
+      "destination": "/account/?a=:address"
+    }
+  ],
   "headers": [
+    {
+      "source": "/opengraph-image",
+      "headers": [{ "key": "Content-Type", "value": "image/png" }]
+    },
     {
       "source": "/_next/static/(.*)",
       "headers": [
