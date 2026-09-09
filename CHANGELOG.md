@@ -11,12 +11,86 @@ each one is in [`run.md`](./run.md).
 ## [Unreleased]
 
 ### Planned
-- Base mainnet deployment of `GlasshouseBook` and `GlasshouseRouter` (module and preflight
-  are ready; needs ETH and a deployer address)
-- Subgraph over the Base deployment, published to The Graph Network and read through the
-  Subgraph MCP. Messari conformance is deliberately not claimed: its generic schema wants
-  non-null USD TVL and revenue fields an auction book does not have.
-- Explanation page and comparison UI
+- Publish the subgraph to The Graph Network. It is deployed to Studio, which the Subgraph
+  MCP cannot see, so the page reads the Book directly over `eth_call` and job 3 -- the UI
+  as the Graph consumer -- is still unmet. Needs ETH on Arbitrum One.
+- `web/lib/bid.js` and `web/lib/chain.js` to TypeScript. `bid.js` is 1,400 lines of wallet
+  and signing code with no test coverage and deserves its own pass.
+- `site/index.html` as a real route rather than a hand-written file synced into `public/`.
+  It is the last thing keeping two palettes, two font strategies and two provenance
+  conventions alive at once.
+- Per-event timeline and transaction links on the receipt. Both blocked on one line:
+  `bidsFor()` in `chain.js` reads the logs and discards `transactionHash`.
+
+---
+
+## [0.6.0] - 2026-09-10
+
+The product. An indexer, a keeper that keeps a round on the board, and a front end that is
+a thing you use rather than a page about a thing.
+
+### Added
+- **The subgraph** (`subgraph/`) over the Base deployment, with the settlement re-derived
+  from the raw reveals and compared to what the contract emitted. That independent replay
+  is why this design needs no operator set and no challenge window: there is no off-chain
+  claim to challenge, and unlike a challenge period the check has no deadline.
+- **The keeper** (`scripts/keeper.ts`) opens a fresh round continuously so a visitor
+  arriving at any moment finds one accepting bids. It is also the house bidder, at
+  commitIdx 0 of every round, and that is disclosed on the page rather than hidden -- a
+  second-price auction with one bidder clears at the reserve and demonstrates nothing.
+- **A live fill through the official Aqua**, rehearsed on a pinned Base fork before any
+  real money moved (`scripts/run-live-fill.ts`, `test/fork/`).
+- **The reserve advisor** (`web/lib/reserve-rule.ts`, `scripts/reserve-advisor.mjs`) -- one
+  pure function, run by both the page and the offline tool, with its own limits printed
+  next to its number. It is a heuristic splitting a known-safe value from a known-unsafe
+  one, not an optimal reserve, and it says so.
+- **The front end** rebuilt as Next.js + Tailwind, static-exported: wallet connect, sealed
+  bidding, reveal, rounds, accounts, the receipt, the comparison, the latency lens, the
+  leaderboard and the mechanism diagram.
+- **A rehearsal** (`web/lib/simulate.ts`) that replays a full round lifecycle at one block
+  per 0.4 s through the same components. The Book holds one auction with zero reveals, so
+  without it the central claim -- the winner pays the runner-up's price -- was never
+  visible on screen. Labelled as simulated by a source chip, an undismissable banner and
+  every caption, and bidding is cut out entirely while it runs.
+- **The provenance system made a property, not a habit.** Every figure carries a source tag
+  and a "What produced this" caption, and `scripts/lint-provenance.mjs` fails the build if
+  one does not -- across the essay and the exported app, with WCAG AA checked on both
+  palettes.
+- **The Uniswap benchmark** (`scripts/uniswap-benchmark.mjs`) quotes the same QuoterV2 to
+  answer "what would this trade have got on Uniswap", including the case where Uniswap's
+  quote is better, which at the live fill's real size it is. Plus `FEEDBACK.md`.
+
+### Changed
+- The front page is a landing page: a hero, the product working, one claim per band with a
+  drawing beside it. The evidence moved to `/proof` and the argument to `/why`. Six
+  full-width figures stacked in one column read as a wall, not a product.
+- One typed source for the rules. `site/phase.js` and `site/reserve-rule.js` were
+  byte-identical duplicates of the `web/lib` copies, and consumers had split across them --
+  the advisor and two tests read one, the app read the other.
+
+### Fixed
+- The type system was named but never loaded: `globals.css` listed Newsreader and IBM Plex
+  and nothing fetched them, so every visitor got Georgia, the system sans and Consolas.
+  `tabular-nums` -- the reason a countdown does not shuffle the digits beside it -- was
+  holding by accident of Consolas being fixed-width.
+- The frontend crashed on first load and had no error boundary. Two data paths produced
+  different fields; the dangerous half was a missing `maker`, which builds a commitment
+  against the wrong auction key -- a bid that seals fine and can never be revealed.
+- The essay linked to Basescan, to Google Fonts and to GitHub, and never once to the
+  product it argues for.
+- A swap that died on RPC replica lag, not on a bad transaction, and rate limiting from
+  hammering a single public endpoint.
+
+### Learned
+- `SwapRouter02` on Base has a struct-incompatible `ExactInputSingleParams` -- no
+  `deadline` field -- and copying the original `SwapRouter`'s struct is a silent ABI
+  mismatch, because struct tuples are positional.
+- `TransferHelper`'s two-character revert strings (`STF`) name the symptom and say nothing
+  about the cause, which is expensive when the real fault is upstream RPC consistency.
+- Node 22 strips TypeScript natively, so `.js` tests and a `.mjs` script can import `.ts`
+  modules with no loader and no build step.
+- `tsc --noEmit` does not catch a stale `./x.js` specifier: TypeScript resolves it to
+  `x.ts` and Turbopack does not. Only the real build does.
 
 ---
 
