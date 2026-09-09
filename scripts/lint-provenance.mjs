@@ -34,7 +34,13 @@ const html = readFileSync(PAGE, "utf8");
 // it is the most quotable thing on a page and the easiest to screenshot without context.
 const NEEDS_SOURCE = [
   { re: /<table[\s>]/g, what: "<table>" },
-  { re: /<svg[\s>]/g, what: "<svg>" },
+  // An <svg> is presumed to be a chart, because on this site it almost always is. The one
+  // exception is a graphic that carries NO information: the hero's atmosphere
+  // (components/Atmosphere.tsx) is a drifting field of envelope glyphs with not a number
+  // in it. `aria-hidden="true"` is the right test for that and not a loophole -- it is the
+  // author asserting, in the markup, that a screen reader loses nothing by skipping this.
+  // Anything that conveys something to a sighted reader cannot honestly carry it.
+  { re: /<svg[\s>]/g, what: "<svg>", exemptIf: /aria-hidden="true"/ },
   { re: /class="[^"]*\bstat\b[^"]*"/g, what: 'class="stat"' },
 ];
 
@@ -75,10 +81,16 @@ function scanStructure(source, { label, captionRe, chipRe, chipName }) {
     return close === -1 ? null : { openAt, close };
   }
 
-  for (const { re, what } of NEEDS_SOURCE) {
+  for (const { re, what, exemptIf } of NEEDS_SOURCE) {
     re.lastIndex = 0;
     let m;
     while ((m = re.exec(source)) !== null) {
+      // The element's own opening tag, for the exemption test. Read from the match to the
+      // first '>' so an attribute on a PARENT can never grant the exemption by accident.
+      if (exemptIf) {
+        const close = source.indexOf(">", m.index);
+        if (close !== -1 && exemptIf.test(source.slice(m.index, close + 1))) continue;
+      }
       const where = `${label} line ${lineOf(m.index)}`;
       const fig = enclosingFigure(m.index);
       if (!fig) {
@@ -147,7 +159,13 @@ failures.push(...scanForbidden(html, "site/index.html"));
 // runs -- which is also what a crawler and a screenshot see. Figures that only appear
 // after a fetch (the receipt) are not in here, and this does not pretend to cover them;
 // the shape test covers their data and the components carry their captions inline.
-const APP_PAGES = ["index.html", "rounds/index.html", "account/index.html"];
+const APP_PAGES = [
+  "index.html",
+  "proof/index.html",
+  "why/index.html",
+  "rounds/index.html",
+  "account/index.html",
+];
 const appRoot = new URL("../web/out/", import.meta.url);
 let appChecked = 0;
 let appFigures = 0;
