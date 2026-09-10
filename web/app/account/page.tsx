@@ -8,6 +8,7 @@ import { SourceChip } from "@/components/Auction";
 import { Profile } from "@/components/Profile";
 import { IdentityCard } from "@/components/Identity";
 import { Loading } from "@/components/Loading";
+import { Record } from "@/components/Record";
 
 // Static export (next.config.mjs: output: "export") means no dynamic route segment can
 // exist -- there is no server at request time to resolve `/account/[address]` against, only
@@ -100,6 +101,13 @@ function AccountView() {
           lives; an address with no name renders as the address, which is the truth. */}
       <div className="mb-6 border border-rule bg-raised rounded-card shadow-card p-5 sm:p-6">
         <IdentityCard address={raw} />
+      </div>
+
+      {/* The indexer's answer -- every round the Book has ever had -- above the board's
+          window. Renders nothing at all when NEXT_PUBLIC_SUBGRAPH_URL is unset, so the
+          page is complete either way rather than showing an empty shape. */}
+      <div className="mb-6">
+        <Record address={raw} />
       </div>
 
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
