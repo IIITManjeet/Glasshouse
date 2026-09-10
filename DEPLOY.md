@@ -137,6 +137,45 @@ For each run:
 
 Use dust amounts. The point is real events at a real address, not volume.
 
+## 7. The keeper
+
+Keeps a live round on the board. It opens each round from `config/rounds.json` in order,
+places one house bid at index 0, reveals it, settles, and moves on.
+
+```bash
+# Rehearse first, on a fork. Never the first thing you point at mainnet.
+DRY_RUN=1 BASE_RPC_URL=http://127.0.0.1:8545 npx hardhat run scripts/keeper.ts --network baseFork
+
+# Then a bounded live session, and watch the board before going further.
+KEEPER_MAX_ROUNDS=3 npx hardhat run scripts/keeper.ts --network base
+
+# Paced, for the days after: one round roughly every 20 minutes.
+KEEPER_PAUSE_BLOCKS=600 npx hardhat run scripts/keeper.ts --network base
+```
+
+| Variable | Default | What it does |
+|---|---|---|
+| `KEEPER_MAX_ROUNDS` | all remaining | Stop after N rounds. Use it for the first live run. |
+| `KEEPER_PAUSE_BLOCKS` | `0` | Blocks to wait between rounds. `0` runs them back to back. |
+| `DRY_RUN` | unset | Refuses to run unless the node reports itself as a fork. |
+
+**`KEEPER_PAUSE_BLOCKS` exists because unpaced is wrong for anything but a live demo.**
+A round is ~135 blocks, so 300 rounds back to back exhaust the table in about 22 hours —
+start it on Friday and the board is dead by Sunday. At 2 s/block, `600` gives a round
+every ~20 minutes and stretches the table over about five days.
+
+**Check `.keeper-state.json` before a mainnet run.** It is gitignored and records
+`nextRound`, so a file left behind by a fork rehearsal makes the keeper skip ahead. That
+matters more than it sounds: `newestOpenedRound()` in `web/lib/chain.js` tests round 0 and
+gives up if it is not open, so a keeper starting at round 4 leaves the board showing the
+cold snapshot **permanently** while burning real rounds. Delete the file to start at 0.
+
+**Do not let the machine sleep.** The keeper resumes from state on restart, but a reveal
+window missed while it was asleep leaves a sealed house bid that never opens — the exact
+behaviour the mechanism exists to punish, displayed on the board.
+
+---
+
 ## Rollback
 
 There is none, by design. `GlasshouseBook` has no owner, no admin and no upgrade path -

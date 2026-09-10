@@ -188,6 +188,22 @@ async function main() {
   // want a fixed session rather than something that runs until the table is exhausted.
   const maxRounds = Number(process.env.KEEPER_MAX_ROUNDS ?? ROUNDS.rounds.length);
   const stopAfter = state.nextRound + maxRounds;
+
+  // PACING. Rounds run back to back by default, which is right while you are watching one
+  // happen and wrong for the days afterwards: 300 rounds at ~135 blocks each is about 22
+  // hours, so an unpaced keeper started on Friday has exhausted the table by Sunday and
+  // leaves judges a dead board with no round to watch.
+  //
+  // KEEPER_PAUSE_BLOCKS spreads them. At ~2 s/block, 600 blocks is a round roughly every
+  // 20 minutes and stretches the table across four or five days, with the board never
+  // worse than "the last round settled a few minutes ago".
+  //
+  // Default 0 -- unpaced -- because that is what a rehearsal and a live demo both want, and
+  // a pacing default that surprised someone mid-demo would be worse than none.
+  const pauseBlocks = BigInt(process.env.KEEPER_PAUSE_BLOCKS ?? 0);
+  if (pauseBlocks > 0n) {
+    console.log(`  Pacing: ~${pauseBlocks} blocks between rounds (~${Number(pauseBlocks) * 2 / 60} min at 2 s/block).`);
+  }
   let stop = false;
   for (const sig of ["SIGINT", "SIGTERM"]) {
     process.on(sig, () => {
@@ -265,6 +281,15 @@ async function main() {
     state.nextRound = spec.round + 1;
     state.active = [];
     saveState(state);
+
+    // AFTER the state write, so a keeper killed during the pause resumes at the next round
+    // rather than replaying the one it just finished -- open() reverts AlreadyOpened, which
+    // would strand the loop. And skipped when stopping, so Ctrl-C does not have to wait out
+    // a twenty-minute sleep before the process exits.
+    if (pauseBlocks > 0n && !stop && state.nextRound < ROUNDS.rounds.length && state.nextRound < stopAfter) {
+      const resumeAt = (await pub.getBlockNumber()) + pauseBlocks;
+      await waitForBlock(pub, resumeAt, `the pause before round ${state.nextRound}`);
+    }
   }
 
   console.log(state.nextRound >= ROUNDS.rounds.length
