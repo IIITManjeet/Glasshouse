@@ -64,7 +64,7 @@ export default function BoardPage() {
       )}
 
       {!loading && !featured && (
-        <div className="border border-rule bg-raised p-6">
+        <div className="border border-rule bg-raised rounded-card shadow-card p-6">
           <p className="text-ink-soft">No round has been opened on this Book yet.</p>
           <p className="mt-2 text-sm text-ink-faint">
             The keeper opens a fresh round every couple of minutes when it is running. Until
@@ -79,7 +79,7 @@ export default function BoardPage() {
 
       {featured && (
         <Swap showing={`${featured.orderHash}-${livePhase(featured, head)}`}>
-        <article className="border border-rule bg-raised">
+        <article className="border border-rule bg-raised rounded-card shadow-card">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-rule px-4 py-2">
             <span className="panel-id">GH 02 · Live round</span>
             <span className="panel-id">Commit 30 / Reveal 30 / Exclusive 15</span>

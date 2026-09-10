@@ -154,7 +154,7 @@ function Point({
 
 export function LatencyLens() {
   return (
-    <figure data-src="test" className="border border-rule bg-raised">
+    <figure data-src="test" className="border border-rule bg-raised rounded-card shadow-card">
       <figcaption className="flex flex-wrap items-center justify-between gap-2 border-b border-rule px-4 py-2.5">
         <span className="font-mono text-[0.72rem] uppercase tracking-[0.14em] text-ink">
           The same three bidders, two gates

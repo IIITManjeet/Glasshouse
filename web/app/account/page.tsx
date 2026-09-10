@@ -37,11 +37,11 @@ function AddressForm({ initial }: { initial: string }) {
         onChange={(e) => setValue(e.target.value)}
         placeholder="0x…"
         spellCheck={false}
-        className="tnum min-w-[16rem] flex-1 border border-rule bg-raised px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-glass focus:outline-none"
+        className="tnum min-w-[16rem] flex-1 border border-rule bg-raised rounded-card shadow-card px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-glass focus:outline-none"
       />
       <button
         type="submit"
-        className="border border-rule px-3 py-2 font-mono text-[0.7rem] uppercase tracking-[0.12em] text-ink-soft hover:border-glass hover:text-glass"
+        className="rounded-control border border-rule px-3 py-2 font-mono text-[0.7rem] uppercase tracking-[0.12em] text-ink-soft hover:border-glass hover:text-glass"
       >
         Look up
       </button>
@@ -65,7 +65,7 @@ function AccountView() {
 
   if (!raw) {
     return (
-      <div className="border border-rule bg-raised p-6">
+      <div className="border border-rule bg-raised rounded-card shadow-card p-6">
         <p className="text-ink-soft">No address in the URL.</p>
         <p className="mt-2 text-sm text-ink-faint">
           This page reads an address from <code className="font-mono">?a=0x…</code> — there is no per-address route,
@@ -98,7 +98,7 @@ function AccountView() {
     <>
       {/* Who this is, before what they did. ENS is read from mainnet, where the registry
           lives; an address with no name renders as the address, which is the truth. */}
-      <div className="mb-6 border border-rule bg-raised p-5 sm:p-6">
+      <div className="mb-6 border border-rule bg-raised rounded-card shadow-card p-5 sm:p-6">
         <IdentityCard address={raw} />
       </div>
 

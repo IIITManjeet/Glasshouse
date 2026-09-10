@@ -113,7 +113,7 @@ export function Receipt({ a, source }: { a: Auction; source: Source }) {
   const reserveBound = won && a.secondBps < a.reserveBps;
 
   return (
-    <figure data-src={simulated ? "sim" : "chain"} className="border border-rule bg-raised">
+    <figure data-src={simulated ? "sim" : "chain"} className="border border-rule bg-raised rounded-card shadow-card">
       <figcaption className="flex flex-wrap items-center justify-between gap-2 border-b border-rule px-4 py-2.5">
         <span className="font-mono text-[0.72rem] uppercase tracking-[0.14em] text-ink">
           Receipt · round {num(a.round)}
@@ -327,7 +327,7 @@ function CheckYourself({ a }: { a: Auction }) {
               window.prompt("Copy this:", cmd);
             }
           }}
-          className="border border-rule px-2 py-1 font-mono text-[0.66rem] uppercase tracking-[0.12em] text-ink-soft hover:border-glass hover:text-glass"
+          className="rounded-control border border-rule px-2 py-1 font-mono text-[0.66rem] uppercase tracking-[0.12em] text-ink-soft hover:border-glass hover:text-glass"
         >
           {copied ? "Copied ✓" : "Copy"}
         </button>

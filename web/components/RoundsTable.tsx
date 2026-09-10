@@ -65,7 +65,7 @@ export function RoundsTable({ auctions, head }: { auctions: Auction[]; head: num
 
   if (rows.length === 0) {
     return (
-      <p className="border border-rule bg-raised p-4 text-sm text-ink-soft">
+      <p className="border border-rule bg-raised rounded-card shadow-card p-4 text-sm text-ink-soft">
         No rounds to show. Nothing has been read from the chain or the fallback snapshot yet
         -- that is a statement about this page's data, not a claim that zero rounds have
         happened, so the table says so in prose instead of drawing an empty grid of zeroes.

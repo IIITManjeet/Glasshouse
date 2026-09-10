@@ -238,7 +238,7 @@ function StatTiles({ account }: { account: Account }) {
     ["fills", num(account.fillsRecorded)],
   ];
   return (
-    <div className="border border-rule bg-raised p-5">
+    <div className="border border-rule bg-raised rounded-card shadow-card p-5">
       <div className="flex flex-wrap gap-6">
         {items.map(([k, v, tone]) => (
           <div key={k}>
@@ -374,7 +374,7 @@ export function Profile({ address, auctions, head }: { address: string; auctions
       </header>
 
       {!touched ? (
-        <div className="border border-rule bg-raised p-6">
+        <div className="border border-rule bg-raised rounded-card shadow-card p-6">
           {auctions.length === 0 ? (
             <p className="text-ink-soft">Nothing has loaded from the chain or the fallback snapshot yet.</p>
           ) : (

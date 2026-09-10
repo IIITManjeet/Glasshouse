@@ -511,13 +511,13 @@ function EnterSecret({ maker, orderHash, bidder, bounds }: { maker: string; orde
           value={bps}
           onChange={(e) => setBps(e.target.value.replace(/[^0-9]/g, ""))}
           placeholder="bps"
-          className="tnum w-24 border border-rule bg-raised px-2 py-1 text-[0.78rem]"
+          className="tnum w-24 border border-rule bg-raised rounded-card shadow-card px-2 py-1 text-[0.78rem]"
         />
         <input
           value={salt}
           onChange={(e) => setSalt(e.target.value.trim())}
           placeholder="0x… (32 bytes)"
-          className="tnum min-w-0 flex-1 border border-rule bg-raised px-2 py-1 text-[0.78rem]"
+          className="tnum min-w-0 flex-1 border border-rule bg-raised rounded-card shadow-card px-2 py-1 text-[0.78rem]"
         />
         <button
           type="button"
@@ -688,7 +688,7 @@ function BidForm({ auction, st, head, headUnknown }: { auction: Auction; st: Der
           // things uint24 cannot hold, and rejecting them at the keystroke is quieter than a
           // validation message after the fact.
           onChange={(e) => setRaw(e.target.value.replace(/[^0-9]/g, ""))}
-          className="tnum mt-1 block w-32 border border-rule bg-raised px-2 py-1 text-base"
+          className="tnum mt-1 block w-32 border border-rule bg-raised rounded-card shadow-card px-2 py-1 text-base"
           placeholder={String(auction.reserveBps)}
         />
       </label>
@@ -944,7 +944,7 @@ export function BidPanel({ auction, head }: { auction: Auction | null; head: num
 
 function Shell({ round, children }: { round: number | null; children: React.ReactNode }) {
   return (
-    <section className="border border-rule bg-raised p-4">
+    <section className="border border-rule bg-raised rounded-card shadow-card p-4">
       <header className="mb-3 flex flex-wrap items-baseline justify-between gap-2 border-b border-rule pb-2">
         <span className={LABEL}>your bid</span>
         {round !== null ? <span className="tnum text-[0.72rem] text-ink-faint">round {num(round)}</span> : null}

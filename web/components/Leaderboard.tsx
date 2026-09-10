@@ -88,7 +88,7 @@ export function Leaderboard({
   const settledCount = auctions.filter((a) => a.settled).length;
 
   return (
-    <figure data-src={simulated ? "sim" : "chain"} className={`border border-rule bg-raised ${className ?? ""}`}>
+    <figure data-src={simulated ? "sim" : "chain"} className={`border border-rule bg-raised rounded-card shadow-card ${className ?? ""}`}>
       <figcaption className="flex flex-wrap items-center justify-between gap-2 border-b border-rule px-4 py-2.5">
         <span className="font-mono text-[0.72rem] uppercase tracking-[0.14em] text-ink">
           Who has been bidding

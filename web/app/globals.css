@@ -29,6 +29,28 @@
      land on <html>. Naming the family after them as well keeps the stack working if the
      layout ever stops loading a face -- the page degrades to the same fallbacks it has
      been quietly using all along rather than to nothing. */
+  /* ---- ELEVATION -------------------------------------------------------------
+     The archived ui-spec forbade shadows and any radius above 2px. That rule was
+     written for an essay, where a hairline grid is the whole visual language and a
+     shadow is noise. The product is a different object and the flatness read as
+     unfinished rather than as restraint, so the rule is replaced here rather than
+     quietly broken -- this file is the living design language now that ui-spec.md is
+     in docs/archive/.
+
+     WHAT DID NOT CHANGE: elevation is meaning, not decoration. A surface lifts only
+     when it sits ON another surface -- a card over the page, a control over a card. It
+     never lifts to look nice. Two shadows only, so "raised" and "lifted" stay
+     distinguishable; a third would just be mush. */
+  --radius-card: 10px;
+  --radius-control: 7px;
+  --radius-chip: 5px;
+
+  /* Layered rather than one blur: a tight contact shadow for the edge and a wide soft
+     one for the lift, which is how a real object sits on a surface. Tuned low-opacity
+     because the ground is off-white and a heavy shadow on paper looks like a sticker. */
+  --shadow-card: 0 1px 2px rgb(15 26 24 / 0.05), 0 4px 16px -4px rgb(15 26 24 / 0.08);
+  --shadow-lift: 0 2px 4px rgb(15 26 24 / 0.06), 0 12px 32px -8px rgb(15 26 24 / 0.14);
+
   --font-display: var(--font-newsreader), Newsreader, Georgia, "Times New Roman", serif;
   --font-sans: var(--font-plex-sans), "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   --font-mono: var(--font-plex-mono), "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -52,6 +74,12 @@
     --color-amber: #d6a94a;
     --color-amber-soft: #33280f;
     --color-label: #e9b036;
+
+    /* On a dark ground a black shadow does nothing. Depth comes from a hairline of
+       light along the top edge -- the way an object catches ambient light -- plus a
+       deeper, wider shadow to separate it from the page. */
+    --shadow-card: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 4px 20px -6px rgb(0 0 0 / 0.5);
+    --shadow-lift: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 16px 40px -10px rgb(0 0 0 / 0.6);
   }
 }
 
@@ -174,6 +202,15 @@ html {
   --color-amber: #e9b036;
   --color-amber-soft: #2b2210;
   --color-label: #e9b036;
+
+  /* Deliberately tighter than the editorial register. A terminal earns depth from a
+     1px grid and a panel id, not from blur -- soft shadows here would read as a
+     terminal skin painted over a consumer app. */
+  --radius-card: 3px;
+  --radius-control: 3px;
+  --radius-chip: 2px;
+  --shadow-card: inset 0 1px 0 rgb(255 255 255 / 0.03);
+  --shadow-lift: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 8px 24px -8px rgb(0 0 0 / 0.55);
 
   background: var(--color-ground);
   color: var(--color-ink);

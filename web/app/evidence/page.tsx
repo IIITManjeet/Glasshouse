@@ -103,7 +103,7 @@ function PinnedReceipt() {
           )}
         </>
       ) : (
-        <div className="border border-rule bg-raised p-6">
+        <div className="border border-rule bg-raised rounded-card shadow-card p-6">
           <p className="text-ink-soft">No round on this Book has settled yet.</p>
           <p className="mt-2 max-w-2xl text-sm text-ink-faint">
             A receipt needs a reveal window that has closed with at least one envelope opened.

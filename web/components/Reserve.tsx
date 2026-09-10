@@ -53,7 +53,7 @@ export function ReservePanel({ auctions, source }: { auctions: Auction[]; source
     `  --rpc-url $BASE_RPC_URL --private-key $MAKER_KEY`;
 
   return (
-    <figure data-src={simulated ? "sim" : "rule"} className="border border-rule bg-raised">
+    <figure data-src={simulated ? "sim" : "rule"} className="border border-rule bg-raised rounded-card shadow-card">
       <figcaption className="flex flex-wrap items-center justify-between gap-2 border-b border-rule px-4 py-2.5">
         <span className="font-mono text-[0.72rem] uppercase tracking-[0.14em] text-ink">
           Next auction · reserve
@@ -142,7 +142,7 @@ export function ReservePanel({ auctions, source }: { auctions: Auction[]; source
                 window.prompt("Copy this:", cast);
               }
             }}
-            className="border border-rule px-2 py-1 font-mono text-[0.66rem] uppercase tracking-[0.12em] text-ink-soft hover:border-glass hover:text-glass"
+            className="rounded-control border border-rule px-2 py-1 font-mono text-[0.66rem] uppercase tracking-[0.12em] text-ink-soft hover:border-glass hover:text-glass"
           >
             {copied ? "Copied ✓" : "Copy"}
           </button>

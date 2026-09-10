@@ -62,7 +62,7 @@ export function Loading({
     <motion.div
       role="status"
       aria-live="polite"
-      className={`border border-rule bg-raised ${className ?? ""}`}
+      className={`border border-rule bg-raised rounded-card shadow-card ${className ?? ""}`}
       initial={reduced ? false : { opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.2 }}

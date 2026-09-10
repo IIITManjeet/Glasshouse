@@ -156,7 +156,7 @@ export function WalletBar({ className = "" }: { className?: string }) {
         >
           <span className="tnum">{short(address)}</span> · Base
         </summary>
-        <div className="absolute right-0 z-30 mt-1 w-72 border border-rule bg-raised p-2 text-[0.75rem] shadow-sm">
+        <div className="absolute right-0 z-30 mt-1 w-72 border border-rule bg-raised rounded-card shadow-card p-2 text-[0.75rem] shadow-sm">
           <button
             type="button"
             className="block w-full px-2 py-1 text-left font-mono text-ink hover:bg-glass-soft"

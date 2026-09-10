@@ -72,7 +72,7 @@ export default function Home() {
 
         {/* The pulse. Read-only by design: it says "this is running", then gets out of the
             way and sends you to the tool. */}
-        <div className="mt-11 max-w-2xl border border-rule bg-raised">
+        <div className="mt-11 max-w-2xl border border-rule bg-raised rounded-card shadow-card">
           <Link href="/board" className="group block px-5 py-4">
             <Swap showing={loading && !featured ? "loading" : featured ? "live" : "empty"}>
             {loading && !featured ? (
