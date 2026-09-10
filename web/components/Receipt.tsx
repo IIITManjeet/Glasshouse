@@ -22,6 +22,39 @@ const num = (n?: number | null) =>
   n === null || n === undefined || Number.isNaN(n) ? "—" : n.toLocaleString("en-US");
 const short = (a?: string | null) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "—");
 
+const BOOK = "0xc4ea91Fe700918220423ac307C6B1c59650FFbfe";
+
+/**
+ * The commands that re-derive this receipt from the chain, with this round's values in
+ * them. Not a link to a block explorer -- the explorer is somebody else's rendering, and
+ * "check it yourself" should mean the reader runs the query, not that they trust a second
+ * website. Every number above comes out of these two calls.
+ */
+function castCommands(a: Auction): string {
+  const from = a.openedAtBlock;
+  const to = a.exclusiveEnd + 5;
+  const RPC = "https://mainnet.base.org";
+  // Written as single lines rather than with shell continuations: a backslash-newline that
+  // survives a copy into one terminal and breaks in another is a worse experience than a
+  // long line, and this is the one block on the page whose entire job is to be pasteable.
+  return [
+    "# the auction struct, exactly as the contract stores it",
+    `cast call ${BOOK} "auctions(address,bytes32)" ${a.maker} ${a.orderHash} --rpc-url ${RPC}`,
+    "",
+    "# every commit and reveal on this round, in the order they landed",
+    `cast logs --address ${BOOK} --from-block ${from} --to-block ${to} --rpc-url ${RPC}`,
+  ].join("\n");
+}
+
+/** Text for sharing a round. The point of a second-price auction is that one bidder
+ *  clears at the reserve and two make the mechanism visible -- so the share is an
+ *  invitation to bid against someone, not a boast about a result. */
+function inviteText(a: Auction, clearing: number | null): string {
+  return a.bestBidder
+    ? `Round ${a.round} on Glasshouse settled at ${clearing} bps — the winner bid higher and paid the runner-up's price. Sealed-bid, second-price, on Base.`
+    : `Round ${a.round} on Glasshouse is open. Sealed bids, second price — the winner pays what the runner-up offered.`;
+}
+
 function Copy({ text, label }: { text: string; label: string }) {
   const [done, setDone] = useState(false);
   return (
@@ -229,6 +262,9 @@ export function Receipt({ a, source }: { a: Auction; source: Source }) {
         </Field>
       </div>
 
+      {!simulated && <CheckYourself a={a} />}
+      <ShareRound a={a} clearing={clearing} simulated={simulated} />
+
       <p className="border-t border-rule px-4 py-3 text-[0.78rem] leading-relaxed text-ink-faint">
         <strong className="font-medium text-ink-soft">What produced this:</strong>{" "}
         {simulated ? (
@@ -252,5 +288,125 @@ export function Receipt({ a, source }: { a: Auction; source: Source }) {
         amount out and knows nothing about what either is worth.
       </p>
     </figure>
+  );
+}
+
+/**
+ * "Do not take our word for it" as a button.
+ *
+ * Every other panel on this page argues that the numbers are checkable. This is the only
+ * one that hands you the means. It emits the two `cast` calls that produce everything
+ * above -- the auction struct as the contract stores it, and every commit and reveal on the
+ * round -- with this round's maker, order hash and block range already filled in.
+ *
+ * Hidden for the rehearsal: the simulator's order hashes name no auction in the Book, so
+ * these commands would return an empty struct and the offer would be a lie.
+ */
+function CheckYourself({ a }: { a: Auction }) {
+  const [copied, setCopied] = useState(false);
+  const cmd = castCommands(a);
+  return (
+    <details className="border-t border-rule px-4 py-3">
+      <summary className="cursor-pointer font-mono text-[0.68rem] uppercase tracking-[0.12em] text-glass">
+        Check this yourself
+      </summary>
+      <p className="mt-2 max-w-2xl text-[0.8rem] text-ink-soft">
+        Every figure above comes out of these two calls. They need{" "}
+        <code className="font-mono">foundry</code> and nothing else — no key, no account, no
+        permission from us.
+      </p>
+      <div className="mt-3 flex justify-end">
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(cmd);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1500);
+            } catch {
+              window.prompt("Copy this:", cmd);
+            }
+          }}
+          className="border border-rule px-2 py-1 font-mono text-[0.66rem] uppercase tracking-[0.12em] text-ink-soft hover:border-glass hover:text-glass"
+        >
+          {copied ? "Copied ✓" : "Copy"}
+        </button>
+      </div>
+      <pre className="mt-1 overflow-x-auto bg-sunk p-3 font-mono text-[0.72rem] leading-relaxed text-ink-soft">
+        {cmd}
+      </pre>
+    </details>
+  );
+}
+
+/**
+ * Invite a rival.
+ *
+ * The native growth loop of a second-price auction is not "look what I won" -- it is that
+ * ONE bidder clears at the reserve and TWO make the mechanism visible. So the share is an
+ * invitation to bid against somebody, and the copy says what the round is rather than
+ * boasting about a result.
+ *
+ * Intent links only: no SDK, no tracking pixel, no third-party script. A link the visitor
+ * clicks, on a page that loads nothing it did not author.
+ */
+function ShareRound({
+  a,
+  clearing,
+  simulated,
+}: {
+  a: Auction;
+  clearing: number | null;
+  simulated: boolean;
+}) {
+  const [copied, setCopied] = useState(false);
+  const url =
+    typeof window === "undefined"
+      ? ""
+      : `${window.location.origin}/evidence?round=${a.round}`;
+  const text = inviteText(a, clearing);
+
+  if (simulated) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-rule px-4 py-3">
+      <span className="font-mono text-[0.66rem] uppercase tracking-[0.12em] text-ink-faint">
+        Bring a rival
+      </span>
+      <a
+        href={`https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(url)}`}
+        target="_blank"
+        rel="noopener"
+        className="font-mono text-[0.72rem] text-glass hover:underline"
+      >
+        Cast ↗
+      </a>
+      <a
+        href={`https://x.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`}
+        target="_blank"
+        rel="noopener"
+        className="font-mono text-[0.72rem] text-glass hover:underline"
+      >
+        Post ↗
+      </a>
+      <button
+        type="button"
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(url);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          } catch {
+            window.prompt("Copy this:", url);
+          }
+        }}
+        className="font-mono text-[0.72rem] text-ink-soft hover:text-glass"
+      >
+        {copied ? "Link copied ✓" : "Copy link"}
+      </button>
+      <span className="text-[0.74rem] text-ink-faint">
+        One bidder clears at the reserve. Two show what the mechanism does.
+      </span>
+    </div>
   );
 }

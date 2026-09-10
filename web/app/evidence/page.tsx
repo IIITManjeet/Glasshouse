@@ -1,6 +1,8 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useBoard } from "@/components/BoardProvider";
 import { Receipt } from "@/components/Receipt";
 import { ReservePanel } from "@/components/Reserve";
@@ -19,16 +21,12 @@ import { Loading } from "@/components/Loading";
  * it to decide which link to click. Splitting an argument by its data source is a filing
  * decision, not an information architecture.
  *
- * Grouped by the question instead:
- *   1. did it work           the receipt, from a round that finished
- *   2. who is playing        the leaderboard, counts and never shares
- *   3. is it better          the three gates run on one order
- *   4. why not a clock       the same three bidders under both rules
- *   5. what happens next     the reserve the advisor recommends
- *
- * Every figure still carries its own source tag, so nothing is lost by putting a test
- * result and a chain read on the same page -- which is the point of having tags at all.
- * Anchored sections, so any single claim is linkable on its own.
+ * ONLY THE RECEIPT IS SUSPENDED, and that boundary is smaller than it first was for a
+ * reason the lint caught. `useSearchParams` forces a Suspense boundary in a static export;
+ * wrapping the WHOLE page in one made the entire page prerender as empty, and
+ * scripts/lint-provenance.mjs -- which counts figures in the built HTML -- went from six to
+ * two. Everything that does not depend on `?round=` renders at build time, so a crawler, a
+ * reader with JavaScript off, and the lint all still see the figures.
  */
 
 const SECTIONS = [
@@ -39,12 +37,91 @@ const SECTIONS = [
   ["reserve", "next auction"],
 ] as const;
 
-export default function EvidencePage() {
-  const { auctions, source, loading, error, setDemo } = useBoard();
+/**
+ * The receipt, pinned by `?round=N` when a share link says so.
+ *
+ * A pinned round wins even when it has no winner: somebody followed a link to THAT round,
+ * and quietly showing them a different one would make the page lie about which auction it
+ * is describing.
+ */
+function PinnedReceipt() {
+  const { auctions, source, loading, setDemo } = useBoard();
+  const params = useSearchParams();
+
+  const asked = params.get("round");
+  const wanted = Number(asked);
+  const pinned =
+    asked !== null && Number.isInteger(wanted)
+      ? auctions.find((a) => a.round === wanted)
+      : undefined;
 
   const settledRounds = auctions.filter((a) => a.settled);
-  const settled = settledRounds.find((a) => a.bestBidder) ?? settledRounds[0];
-  const skipped = settled ? settledRounds.indexOf(settled) : 0;
+  const newest = settledRounds.find((a) => a.bestBidder) ?? settledRounds[0];
+  const shown = pinned ?? newest;
+  const skipped = pinned || !shown ? 0 : settledRounds.indexOf(shown);
+  const missing = asked !== null && !pinned && !loading;
+
+  if (loading && auctions.length === 0) {
+    return (
+      <Loading
+        what="Looking for a settled round"
+        detail="A receipt needs a reveal window that has closed with at least one envelope opened. Reading the Book to find one."
+      />
+    );
+  }
+
+  return (
+    <>
+      {missing && (
+        <p className="mb-3 border-l-2 border-amber bg-amber-soft px-3 py-2 text-sm text-ink-soft">
+          Round {asked} is not in the window this page reads — it holds the most recent rounds
+          only. It is still on chain;{" "}
+          <Link href="/rounds" className="text-glass underline underline-offset-2">
+            the rounds table
+          </Link>{" "}
+          lists what this build can see.
+        </p>
+      )}
+      {pinned && (
+        <p className="mb-3 font-mono text-[0.7rem] uppercase tracking-[0.12em] text-glass">
+          Pinned to round {pinned.round} by the link you followed
+        </p>
+      )}
+
+      {shown ? (
+        <>
+          <Receipt a={shown} source={source} />
+          {skipped > 0 && (
+            <p className="mt-2 text-[0.8rem] text-ink-faint">
+              {skipped} more recent round{skipped === 1 ? "" : "s"} settled with no winner — every
+              commitment stayed sealed, so there is no price and no fill to print.{" "}
+              <Link href="/rounds" className="text-glass underline underline-offset-2">
+                They are in the rounds table
+              </Link>
+              .
+            </p>
+          )}
+        </>
+      ) : (
+        <div className="border border-rule bg-raised p-6">
+          <p className="text-ink-soft">No round on this Book has settled yet.</p>
+          <p className="mt-2 max-w-2xl text-sm text-ink-faint">
+            A receipt needs a reveal window that has closed with at least one envelope opened.
+            This build has not seen one, and inventing a plausible receipt is exactly the thing
+            this page refuses to do.{" "}
+            <button type="button" onClick={() => setDemo(true)} className="text-glass underline underline-offset-2">
+              Run the rehearsal
+            </button>{" "}
+            to see the same card filled in from a simulated round — labelled as one.
+          </p>
+        </div>
+      )}
+    </>
+  );
+}
+
+export default function EvidencePage() {
+  const { auctions, source, error } = useBoard();
 
   return (
     <main>
@@ -82,39 +159,16 @@ export default function EvidencePage() {
             The claim in one card: what the winner bid, what the winner paid, and the gap between
             them that went to the maker.
           </p>
-          {loading && auctions.length === 0 ? (
-            <Loading
-              what="Looking for a settled round"
-              detail="A receipt needs a reveal window that has closed with at least one envelope opened. Reading the Book to find one."
-            />
-          ) : settled ? (
-            <>
-              <Receipt a={settled} source={source} />
-              {skipped > 0 && (
-                <p className="mt-2 text-[0.8rem] text-ink-faint">
-                  {skipped} more recent round{skipped === 1 ? "" : "s"} settled with no winner — every
-                  commitment stayed sealed, so there is no price and no fill to print.{" "}
-                  <Link href="/rounds" className="text-glass underline underline-offset-2">
-                    They are in the rounds table
-                  </Link>
-                  .
-                </p>
-              )}
-            </>
-          ) : (
-            <div className="border border-rule bg-raised p-6">
-              <p className="text-ink-soft">No round on this Book has settled yet.</p>
-              <p className="mt-2 max-w-2xl text-sm text-ink-faint">
-                A receipt needs a reveal window that has closed with at least one envelope opened.
-                This build has not seen one, and inventing a plausible receipt is exactly the thing
-                this page refuses to do.{" "}
-                <button type="button" onClick={() => setDemo(true)} className="text-glass underline underline-offset-2">
-                  Run the rehearsal
-                </button>{" "}
-                to see the same card filled in from a simulated round — labelled as one.
-              </p>
-            </div>
-          )}
+          <Suspense
+            fallback={
+              <Loading
+                what="Reading the round"
+                detail="Resolving which round to show — a share link can pin a specific one."
+              />
+            }
+          >
+            <PinnedReceipt />
+          </Suspense>
         </section>
       </Reveal>
 
