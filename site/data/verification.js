@@ -5,13 +5,13 @@
 // never a live check: the block it was taken at is in the payload, and the panel that
 // renders it prints that block rather than the chain head.
 window.GLASSHOUSE_VERIFICATION = {
-  "generatedAt": "2026-09-11T22:22:29.596Z",
+  "generatedAt": "2026-09-11T23:47:23.109Z",
   "rpc": "https://mainnet.base.org",
   "book": "0xc4ea91Fe700918220423ac307C6B1c59650FFbfe",
   "fromBlock": "50965408",
-  "head": "51187983",
-  "auctions": 3,
-  "logs": 14,
+  "head": "51190518",
+  "auctions": 8,
+  "logs": 34,
   "passed": 7,
   "failed": 0,
   "notApplicable": 1,
@@ -19,22 +19,22 @@ window.GLASSHOUSE_VERIFICATION = {
     {
       "name": "LIFECYCLE",
       "ok": true,
-      "detail": "2 of 3 auction(s) ran open -> commit -> reveal -> settle. Totals: 3 opened, 5 commits, 3 reveals, 1 fills, 2 settlements."
+      "detail": "7 of 8 auction(s) ran open -> commit -> reveal -> settle. Totals: 8 opened, 10 commits, 8 reveals, 1 fills, 7 settlements."
     },
     {
       "name": "REPLAY",
       "ok": true,
-      "detail": "2 settlement(s) re-derived from the raw reveals match what settle() emitted, winner and clearing price both. e.g. 50 bps to 0xeebf737f…"
+      "detail": "7 settlement(s) re-derived from the raw reveals match what settle() emitted, winner and clearing price both. e.g. 50 bps to 0xeebf737f…"
     },
     {
       "name": "PRICE_SET_BY",
       "ok": true,
-      "detail": "1 of 2 settled auction(s) cleared at the RUNNER-UP's bid, which is the second-price claim actually happening. 1 cleared at the reserve. reserve 50 / second 0 -> 50; reserve 50 / second 250 -> 250"
+      "detail": "1 of 7 settled auction(s) cleared at the RUNNER-UP's bid, which is the second-price claim actually happening. 6 cleared at the reserve. reserve 50 / second 0 -> 50; reserve 50 / second 250 -> 250; reserve 50 / second 0 -> 50"
     },
     {
       "name": "SITE_DERIVATION",
       "ok": true,
-      "detail": "web/lib/reserve-window.ts agrees with this replay on competition class, thinness and winner margin over 3 row(s) past their reveal window, and its clearing price matches the value settle() EMITTED on 2 settled round(s). 0 row(s) dropped as unreadable."
+      "detail": "web/lib/reserve-window.ts agrees with this replay on competition class, thinness and winner margin over 8 row(s) past their reveal window, and its clearing price matches the value settle() EMITTED on 7 settled round(s). 0 row(s) dropped as unreadable."
     },
     {
       "name": "TRANSLITERATION",
@@ -44,12 +44,12 @@ window.GLASSHOUSE_VERIFICATION = {
     {
       "name": "PHASE",
       "ok": true,
-      "detail": "every settled auction reads as phase \"open\" at block 51187983, which is what settle() requires (n > exclusiveEnd) -- near-tautological, and kept only to catch a boundary regression in web/lib/phase.ts. 0x00000000… open, 0x50d52b02… open, 0x58296d32… open"
+      "detail": "every settled auction reads as phase \"open\" at block 51190518, which is what settle() requires (n > exclusiveEnd) -- near-tautological, and kept only to catch a boundary regression in web/lib/phase.ts. 0x00000000… open, 0x50d52b02… open, 0x58296d32… open"
     },
     {
       "name": "RESERVE_RULE",
       "ok": true,
-      "detail": "recommendReserve() over 3 settled row(s): 108 bps, band 50-167, reason THIN_COMPETITION. A heuristic splitting a known-safe floor from a known-unsafe ceiling, not an optimal reserve."
+      "detail": "recommendReserve() over 8 settled row(s): 57 bps, band 50-65, reason THIN_COMPETITION. A heuristic splitting a known-safe floor from a known-unsafe ceiling, not an optimal reserve."
     },
     {
       "name": "BONDS",
