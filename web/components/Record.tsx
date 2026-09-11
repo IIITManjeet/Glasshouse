@@ -85,6 +85,19 @@ export function Record({ address }: { address: string }) {
   const a = res.data;
   const sealed = a.bidsCommitted - a.bidsRevealed;
 
+  // NOTHING TO SHOW IS A SENTENCE, NOT A GRID OF ZEROS.
+  //
+  // An address the indexer has seen but that has never bid rendered as "0 of 0 sealed"
+  // above six tiles reading 0, 0, 0, 0, 0 and a block number. Every figure was correct and
+  // the panel said nothing -- worse than nothing, because a wall of zeros looks like a page
+  // that failed to load rather than an account that has not bid. The maker's own record is
+  // exactly this case: one round opened, and no bidding at all.
+  //
+  // So when there is no bidding history the counts collapse to a sentence, and the tiles
+  // that would all read zero are not drawn. `auctionsOpened` is still shown when it is
+  // non-zero, because opening rounds IS activity and is the one thing this address did.
+  const neverBid = a.bidsCommitted === 0 && a.fillsRecorded === 0 && a.auctionsWon === 0;
+
   return (
     <figure data-src="base" className="rounded-card border border-rule bg-raised shadow-card">
       <figcaption className="flex flex-wrap items-center justify-between gap-2 border-b border-rule px-4 py-2.5">
@@ -99,6 +112,28 @@ export function Record({ address }: { address: string }) {
         </span>
       </figcaption>
 
+      {neverBid ? (
+        <div className="border-b border-rule px-4 py-4">
+          <p className="lede max-w-xl text-[0.9rem] text-ink-soft">
+            This address has never bid on a Glasshouse round.
+            {a.auctionsOpened > 0 && (
+              <>
+                {" "}
+                It has opened{" "}
+                <span className="tnum text-ink">{num(a.auctionsOpened)}</span> round
+                {a.auctionsOpened === 1 ? "" : "s"} as a maker, which is the other side of the
+                book.
+              </>
+            )}
+          </p>
+          <p className="lede mt-2 max-w-xl text-[0.82rem] text-ink-faint">
+            That is a real answer and not a failure to load — there is simply nothing to
+            count yet. Once this address seals a bid, the figures that matter appear here:
+            how many it opened of how many it sealed, what it won, and what it forfeited.
+          </p>
+        </div>
+      ) : (
+      <>
       {/* The reliability line, first and largest, because it is the one that says something
           about the person rather than about their luck. */}
       <div className="border-b border-rule px-4 py-4">
@@ -128,6 +163,8 @@ export function Record({ address }: { address: string }) {
         <Stat label="unrevealed forfeits" value={a.unrevealedForfeits} note="bond lost" bad />
         <Stat label="first seen" value={Number(a.firstSeenBlock)} note="block" />
       </dl>
+      </>
+      )}
 
       <p className="border-t border-rule px-4 py-3 text-[0.78rem] leading-relaxed text-ink-faint">
         <strong className="font-medium text-ink-soft">What produced this:</strong> the{" "}

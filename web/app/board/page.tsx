@@ -6,6 +6,7 @@ import { useBoard } from "@/components/BoardProvider";
 import { PhaseTrack, BidCards, Stats, ReplayCheck } from "@/components/Auction";
 import { WalletBar } from "@/components/WalletBar";
 import { BidPanel, RevealStrip } from "@/components/BidPanel";
+import { HowToBid } from "@/components/HowToBid";
 import { Loading, Swap } from "@/components/Loading";
 
 const num = (n?: number | null) =>
@@ -45,6 +46,16 @@ export default function BoardPage() {
             The round happening right now, and the panel to join it. Phases are counted in
             blocks, because blocks are what the contract enforces — seconds are an estimate.
           </p>
+          {/* The explainer sits at the foot of the page, which is the right place for it
+              once you know what this is and the wrong place for the person who does not.
+              A visitor who arrives wanting to bid should not have to scroll past the whole
+              instrument to find out how. */}
+          <a
+            href="#how-to-take-part"
+            className="mt-2 inline-block text-[0.82rem] text-glass underline underline-offset-2"
+          >
+            New here? How to take part →
+          </a>
         </div>
         <Link href="/rounds" className="text-sm text-glass underline underline-offset-2">
           Every round so far →
@@ -155,6 +166,16 @@ export default function BoardPage() {
           Every round
         </Link>
       </nav>
+
+      {/* The board told you the state of the round and never how a person takes part, so
+          someone arriving wanting to bid had nowhere to begin -- most visibly when nothing
+          is live and the panel above correctly says there is nothing to bid on. This is
+          present either way, because "how does this work" does not wait for a commit window.
+          `liveRound` is the same predicate the board uses for the featured card: a round
+          that is not yet past its exclusive window. */}
+      <div className="mt-10">
+        <HowToBid liveRound={Boolean(live)} />
+      </div>
 
       <RevealStrip head={head} auctions={demo ? [] : auctions} />
     </main>

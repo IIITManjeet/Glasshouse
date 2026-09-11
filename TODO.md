@@ -41,6 +41,18 @@ Findings referenced as F-n live in `DESIGN.md`.
 
 ## Frontend — done
 
+- [x] **"Where do I start?" had no answer.** The board could say what phase a round was in
+      and never how a person takes part — most visibly when nothing is live and the panel
+      correctly says there is nothing to bid on, leaving a visitor with no idea what they
+      would have done. `components/HowToBid.tsx` is the missing half: four steps from the
+      bidder's side, present whether or not a round is open, with a pointer to it from the
+      page lede so it is not something you find only by scrolling past the whole instrument.
+- [x] **The account page was a wall of zeros.** An address the indexer had seen but that had
+      never bid rendered "0 of 0 sealed" above six tiles of 0 — every figure correct and the
+      panel saying nothing, which reads as a page that failed to load rather than an account
+      with no history. It now leads with a sentence and draws the tiles only when there is
+      something in them.
+
 - [x] F-0 `/profile/<addr>` 404 on localhost — dev-parity rewrite in `next.config.mjs`
 - [x] F-1 record page had no nav entry — `Bidders` added
 - [x] F-2 every address left the site — `components/Address.tsx`, in-app record first
