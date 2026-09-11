@@ -130,11 +130,24 @@ Findings referenced as F-n live in `DESIGN.md`.
 
   No second wallet was needed: `run-live-fill.ts` generates and funds ephemeral bidders
   itself. That had been mis-scoped in this list as blocked on funding a second account.
-- [ ] Cross-check the live subgraph's `Auction` entity against `verify-run`'s independent
-  derivation for the same auction, AS A SCRIPT. Replaces the regex drift guard with a real
-  one. Done by hand on 2026-09-12 against both settled rounds and they agree on every field
-  compared; what is missing is the automation, which needs `verify-run.mjs` to export its
-  derivation so the checker is not a fourth copy of the rule.
+- [x] **The subgraph is cross-checked against an independent replay, by script.**
+  `scripts/cross-check-subgraph.mjs` (`npm run crosscheck`). It re-derives every auction
+  from the Book's raw logs, asks the deployed subgraph about the same ones, and diffs them
+  field by field: **45 comparisons across 3 auctions, all agreeing**, plus the mapping's own
+  `settlementMatchesDerivation` asserted true on every settled round.
+
+  The derivation is IMPORTED from `verify-run.mjs`, not rewritten — that file's whole value
+  is that its replay imports none of the three implementations, and re-typing the top-2 walk
+  would have made this a test of whether two copies of one mistake match. `readLogs` and
+  `rebuild` are exported for it, and the CLI is now guarded by an `import.meta.url` check so
+  importing them does not run the whole scan as a side effect.
+
+  Verified non-vacuous: injecting an off-by-one into the replay side makes it report the
+  disagreement on all three auctions with both values, and exit 1.
+
+  This does NOT replace `TRANSLITERATION`, and does not fully retire it either: both sides
+  here read the same chain, so this catches a mapping that computes the wrong thing, not a
+  chain that emitted the wrong thing. The latter is `verify-run`'s `REPLAY`.
 - [ ] ~~`web/lib/bid.js` and `chain.js` to TypeScript~~ — **recommend NOT doing this before
       submission.** 1,400 lines of wallet and signing code, nearly all of it untested (only
       `decodeAuction` and the poll's call budget are covered), on the path every bid takes. A type migration there is a large diff with no observable benefit to a

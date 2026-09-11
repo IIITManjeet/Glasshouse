@@ -55,6 +55,8 @@ async function main() {
   console.log(`  mode        ${SEND ? "SEND" : "report only (pass --send to sweep)"}`);
   console.log("  ------------------------------------------------------------\n");
 
+  const balanceBefore = await pub.getBalance({ address: getAddress(MAKER) });
+
   let swept = 0n;
   let left = 0n;
 
@@ -94,8 +96,20 @@ async function main() {
   console.log(`  ${SEND ? "swept" : "recoverable"}  ${formatEther(swept)} ETH`);
   if (left > 0n) console.log(`  left behind  ${formatEther(left)} ETH (below the cost of moving it)`);
   if (SEND) {
-    const after = await pub.getBalance({ address: getAddress(MAKER) });
-    console.log(`  maker now    ${formatEther(after)} ETH`);
+    // POLL, DO NOT JUST READ. Base's public endpoint is load balanced, and the first run
+    // of this printed 0.000446 ETH when the true figure was 0.000545 -- the second sweep's
+    // receipt had been waited for, but the balance read landed on a replica that had not
+    // applied that block yet. get-usdc.ts hit the same thing and documents it. Printing a
+    // stale number is a poor look anywhere; on this project it is the thing we lint the
+    // site for.
+    const before = balanceBefore;
+    let after = await pub.getBalance({ address: getAddress(MAKER) });
+    for (let i = 0; i < 10 && after < before + swept; i++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      after = await pub.getBalance({ address: getAddress(MAKER) });
+    }
+    const settled = after >= before + swept;
+    console.log(`  maker now    ${formatEther(after)} ETH${settled ? "" : "  (endpoint still behind; the sweeps are mined, this read is not caught up)"}`);
   } else {
     console.log("  nothing was sent. Re-run with --send to sweep.");
   }

@@ -51,6 +51,16 @@ each one is in [`run.md`](./docs/archive/run.md).
   The one check still n/a is `BONDS`: every round so far runs with `bond = 0`, so
   `claimBond` / `claimForfeit` / `claimUnrevealed` remain unexercised, and the verifier says
   so rather than counting them as passing.
+- `scripts/cross-check-subgraph.mjs` (`npm run crosscheck`) — diffs the published index
+  against an independent replay of the Book's logs, field by field. 45 comparisons across 3
+  auctions, all agreeing. Until now the only guard on `subgraph/src/book.ts` drifting from
+  the rule was verify-run's `TRANSLITERATION` check, which is a regex over two source files
+  and says so; two files can express one rule in text and still disagree on data.
+
+  The derivation is imported from `verify-run.mjs` rather than rewritten, since a fourth
+  copy of the clearing rule would turn this into a test of whether two copies of one mistake
+  match. That file now exports `readLogs` and `rebuild`, and guards its CLI behind an
+  `import.meta.url` check so importing them does not run the entire scan as a side effect.
 - `scripts/sweep-bidders.mjs` — returns the ephemeral bidders' unspent gas to the maker.
   `run-live-fill.ts` had always called those keys "sweepable if this run dies", but nothing
   could sweep them, so the word was an assertion rather than a capability. It matters on a

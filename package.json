@@ -2,7 +2,7 @@
   "name": "glasshouse",
   "version": "0.1.0",
   "private": true,
-  "description": "Taker priority by sealed competitive bid — a SwapVM instruction for 1inch Aqua",
+  "description": "Taker priority by sealed competitive bid \u2014 a SwapVM instruction for 1inch Aqua",
   "license": "MIT",
   "scripts": {
     "build": "npx hardhat compile",
@@ -11,7 +11,8 @@
     "size": "npx hardhat compile && node scripts/size-check.mjs",
     "test:js": "node --test test/js/*.test.js",
     "lint:page": "node scripts/lint-provenance.mjs",
-    "verify:emit": "node scripts/verify-run.mjs --emit"
+    "verify:emit": "node scripts/verify-run.mjs --emit",
+    "crosscheck": "node scripts/cross-check-subgraph.mjs"
   },
   "dependencies": {
     "@1inch/aqua": "github:1inch/aqua#v1.0.0",

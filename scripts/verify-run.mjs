@@ -23,6 +23,7 @@
 // rehearsal.
 
 import { readFileSync, writeFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import { createPublicClient, http, parseEventLogs } from "viem";
 import { base } from "viem/chains";
 
@@ -75,7 +76,7 @@ const check = (name, ok, detail) => {
 // break a hard-coded scan with an error that names the new cap and nothing else. So the
 // cap is parsed out of that error and the chunk retried at it, once per shrink. An
 // archive endpoint that allows more is still used at the larger size.
-async function readLogs() {
+export async function readLogs() {
   const client = createPublicClient({
     chain: base,
     transport: http(RPC, { retryCount: 3, retryDelay: 800 }),
@@ -110,7 +111,7 @@ async function readLogs() {
 // replay that imports the implementation it is checking is not independent.
 // ---------------------------------------------------------------------------------
 
-function rebuild(decoded) {
+export function rebuild(decoded) {
   const auctions = new Map();
   const get = (maker, orderHash) => {
     const k = maker.toLowerCase() + "-" + orderHash.toLowerCase();
@@ -621,7 +622,18 @@ async function main() {
   if (failed.length > 0) process.exitCode = 1;
 }
 
-main().catch((e) => {
-  console.error("\n  verify-run failed to complete: " + (e?.message ?? e) + "\n");
-  process.exitCode = 2;
-});
+// RUN ONLY WHEN INVOKED DIRECTLY.
+//
+// `readLogs` and `rebuild` are exported so a second checker can reuse THIS derivation
+// instead of writing a fourth copy of the clearing rule. The whole value of this file is
+// that its derivation imports none of the three implementations, and that value is lost
+// the moment someone re-types it in order to compare against it.
+//
+// Without the guard, importing either function would run the entire CLI as a side effect:
+// the full log scan, every check, and an exit code set on the importing process.
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  main().catch((e) => {
+    console.error("\n  verify-run failed to complete: " + (e?.message ?? e) + "\n");
+    process.exitCode = 2;
+  });
+}
