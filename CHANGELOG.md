@@ -10,18 +10,56 @@ each one is in [`run.md`](./docs/archive/run.md).
 
 ## [Unreleased]
 
+### Added
+- **The keeper's first mainnet round.** 2026-09-12, round 0 of `config/rounds.json`, one
+  round only: approve, ship, open, commit, reveal, settle, dock, for 0.0000028 ETH of Base
+  gas. Everything the project previously called "end to end" was demonstrated on an anvil
+  fork of Base; this is the same lifecycle on the chain itself.
+
+  `scripts/verify-run.mjs` moves from **3 passed / 2 failed / 3 n/a** to **6 / 1 / 1**.
+  `REPLAY` is the one worth having: the settlement re-derived from the raw reveals matches
+  what `settle()` emitted, winner and clearing price both, without importing the contract's
+  rule, the subgraph's copy of it, or the page's. It had never run against mainnet.
+  `PRICE_SET_BY` moves n/a → **FAIL**, which is the honest direction — there is now a
+  settled auction with a winner, so the check can *run*, and it reports that the house was
+  the only bidder and cleared at the reserve. That is a different claim from "nothing to run
+  on" and the verifier should stop making the second one.
+
+  The AssemblyScript mapping also ran on a real settlement for the first time and reports
+  `settlementMatchesDerivation: true`, so three independent implementations of the clearing
+  rule now agree on real data rather than on a fork.
+- `scripts/wrap-weth.ts` — wraps the ETH that backs the keeper's declared depth, through the
+  Hardhat keystore, so the mainnet deployer key is never pasted into a `cast --interactive`.
+  `get-usdc.ts` wraps too, but wraps in order to swap the WETH away again and refuses below a
+  0.002 ETH floor; both wrong for this.
+- `test/js/chain-call-budget.test.js` — asserts how many RPC calls one poll of the board is
+  allowed to cost, not just what it returns. First coverage of `web/lib/chain.js` beyond
+  `decodeAuction`.
+
+### Fixed
+- **The deployed `/evidence` page was rate limited within an hour of mainnet having a round.**
+  `newestOpenedRound` in `web/lib/chain.js` memoises the newest opened round so a poll costs
+  one or two `eth_call`s instead of binary-searching all 300 — but the memo was guarded by
+  `cursor > 0`, and the remembered cursor for a chain holding exactly one auction is `0`. The
+  fast path never engaged, every poll paid the full ~10-call search, and `writeCursor(0)`
+  stored a value that failed the same guard on the next tick, so the memo could never warm
+  up. Ten calls every 12 s, from every visitor's IP, against Base's public endpoint.
+
+  It was dormant for as long as mainnet was empty, because an unopened round 0 returns early
+  after ONE call — the code was cheapest exactly while it was untested, and became expensive
+  at the moment the thing it guards started working. Ten calls per poll before, three after.
+
 ### Planned
-- Run the keeper against mainnet. It never has: the one auction on chain is a manual open
-  from `DEPLOY.md` section 6, so the index holds one auction, two commits and zero reveals,
-  and no round from `config/rounds.json` has been used.
 - `web/lib/bid.js` and `web/lib/chain.js` to TypeScript. `bid.js` is 1,400 lines of wallet
   and signing code with no test coverage and deserves its own pass.
 - `site/index.html` as a real route rather than a hand-written file synced into `public/`.
   It is the last thing keeping two palettes, two font strategies and two provenance
   conventions alive at once.
-- A second reveal on mainnet. The fork rehearsal now exercises the second-price arm
+- A second reveal on mainnet. The fork rehearsal exercises the second-price arm
   (`secondBps > reserveBps`) and a real fill, but no mainnet auction has ever had two
-  bidders reveal, so `PRICE_SET_BY` in `scripts/verify-run.mjs` has nothing to confirm there.
+  bidders reveal — so `PRICE_SET_BY` in `scripts/verify-run.mjs` now FAILS rather than
+  reading n/a, reporting that the one settled round cleared at its reserve. Needs a second
+  funded wallet, not a code change.
 - The reserve panel reading the index rather than re-deriving. `web/lib/reserve-window.ts`
   is still a transliteration of `subgraph/src/helpers.ts`; the subgraph is published now, so
   the condition its header made deletion conditional on has arrived.

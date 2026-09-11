@@ -201,8 +201,9 @@ The keeper is a script you run. It is not a hosted service, and it is not runnin
 
 ## What is proven, and what is not
 
-**Verified by `forge test` — 97 tests, 9 suites, 0 failures.** Plus `npm run test:js`, 45
-tests, 0 failures, over the shared ESM (`phase`, the reserve rule, the advisor).
+**Verified by `forge test` — 97 tests, 9 suites, 0 failures.** Plus `npm run test:js`, 48
+tests, 0 failures, over the shared ESM (`phase`, the reserve rule, the advisor, and the
+call budget one poll of the board is allowed to spend).
 
 - **A real fill through the official Aqua, on a fork of Base.**
   `test/fork/AquaBaseFork.t.sol::test_Fork_RealFillThroughOfficialAqua`: 0.01 WETH in,
@@ -249,9 +250,22 @@ rather than re-derived. That preflight passes end-to-end against real Base state
   block 50,965,408; an indexer has allocated to it, so it is served rather than merely listed
   (`subgraph/README.md` step 3 verifies this from the GNS logs on Arbitrum rather than from the
   Studio UI). The MCP composition path is operational — `scripts/reserve-advisor.mjs` runs
-  against it end to end. What the index *holds* is the honest part: one auction, two commits,
-  **zero reveals, zero fills, zero settlements**, because the keeper has never run against
-  mainnet. Every figure drawn from it says so. The board still reads the chain directly, which
+  against it end to end. What the index *holds* is the honest part: as of block 51,185,203,
+  **two auctions, three commits, one reveal, one settlement, and still zero fills**. The
+  keeper ran its first mainnet round on 2026-09-12 (round 0, order hash `0x50d52b02…`), which
+  is the first time the AssemblyScript mapping has run on a real settlement. The index remains
+  nearly empty and every figure drawn from it says so.
+
+  That round is also where three independent implementations of the clearing rule met real
+  data for the first time, and agreed. The subgraph's own replay reports
+  `settlementMatchesDerivation: true`; `scripts/verify-run.mjs`, which re-derives the outcome
+  from the raw reveals without importing any of the three, reports `REPLAY` pass against what
+  `settle()` emitted; and `web/lib/reserve-window.ts` agrees with that replay on competition
+  class, thinness and winner margin. One bidder, `bestBps` 168, `secondBps` 0, cleared at the
+  reserve of 50 — `competition: SOLE`, `thin: true`. Which is exactly why it is not yet the
+  demonstration that matters: a lone bidder clears at the reserve, so the second-price arm is
+  still unexercised on mainnet and `verify-run`'s `PRICE_SET_BY` check FAILS rather than
+  passing, saying so. That needs a second funded wallet. The board still reads the chain directly, which
   is the right long-run source for a ticking card (polling an indexer every 12 s is 7,200
   queries/day/tab against a 3,000/day cap), so the subgraph's derived history is not what you
   see live.
@@ -299,7 +313,7 @@ Requires **Node ≥ 22.13.0** (Hardhat 3) and [Foundry](https://getfoundry.sh).
 ```bash
 npm install
 forge test                    # 97 tests; the fork suites need internet
-npm run test:js               # 45 tests
+npm run test:js               # 48 tests
 node scripts/size-check.mjs   # EIP-170 guard, runs on every build
 ```
 
