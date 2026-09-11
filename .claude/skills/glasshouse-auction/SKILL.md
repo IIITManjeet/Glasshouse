@@ -1,6 +1,6 @@
 ---
 name: glasshouse-auction
-description: Use when a Glasshouse maker or a judge asks "what reserve should I set for my next auction", "what phase is auction X in", or "explain the receipt for auction X". Answers by querying the live Glasshouse subgraph through the Subgraph MCP and running the integer reserve rule in site/reserve-rule.js — it never estimates a number from memory. NOT YET OPERATIONAL as of 2026-09-09: the subgraph is deployed to Studio but not published to The Graph Network, so the Subgraph MCP cannot see it yet. See "Current status" below before doing anything else.
+description: Use when a Glasshouse maker or a judge asks "what reserve should I set for my next auction", "what phase is auction X in", or "explain the receipt for auction X". Answers by querying the live Glasshouse subgraph through the Subgraph MCP and running the integer reserve rule in site/reserve-rule.js — it never estimates a number from memory. NOT YET OPERATIONAL as of 2026-09-11: the subgraph IS published to The Graph Network now, but no Gateway API key has been created, so the Subgraph MCP fails auth. See "Current status" below before doing anything else.
 ---
 
 # Glasshouse auction skill
@@ -15,29 +15,34 @@ places that MCP is actually on the runtime path. Read `docs/design/subgraph-desi
 §7.2, §7.3, §8.1–§8.5 for the full spec this file summarizes; where the two disagree, the
 design doc is the one to trust and this file is stale.
 
-## Current status: this cannot work yet
+## Current status: one blocker left
 
 **Say this plainly, first, whenever this skill is invoked, before attempting anything:**
 
-- The subgraph is **deployed to Studio** (deployment id
-  `Qmc9Ah4ow5mXD7599hi3ewze7Fg77x1GivAqaCSAmmpK7E`, version `v0.5.1`,
-  `subgraph/README.md`) but **not published to The Graph Network**.
-- The Subgraph MCP only queries subgraphs "available on The Graph Network" through the
-  Gateway (`docs/design/subgraph-design.md` §2). A Studio-only deployment is invisible to
-  it, full stop — there is no fallback query path from the MCP to the Studio dev URL.
-- Publishing is an on-chain transaction on **Arbitrum One** and needs ETH there
-  (`run.md` F-83, U-b). After publishing, a **Gateway API key** restricted to this
-  subgraph must be created in Studio (Studio → API Keys) and exported as `GRAPH_API_KEY`.
-  Neither step has happened yet (`subgraph/README.md` "Deploy and publish" status table).
-- Until both are done, do not guess a reserve, a phase, or anything else from general
+- ✅ **Published to The Graph Network** on 2026-09-11. Subgraph id
+  `FPQdiZTAnR8ac6grgAF2x49bWqwDh87RzqUgQxAvoY2y`, deployment
+  `Qmc9Ah4ow5mXD7599hi3ewze7Fg77x1GivAqaCSAmmpK7E` (`v0.5.1`). One indexer has allocated
+  to it, so it is served and not merely listed. The publish is verifiable from the GNS
+  logs on Arbitrum without trusting Studio — `subgraph/README.md` step 3 shows how.
+- ❌ **No Gateway API key.** `.mcp.json` sends `Authorization: Bearer ${GRAPH_API_KEY}`,
+  and with the variable unset the MCP fails with `auth error: malformed API key`. That is
+  the only thing still in the way.
+- The key must be set **before the session starts** — MCP servers read their environment
+  at startup, so exporting it mid-session does nothing until Claude Code is restarted.
+- Until the key exists, do not guess a reserve, a phase, or anything else from general
   knowledge or from a stale local snapshot and present it as live. Report the missing
-  prerequisites and stop, exactly as `scripts/reserve-advisor.mjs` already does — see
+  prerequisite and stop, exactly as `scripts/reserve-advisor.mjs` already does — see
   "How this fails honestly" below.
+
+⚠️ **Even once the key is set, the index is nearly empty**: one auction, two commits, zero
+reveals, zero settlements, and the keeper has never run against mainnet. Any question of
+the form "what does the data say" must answer from that, and a reserve recommendation drawn
+from a single unsettled auction should say so in the same breath as the number.
 
 ## Setup a maker must complete once (outside this repo, never committed)
 
-1. Publish the subgraph to The Graph Network from Studio (needs ETH on Arbitrum One).
-2. Create a Gateway API key in Studio, restricted to `glasshouse-base`, with a spend cap.
+1. ~~Publish the subgraph to The Graph Network from Studio.~~ Done 2026-09-11.
+2. Create a Gateway API key in Studio, restricted to `glasshouse`, with a spend cap.
 3. `export GRAPH_API_KEY=<the key>` in the shell that launches Claude Code (or set it in
    `~/.claude/settings.json`'s `env` block). **Never put the key in `.mcp.json` or any
    other committed file** — this repository is public, and `.mcp.json` references

@@ -164,15 +164,29 @@ Unset, `web/lib/subgraph.ts` reports `state: "off"` and `Record.tsx` renders not
 rather than an empty shape. Set, the account record goes live on the next deploy. Studio is
 a development endpoint and is rate-limited; that is the accepted cost of not shipping a key.
 
-### Step 3 — publish to The Graph Network (an Arbitrum One transaction)
+### Step 3 — publish to The Graph Network — DONE 2026-09-11
 
-Publish from Studio with the wallet that owns the subgraph. It needs ETH on **Arbitrum
-One** — a few dollars is enough, and as of 2026-09-11 the Base deployer
-`0xeebf737f92c8f0d9070f35a7d9baf416923becdf` holds `0`, so check the balance before
-opening Studio rather than after connecting a wallet.
+Published from Studio by `0xeebf737f92c8f0d9070f35a7d9baf416923becdf`, which was funded on
+Arbitrum One first. Verified from the chain rather than from the Studio UI, by reading the
+GNS logs on Arbitrum and checking the deployment hash in them against ours:
 
-Publishing is what the Gateway serves from, and the Subgraph MCP queries only the Gateway.
-Until this step lands, the composition claim does not hold and the skill stays off.
+| | |
+|---|---|
+| Publish tx | `0x14abd788bd19dffe372270a6d4ca4ec4fd72b81f0270183340da7d625d3b597c` |
+| GNS | `0xec9a7fb6cbc2e41926127929c2dce6e9c5d33bec`, Arbitrum block 504080832 |
+| Subgraph id | `FPQdiZTAnR8ac6grgAF2x49bWqwDh87RzqUgQxAvoY2y` |
+| Deployment in the event | `0xcd128c4faa5567a6cde0dd66f8a463ffc9a56750510c2d185f4493fe74dd4d49` |
+| Reserve ratio | 1000000 ppm |
+
+That deployment hash is `Qmc9Ah4ow5mXD7599hi3ewze7Fg77x1GivAqaCSAmmpK7E` with its `0x1220`
+multihash prefix stripped, which is how the published subgraph is tied to the deployment we
+built rather than to some other one. The subgraph id above is the same 32 bytes as the GNS
+event's first indexed argument, base58 of the raw value with no prefix — 44 characters,
+where an IPFS deployment id is 46.
+
+**An indexer allocated to it 117 blocks later** — `AllocationCreated` on the staking
+contract `0xb2bb92d0de618878e438b55d5846cfecd9301105` at block 504080949. Published and
+actually served are different things, and this is the evidence for the second.
 
 ### Step 4 — the Gateway key, server-side only
 
@@ -195,15 +209,35 @@ checks both and names each missing one rather than falling back to a cached numb
 | Deployment id (`Qm…`) | `Qmc9Ah4ow5mXD7599hi3ewze7Fg77x1GivAqaCSAmmpK7E` ✅ |
 | Version label | `v0.5.1` ✅ |
 | Mappings match the repo | ✅ unchanged since `40120fd`; rebuilt clean at `571ae53` |
-| Studio query URL | deployed; not recorded here, it carries the Studio account id |
-| `NEXT_PUBLIC_SUBGRAPH_URL` | ❌ not set — step 2, and nothing blocks it |
-| Subgraph id (network) | ❌ not published — needs ETH on Arbitrum One |
-| Gateway query URL | ❌ not published |
-| `GRAPH_API_KEY` | ❌ not created |
+| Studio query URL | `.../query/1758826/glasshouse/version/latest` ✅ answering; 6 blocks behind head |
+| `NEXT_PUBLIC_SUBGRAPH_URL` | ✅ set on Vercel production, deployed, live in the bundle |
+| Subgraph id (network) | `FPQdiZTAnR8ac6grgAF2x49bWqwDh87RzqUgQxAvoY2y` ✅ published 2026-09-11 |
+| Indexer allocation | ✅ one, Arbitrum block 504080949 |
+| Gateway query URL | `https://gateway.thegraph.com/api/<key>/subgraphs/id/FPQdiZTAnR8ac6grgAF2x49bWqwDh87RzqUgQxAvoY2y` |
+| `GRAPH_API_KEY` | ❌ not created — the last blocker |
 
-`@modelcontextprotocol/sdk` is installed as of 2026-09-08, so the two remaining blockers for
-`scripts/reserve-advisor.mjs` are the published subgraph and the Gateway key.
+`@modelcontextprotocol/sdk` is installed as of 2026-09-08 and the subgraph is published, so
+the Gateway key is the **only** thing still stopping `scripts/reserve-advisor.mjs` and the
+`glasshouse-auction` skill. `.mcp.json` passes it as `Bearer ${GRAPH_API_KEY}`; unset, the
+MCP fails with `auth error: malformed API key`. MCP servers read their environment at
+startup, so the key must be set **before** the session begins, not during it.
 
-⚠️ **The Book had emitted no events at all until 2026-09-08**, so a healthy, fully synced
-subgraph over an empty contract is the expected state, not a fault. The first live auction
-run put `AuctionOpened` and two `BidCommitted` into the index.
+⚠️ **A nearly empty index is the expected state, not a fault.** The Book emitted nothing at
+all until 2026-09-08, and as of 2026-09-11 the whole of recorded history is:
+
+```
+cumulativeAuctionCount  1     cumulativeRevealCount  0
+cumulativeCommitCount   2     cumulativeFillCount    0
+                              cumulativeSettleCount  0
+```
+
+That one auction is `parameterSet: ADVOCATED` on 30/30 windows with a placeholder
+`orderHash` of `0x00…01a07d2dfab2`, so it is a manual open from `DEPLOY.md` section 6 and
+**not** the keeper's: the keeper hardcodes the `humanDemo` 60/60/15 windows and draws real
+order hashes from `config/rounds.json`, none of which appear on chain. The keeper has never
+run against Base mainnet.
+
+Both of that auction's commits went **unrevealed** and its reveal window closed on 2026-09-07,
+so the only reliability record the index holds is two bidders at `bidsRevealed 0` of
+`bidsCommitted 1`. That is a real result and the page prints it rather than hiding it, but it
+is worth knowing before showing the account record to anyone.

@@ -11,11 +11,13 @@ each one is in [`run.md`](./docs/archive/run.md).
 ## [Unreleased]
 
 ### Planned
-- Publish the subgraph to The Graph Network. It is deployed to Studio, which the Subgraph
-  MCP cannot see, so `scripts/reserve-advisor.mjs` and the `glasshouse-auction` skill stay
-  off. Needs ETH on Arbitrum One. The page is a separate question and is not blocked on it:
-  it reads the Studio endpoint the moment `NEXT_PUBLIC_SUBGRAPH_URL` is set. The runbook,
-  and why those two consumers must not share a URL, is in `subgraph/README.md`.
+- A Gateway API key. The subgraph is now published and served, and the page is live on the
+  Studio endpoint, but `scripts/reserve-advisor.mjs` and the `glasshouse-auction` skill are
+  still dark: `.mcp.json` sends `Bearer ${GRAPH_API_KEY}` and the variable is unset. It has
+  to be set before the session starts, because MCP servers read their environment once.
+- Run the keeper against mainnet. It never has: the one auction on chain is a manual open
+  from `DEPLOY.md` section 6, so the index holds one auction, two commits and zero reveals,
+  and no round from `config/rounds.json` has been used.
 - `web/lib/bid.js` and `web/lib/chain.js` to TypeScript. `bid.js` is 1,400 lines of wallet
   and signing code with no test coverage and deserves its own pass.
 - `site/index.html` as a real route rather than a hand-written file synced into `public/`.
@@ -24,6 +26,17 @@ each one is in [`run.md`](./docs/archive/run.md).
 - Per-event timeline on the receipt. The transaction links themselves shipped in
   `1ef507d`; `bidsFor()` in `chain.js` now keeps `transactionHash` as `commitTx` and
   `revealTx`, so what is left is the ordered per-event timeline, not the plumbing.
+
+### Added
+- **The subgraph is published to The Graph Network** (2026-09-11), subgraph id
+  `FPQdiZTAnR8ac6grgAF2x49bWqwDh87RzqUgQxAvoY2y`, and an indexer allocated to it 117 blocks
+  later, so it is served rather than merely listed. Verified by decoding the GNS logs on
+  Arbitrum and matching the deployment hash in them to `Qmc9Ah…pK7E`, rather than by
+  trusting the Studio UI. The method is written down in `subgraph/README.md` step 3.
+- **The account record reads the indexer in production.** `NEXT_PUBLIC_SUBGRAPH_URL` points
+  at the Studio endpoint, deliberately not the Gateway: the site is `output: "export"`, so
+  that value is inlined into a public chunk, and a Gateway URL carries its API key in the
+  path. `subgraph/README.md` now tabulates which of the three consumers may see which URL.
 
 ### Fixed
 - The account record labelled almost every visitor wrong. `web/lib/subgraph.ts` declared
