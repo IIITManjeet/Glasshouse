@@ -29,10 +29,14 @@ Findings referenced as F-n live in `DESIGN.md`.
   `next dev` and absent from production. Verified against the deployed site and the built
   chunks. Second finding withdrawn for the same reason as F-8.
 - [x] **F-7 withdrawn** — the CTA panel populates; the capture was taken mid-transition.
-- [x] `.btn-tertiary` applied to the three ad-hoc controls (`rounds` refresh, `Receipt`,
-      `Reserve`). `BidPanel` and the `StatusBar` rehearsal toggle still carry bespoke styles;
-      both are stateful toggles rather than plain buttons, so they want a `.btn-toggle`
-      variant rather than being forced into an existing one.
+- [x] **The control system is complete.** Every label and control in the app now uses a
+      primitive — a grep for the old ad-hoc class lists returns nothing. `.chip` gained
+      `chip-live` / `chip-warn` tints so `SourceChip` keeps its semantic colour (mainnet vs
+      fork/sim/snapshot) without a border; `.btn-toggle` drives its pressed look from
+      `aria-pressed`, so the visible and announced states cannot drift.
+      Two over-corrections caught by looking at the result: `refresh` was too quiet as
+      tertiary when it is the only control on the page, and the rehearsal toggle lost the
+      status bar's uppercase. Both fixed.
 - [ ] Art overlays, at most three, per the art direction in `DESIGN.md`. Last, and safe to cut.
 
 ## Frontend — done
@@ -95,7 +99,11 @@ Findings referenced as F-n live in `DESIGN.md`.
 - [ ] Cross-check the live subgraph's `Auction` entity against `verify-run`'s independent
   derivation for the same auction. Only way to exercise the AssemblyScript mapping on real
   data; replaces the regex drift guard with a real one.
-- [ ] `web/lib/bid.js` and `chain.js` to TypeScript (1,400 lines of wallet code, no tests).
+- [ ] ~~`web/lib/bid.js` and `chain.js` to TypeScript~~ — **recommend NOT doing this before
+      submission.** 1,400 lines of wallet and signing code with no test coverage, on the path
+      every bid takes. A type migration there is a large diff with no observable benefit to a
+      judge and a real chance of breaking the one flow that must work live. It is the right
+      thing to do the week after, not the day before.
 
 ## Backend — done
 

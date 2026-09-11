@@ -30,17 +30,11 @@ export function SourceChip({ source, head, isFork }: { source: Source; head: num
             // "synthetic" in front of it.
             `Source · SIMULATED by lib/simulate.js · nothing on any chain · synthetic block ${num(head)}`
           : "Source · none";
-  const tone =
-    source === "chain" && !isFork
-      ? "text-glass border-glass"
-      : source === "chain" && isFork
-        ? "text-amber border-amber"
-        : "text-amber border-amber";
-  return (
-    <div className={`inline-block border px-2 py-0.5 text-[0.66rem] uppercase tracking-[0.12em] ${tone} font-mono`}>
-      {label}
-    </div>
-  );
+  // Mainnet reads are the only ones that get the calm tone. A fork, a simulation and a
+  // snapshot all get the warning tint, because for a reader the relevant fact about all
+  // three is the same: this is not the live chain.
+  const tone = source === "chain" && !isFork ? "chip-live" : "chip-warn";
+  return <div className={`chip ${tone}`}>{label}</div>;
 }
 
 const PHASES = ["commit", "reveal", "exclusive", "open"] as const;

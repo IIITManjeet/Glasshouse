@@ -159,7 +159,7 @@ export function LatencyLens() {
         <span className="font-mono text-[0.72rem] uppercase tracking-[0.14em] text-ink">
           The same three bidders, two gates
         </span>
-        <span className="border border-ink-faint px-2 py-0.5 font-mono text-[0.64rem] uppercase tracking-[0.12em] text-ink-faint">
+        <span className="chip">
           Source · Foundry test · valuations and arrival order assigned
         </span>
       </figcaption>

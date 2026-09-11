@@ -159,6 +159,56 @@ html {
   cursor: default;
 }
 
+/* TONE IS MEANING ON A SOURCE CHIP, so the variants are tints rather than borders.
+
+   `SourceChip` has always used colour to separate "read from Base mainnet" from "a local
+   fork, or a simulation, or a snapshot" -- the one distinction a screenshot of this project
+   can do the most damage by losing. That has to survive the move away from bordered chips.
+
+   A soft amber fill is LOUDER at this size than the amber hairline border it replaces, not
+   quieter, so the warning gets stronger while the chip stops impersonating a button. */
+.chip-live {
+  color: var(--color-glass);
+}
+.chip-warn {
+  background: color-mix(in srgb, var(--color-amber) 20%, transparent);
+  color: var(--color-amber);
+}
+
+/* A TOGGLE IS NOT A BUTTON, and pressing it does not do a thing so much as change a
+   standing state. `.btn-secondary` would have been wrong for the rehearsal switch: it
+   would have said "perform an action" when what it means is "this mode is on".
+
+   The pressed state is driven by `aria-pressed`, which means the accessible state and the
+   visible state cannot drift apart -- there is no second boolean in a className to forget
+   to update. The unpressed form is deliberately quiet: an off switch should recede. */
+.btn-toggle {
+  background: transparent;
+  border-color: var(--color-rule);
+  color: var(--color-ink-faint);
+  /* The status bar is uppercase throughout. Dropping the case here left "Rehearsal off"
+     sitting in sentence case beside ACCOUNTS and HEAD, which read as a rendering slip
+     rather than as a deliberate difference. Case is not an affordance signal -- that is
+     what the border and the pressed tint are for -- but it is very much a consistency one. */
+  padding: 3px 8px;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.btn-toggle:hover {
+  border-color: var(--color-glass);
+  color: var(--color-glass);
+}
+.btn-toggle[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--color-amber) 18%, transparent);
+  border-color: var(--color-amber);
+  color: var(--color-amber);
+}
+.btn-toggle[aria-pressed="true"]:hover {
+  background: var(--color-amber);
+  color: var(--color-ground);
+}
+
 /* The shared control shape. Size is deliberately constant across every variant: hierarchy
    here is carried by FILL, never by scale. A bigger button reads as clumsy against a
    monospace grid, and every system studied varies fill and keeps size fixed. */

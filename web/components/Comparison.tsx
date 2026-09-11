@@ -71,7 +71,7 @@ export function Comparison() {
         <span className="font-mono text-[0.72rem] uppercase tracking-[0.14em] text-ink">
           The same order, three ways
         </span>
-        <span className="border border-ink-faint px-2 py-0.5 font-mono text-[0.64rem] uppercase tracking-[0.12em] text-ink-faint">
+        <span className="chip">
           Source · Foundry test · test/Comparison.t.sol
         </span>
       </figcaption>

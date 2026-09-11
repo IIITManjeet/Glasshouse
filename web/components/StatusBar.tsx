@@ -75,12 +75,10 @@ export function StatusBar() {
           type="button"
           onClick={() => setDemo(!demo)}
           aria-pressed={demo}
-          className={[
-            "border px-2 py-0.5 tracking-[0.1em] uppercase transition-colors",
-            demo
-              ? "border-amber text-amber hover:bg-amber hover:text-raised"
-              : "border-rule text-ink-faint hover:border-glass hover:text-glass",
-          ].join(" ")}
+          // A standing mode, not an action, so .btn-toggle rather than a button variant.
+          // The pressed look is driven by aria-pressed above, so the visible state and the
+          // announced state cannot drift apart.
+          className="btn btn-toggle" 
         >
           Rehearsal {demo ? "on" : "off"}
         </button>

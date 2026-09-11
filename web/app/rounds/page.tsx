@@ -83,7 +83,10 @@ export default function RoundsPage() {
           <button
             type="button"
             onClick={refresh}
-            className="btn btn-tertiary"
+            // Secondary, not tertiary: this is the only control on the page, and the
+            // "invisible until reached for" treatment is for actions that crowd a view.
+            // One quiet action in an empty corner just looks like text.
+            className="btn btn-secondary"
           >
             refresh
           </button>
