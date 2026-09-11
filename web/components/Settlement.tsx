@@ -38,9 +38,9 @@ import { type Auction, livePhase } from "@/lib/useAuctions";
  * and settle. Sorting by value would be a lie about what the contract knows and when.
  */
 
-const PAD = { top: 26, right: 132, bottom: 46, left: 48 };
-const W = 720;
-const H = 300;
+const PAD = { top: 26, right: 140, bottom: 62, left: 48 };
+const W = 760;
+const H = 320;
 
 const num = (n: number) => n.toLocaleString("en-US");
 const short = (a?: string | null) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "—");
@@ -72,6 +72,22 @@ export function Settlement({ a, head }: { a: Auction; head: number }) {
   // still move both numbers, and an animated "150 bps to the maker" that changes its mind
   // is worse than not saying it.
   const surplus = hasPrice && revealClosed ? Math.max(0, a.bestBps - (clearing as number)) : 0;
+
+  // WHICH SLOT SET THE PRICE. "Set by the runner-up" is true and vague; naming the slot ties
+  // the line to a column a reader can point at. When secondBps never cleared the reserve
+  // there IS no runner-up -- the reserve set the price -- and saying so is the honest case,
+  // not a fallback.
+  const setByReserve = a.secondBps <= a.reserveBps;
+  const runnerUp = setByReserve
+    ? null
+    : bids.find((b) => b.bps === a.secondBps && b.bidder?.toLowerCase() !== winner) ?? null;
+
+  // The exclusive window is the one part of the mechanism with no room on either axis, so
+  // the price line carries it: while it is open the line is the winner's alone; once it
+  // lapses unfilled, the improvement is gone and anyone may fill at the base price.
+  const inExclusive = phase === "exclusive" && !a.filled;
+  const lapsed = phase === "open" && hasPrice && !a.filled;
+  const blocksLeft = Math.max(0, a.exclusiveEnd - head);
 
   return (
     <figure data-src="base" className="rounded-card border border-rule bg-raised shadow-card">
@@ -144,10 +160,11 @@ export function Settlement({ a, head }: { a: Auction; head: number }) {
                     height={plotH}
                     fill="url(#seal)"
                     mask="url(#fadeTop)"
-                    opacity={forfeited ? 0.5 : 1}
-                    stroke={forfeited ? "var(--color-brick)" : "none"}
-                    strokeWidth={forfeited ? 1 : 0}
+                    opacity={forfeited ? 0.45 : 1}
                   />
+                )}
+                {forfeited && (
+                  <rect x={x(i)} y={PAD.top} width={colW} height={plotH} fill="var(--color-brick)" opacity="0.16" mask="url(#fadeTop)" />
                 )}
 
                 {/* The winner gets a cap, not a colour. */}
@@ -161,11 +178,34 @@ export function Settlement({ a, head }: { a: Auction; head: number }) {
                   </text>
                 )}
 
+                {/* Three lines, because the queue slot, the bidder and the state are three
+                    different facts and collapsing them loses one. The slot comes first: it
+                    is fixed at commit and is what the price line points back to. */}
                 <text x={x(i) + colW / 2} y={H - PAD.bottom + 16} textAnchor="middle" className="fill-[var(--color-ink-faint)] font-mono text-[10px]">
-                  #{b.commitIdx}
+                  #{b.commitIdx} · blk {num(b.committedAtBlock)}
                 </text>
                 <text x={x(i) + colW / 2} y={H - PAD.bottom + 29} textAnchor="middle" className="fill-[var(--color-ink-faint)] font-mono text-[9px]">
-                  {forfeited ? "never opened" : revealed ? short(b.bidder) : "sealed"}
+                  {short(b.bidder)}
+                </text>
+                <text
+                  x={x(i) + colW / 2}
+                  y={H - PAD.bottom + 42}
+                  textAnchor="middle"
+                  className={
+                    forfeited
+                      ? "fill-[var(--color-brick)] font-mono text-[9px]"
+                      : isWinner && revealed
+                        ? "fill-[var(--color-ink)] font-mono text-[9px]"
+                        : "fill-[var(--color-ink-faint)] font-mono text-[9px]"
+                  }
+                >
+                  {forfeited
+                    ? "never revealed · bond forfeit"
+                    : revealed
+                      ? isWinner
+                        ? "wins"
+                        : "opened"
+                      : "sealed"}
                 </text>
               </g>
             );
@@ -189,7 +229,9 @@ export function Settlement({ a, head }: { a: Auction; head: number }) {
                 price {clearing} bps
               </text>
               <text x={W - PAD.right + 12} y={y(clearing as number) + 12} className="fill-[var(--color-ink-faint)] font-mono text-[10px]">
-                {a.secondBps > a.reserveBps ? "set by the runner-up" : "set by the reserve"}
+                {setByReserve
+                  ? "set by the reserve"
+                  : `set by #${runnerUp ? runnerUp.commitIdx : "?"}`}
               </text>
               {/* The surplus is LABELLED HERE, beside the price, and only SHADED on the
                   column. Inside the band it collided with the price line the moment the
@@ -200,6 +242,40 @@ export function Settlement({ a, head }: { a: Auction; head: number }) {
                 <text x={W - PAD.right + 12} y={y(clearing as number) + 26} className="fill-[var(--color-amber)] font-mono text-[10px]">
                   {surplus} bps → maker
                 </text>
+              )}
+              {/* THE EXCLUSIVE WINDOW HAS NO AXIS OF ITS OWN, so the price line carries it.
+                  While the window is open the improved price belongs to the winner alone.
+                  Once it lapses unfilled the improvement is simply gone: a second, grey,
+                  dashed line at the floor of the scale says anyone may now fill at the base
+                  price, and the drop from one line to the other IS the thing that expired. */}
+              {inExclusive && (
+                <text x={W - PAD.right + 12} y={y(clearing as number) + 40} className="fill-[var(--color-ink)] font-mono text-[10px]">
+                  winner only · {num(blocksLeft)} blk left
+                </text>
+              )}
+              {a.filled && (
+                <text x={W - PAD.right + 12} y={y(clearing as number) + 40} className="fill-[var(--color-glass)] font-mono text-[10px]">
+                  filled at this price
+                </text>
+              )}
+              {lapsed && (
+                <g>
+                  <line
+                    x1={PAD.left - 6}
+                    y1={PAD.top + plotH}
+                    x2={W - PAD.right + 6}
+                    y2={PAD.top + plotH}
+                    stroke="var(--color-ink-faint)"
+                    strokeWidth="1.5"
+                    strokeDasharray="4 4"
+                  />
+                  <text x={W - PAD.right + 12} y={PAD.top + plotH + 4} className="fill-[var(--color-ink-faint)] font-mono text-[10px]">
+                    open · base price
+                  </text>
+                  <text x={W - PAD.right + 12} y={y(clearing as number) + 40} className="fill-[var(--color-ink-faint)] font-mono text-[10px]">
+                    window lapsed
+                  </text>
+                </g>
               )}
             </g>
           )}
@@ -226,7 +302,9 @@ export function Settlement({ a, head }: { a: Auction; head: number }) {
         Column height is the revealed bid; a hatched column is a bid that exists and cannot be
         read. The ochre line is <code className="font-mono">clearingBps</code> —{" "}
         <code className="font-mono">max(reserveBps, secondBps)</code> from
-        GlasshouseBook.sol:229, not a figure computed here.{" "}
+        GlasshouseBook.sol:229, not a figure computed here. Columns are in commit order and
+        never re-sorted: their position is fixed when the bid is sealed, which is why bidding
+        early cannot be punished.{" "}
         {hasPrice ? (
           <>
             It is drawn from the runner-up because that is where the number comes from: the

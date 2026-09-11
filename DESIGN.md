@@ -734,6 +734,37 @@ since a small gap means the runner-up bid close to the winner — so the annotat
 exactly when the auction was most competitive), and the longer replacement label was clipped
 by the right gutter.
 
+## The spec, delivered in two passes
+
+The first pass built the chart and quietly implemented about two thirds of the decision —
+the scale, commit order, the hatch, the price line and the surplus. Left out: the exclusive
+window (not represented at all), the slot that set the price, the commit block, the forfeit
+label and the bidder on sealed columns. Caught only because it was asked whether the Fable
+decision had actually been carried out, which it had not.
+
+Now complete:
+
+| Spec item | Treatment |
+|---|---|
+| sealed | hatched full height, fading at the top, bidder shown, labelled `sealed` |
+| queue position | `#n · blk N` under every column; columns never re-sorted |
+| reveal | solid teal column at its true height, value at the cap |
+| winner | ink cap and the word `wins` — no colour, which is reserved for money |
+| second price | ochre line at the runner-up's height, labelled `set by #n`, or `set by the reserve` when no runner-up cleared it |
+| surplus | ochre band above the line, labelled beside the price |
+| forfeit | terracotta tint over the hatch, `never revealed · bond forfeit` |
+| exclusive window | carried by the price line: `winner only · N blk left`, then `filled at this price`, or on lapse a grey dashed line at the floor reading `open · base price` |
+
+**One item deliberately not built: the 300ms reveal animation.** The chart renders a state
+from data rather than a transition between states, so animating it would mean tracking a
+previous render purely to have something to animate from. Motion is also the first thing to
+look cheap when added in a hurry. The state change is legible without it.
+
+**Already satisfied, so not changed:** the decision said to brighten ochre on dark because
+`#8a5a14` is mud on `#0b1513`. The dark theme already defines `--color-amber: #d6a94a`, and
+`.tape` uses `#e9b036` — both brighter than the suggested `#c9932a`. The palette Fable was
+shown listed only the light value.
+
 ## Still open
 
 The landing hero could be this same chart rendered from the most recently settled round, with
