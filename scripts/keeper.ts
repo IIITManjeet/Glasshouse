@@ -236,7 +236,37 @@ async function main() {
     });
   }
 
+  // WHAT ONE ROUND COSTS, so the loop can refuse to start one it cannot finish.
+  // Everything except `approve`, which is a one-off across the whole session.
+  const ROUND_GAS = GAS.ship + GAS.open + GAS.commit + GAS.reveal + GAS.settle + GAS.dock;
+
   while (!stop && state.nextRound < ROUNDS.rounds.length && state.nextRound < stopAfter) {
+    // STOP BETWEEN ROUNDS, NEVER INSIDE ONE.
+    //
+    // The balance was read once at startup and never again, so a long session simply ran
+    // until a transaction failed for want of gas -- and where it failed decided how bad it
+    // was. Dying after `commit` and before `reveal` leaves the house's bid sealed forever
+    // on a live round: the board shows an auction nobody can settle, carrying exactly the
+    // shape of the withheld-reveal attack this mechanism exists to punish, performed by
+    // the house. The keeper's own header calls that the one failure worth engineering
+    // against, and then the loop did not check.
+    //
+    // Checked per round rather than once, because the gas price moves and 227 rounds is
+    // long enough for it to matter. The floor is two rounds' worth, so the run stops with
+    // a round's margin in hand instead of on the exact wei.
+    const gasPrice = await rpc(() => pub.getGasPrice(), "gas price");
+    const roundCost = ROUND_GAS * gasPrice;
+    const onHand = await rpc(() => pub.getBalance({ address: maker }), "balance before round");
+    if (onHand < roundCost * 2n) {
+      console.log(
+        `\n  STOPPING BEFORE ROUND ${ROUNDS.rounds[state.nextRound].round}: ${formatEther(onHand)} ETH left, ` +
+        `and one round costs about ${formatEther(roundCost)} at ${gasPrice} wei.`,
+      );
+      console.log("  Nothing is half-open: the previous round settled and docked before this check.");
+      console.log(`  Top the maker up and re-run; the cursor is saved at ${state.nextRound}.\n`);
+      break;
+    }
+
     const spec = ROUNDS.rounds[state.nextRound];
     const order = { maker: MAKER, traits: BigInt(spec.traits), data: spec.data as `0x${string}` };
     const orderHash = spec.orderHash as `0x${string}`;
