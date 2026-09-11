@@ -84,7 +84,13 @@ Findings referenced as F-n live in `DESIGN.md`.
 
 ## Housekeeping
 
-- [ ] Commit and push everything since `0f49d1e` (wallet fix, dev rewrite, nav, Address,
-      NavLink, primitives, DESIGN.md, TODO.md).
-- [ ] Kill the background anvil and dev server when done. Anvil holds the only settled
-      rounds that exist, so killing it loses the populated-receipt demo.
+- [x] Committed and pushed as `4726856` on 2026-09-11.
+- [x] Background anvil and dev server stopped.
+
+> **The fork is gone, and with it the only settled rounds that existed.** Four keeper rounds
+> and the two-bidder live fill that cleared at the runner-up's 250 bps lived only in that
+> anvil process. To demo a populated receipt or the rounds filters against real data again,
+> restart the fork and re-run: `anvil --fork-url https://mainnet.base.org --chain-id 8453
+> --block-time 1`, then the keeper with `DRY_RUN=1`, then `run-live-fill.ts`. Budget about
+> ten minutes. A fresh fork also clears the shipped-strategy collisions that stalled round
+> generation, so this is the fix for that too.
