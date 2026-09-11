@@ -50,3 +50,10 @@ web/tsconfig.tsbuildinfo
 # part worth keeping.
 design-shots/
 scripts/shoot-screens.mjs
+
+# Working folder for AI-generated art: the prompts, and whatever comes back from them.
+# Untracked on purpose -- the prompts are a scratchpad that changes every time an image
+# disappoints, and generated PNGs have no business in a git history until one is actually
+# chosen. The direction and the rules that survive live in DESIGN.md; anything CHOSEN gets
+# committed to web/public/art/ and referenced from CSS.
+art-prompts/
