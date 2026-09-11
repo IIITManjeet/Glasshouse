@@ -172,13 +172,28 @@ const writeCursor = (n) => { try { localStorage.setItem(CURSOR_KEY, String(n)); 
  *
  * Better still, the answer is remembered: after the first load the page starts from the
  * round it last saw and usually needs one or two calls to confirm nothing has moved.
+ *
+ * THE GUARD IS `>= 0`, NOT `> 0`, AND THAT IS THE WHOLE POINT OF THE MEMO.
+ *
+ * Round 0 is a real round, and for a chain with exactly one auction on it the remembered
+ * cursor IS 0. Under `> 0` the fast path never engaged there, so every poll paid the full
+ * ten-call binary search over all 300 rounds -- and `writeCursor(0)` stored a value that
+ * read back as 0 and failed the same guard on the next tick, so the memo could never warm
+ * up. The page was rate limited by the endpoint within minutes of the first keeper round
+ * landing on mainnet, having been cheap for as long as the chain was empty (round 0 not
+ * open meant an early return after ONE call). That is the worst shape for a bug: dormant
+ * until the moment the thing it guards starts working.
+ *
+ * `readCursor` cannot distinguish "nothing stored" from "stored 0" -- `Number("0") || 0`
+ * is 0 either way -- and it does not need to. Both mean "start at round 0", and asking
+ * whether round 0 is open costs one call, which is what the empty chain used to cost.
  */
 async function newestOpenedRound(rpc, book, manifest, at) {
   const rounds = manifest.rounds;
   const cursor = Math.min(readCursor(), rounds.length - 1);
 
   // Fast path: the remembered round is still the newest, or one or two have passed.
-  if (cursor > 0 && (await isOpened(rpc, book, manifest.maker, rounds[cursor].orderHash, at))) {
+  if (cursor >= 0 && (await isOpened(rpc, book, manifest.maker, rounds[cursor].orderHash, at))) {
     let i = cursor;
     while (i + 1 < rounds.length && (await isOpened(rpc, book, manifest.maker, rounds[i + 1].orderHash, at))) i++;
     writeCursor(i);

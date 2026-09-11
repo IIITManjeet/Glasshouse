@@ -66,6 +66,24 @@ Findings referenced as F-n live in `DESIGN.md`.
       counts, zero-count tabs disabled rather than hidden, `role="tablist"`. Rounds whose
       bids could not be READ are excluded from bid-based filters and named separately rather
       than being counted as having none, because "we could not read it" is not "nobody bid".
+- [x] **The deployed /evidence page was rate limited the moment mainnet had a round.**
+      Reported from the live site within an hour of the first keeper round settling. Cause
+      in `web/lib/chain.js`: `newestOpenedRound` memoises the newest opened round so a poll
+      confirms it in one or two `eth_call`s instead of binary-searching all 300, but the
+      memo was guarded by `cursor > 0` -- and the remembered cursor for a chain holding
+      exactly ONE auction is 0. The fast path never engaged, every poll paid the full
+      ~10-call search, and `writeCursor(0)` stored a value that failed the same guard on the
+      next tick, so the memo could never warm up. 10 calls per poll, every 12 s while a
+      round is live, from every visitor's IP against Base's public endpoint.
+
+      It was dormant for as long as mainnet was empty, because an unopened round 0 returns
+      early after ONE call — so the code was cheapest precisely while it was untested, and
+      became expensive at the moment the thing it guards started working. Fix is `>= 0`.
+
+      `test/js/chain-call-budget.test.js` asserts the PRICE of a poll, not just its answer:
+      10 calls before, 3 after. Its third case — "still finds the newest round when many are
+      open" — passes under BOTH guards, which is the point. Correctness was never broken, so
+      no correctness test could have caught this, and `chain.js` had no coverage at all.
 
 ## Backend — open
 
@@ -77,43 +95,37 @@ Findings referenced as F-n live in `DESIGN.md`.
   mainnet exactly once, on the first keeper round, unless the maker happens to have approved
   WETH beforehand. Fix: approve both tokens in the same pre-flight block that already does USDC.
 
-- [!] **Run the keeper against Base mainnet — BLOCKED ON YOU, twice over.**
+- [x] **The keeper has run against Base mainnet.** 2026-09-12, round 0, one round only.
+  The two things that gated it are gone: `scripts/wrap-weth.ts` wraps through the Hardhat
+  keystore (so the deployer key never leaves it for a `cast --interactive` paste), and
+  0.0005 WETH now backs the 0.0004 of declared depth. The whole round -- approve, ship,
+  open, commit, reveal, settle, dock -- cost 0.0000028 ETH.
 
-  1. **The private key is in Hardhat's production keystore**, which prompts for a password
-     interactively. A non-interactive shell cannot decrypt it, so this command has to be run
-     by a human at a terminal. Nothing else in this list has that property.
-  2. **The maker holds 0 WETH on mainnet** and the keeper declares 0.0004 WETH of depth per
-     round, so `ship` reverts before anything else happens. Checked 2026-09-11: ETH
-     0.001364, WETH 0 (allowance 0), USDC 2.239349 (allowance 200).
+  `verify-run` went from **3 passed / 2 failed / 3 n/a** to **6 passed / 1 failed / 1 n/a**:
 
-  Minimum-spend recipe, in order. Total cost is Base gas for about eight transactions, which
-  is cents, plus wrapping 0.0005 ETH that stays yours as WETH:
+  - `LIFECYCLE` and `REPLAY` flipped to pass. REPLAY is the one that matters -- the
+    settlement re-derived from the raw reveals matches what `settle()` emitted, winner and
+    clearing price both, without importing the contract's rule, the subgraph's copy of it,
+    or the page's. It had never run against mainnet before.
+  - `PHASE` went n/a -> pass, and `SITE_DERIVATION` now checks its clearing price against
+    a real settled round instead of against zero of them.
+  - `PRICE_SET_BY` went n/a -> **FAIL**, which is the honest move rather than a regression:
+    there is now a settled auction with a winner, so the check can run, and it reports that
+    the winner cleared at the reserve because the house was the only bidder. "Ran, and the
+    second-price arm was not exercised" is a different claim from "nothing to run on", and
+    the verifier is right to stop saying the second one.
 
-  ```
-  # 1. wrap a little ETH so the maker can back one round's declared depth
-  cast send 0x4200000000000000000000000000000000000006 "deposit()"     --value 0.0005ether --rpc-url https://mainnet.base.org --interactive
+  Snapshot regenerated and committed, so `/evidence` shows this rather than the old 3/2/3.
 
-  # 2. one round only. The keeper approves both legs itself now.
-  KEEPER_MAX_ROUNDS=1 npx hardhat run scripts/keeper.ts --network base
-
-  # 3. prove it from the logs, independently of the subgraph
-  node scripts/verify-run.mjs --from 50965408
-  ```
-
-  After step 2, `LIFECYCLE` and `REPLAY` in verify-run flip from FAIL to pass, the subgraph
-  mapping runs on real data for the first time, the Record page has something to show and the
-  advisor gets a non-empty window. `PRICE_SET_BY` stays n/a until a second bidder reveals
-  above the reserve, which needs a second funded wallet.
-
-  Keep 0.0008 ETH or so unspent for gas; the wrap in step 1 comes out of the same balance.
 - [ ] **A second bidder revealing above the reserve on mainnet**, so `PRICE_SET_BY` has
   something to confirm. The fork proves the second-price arm works; mainnet has never seen it.
 - [ ] Cross-check the live subgraph's `Auction` entity against `verify-run`'s independent
   derivation for the same auction. Only way to exercise the AssemblyScript mapping on real
-  data; replaces the regex drift guard with a real one.
+  data; replaces the regex drift guard with a real one. **No longer blocked** -- round 0
+  settled on mainnet 2026-09-12, so the mapping finally has a settlement to run on.
 - [ ] ~~`web/lib/bid.js` and `chain.js` to TypeScript~~ — **recommend NOT doing this before
-      submission.** 1,400 lines of wallet and signing code with no test coverage, on the path
-      every bid takes. A type migration there is a large diff with no observable benefit to a
+      submission.** 1,400 lines of wallet and signing code, nearly all of it untested (only
+      `decodeAuction` and the poll's call budget are covered), on the path every bid takes. A type migration there is a large diff with no observable benefit to a
       judge and a real chance of breaking the one flow that must work live. It is the right
       thing to do the week after, not the day before.
 
