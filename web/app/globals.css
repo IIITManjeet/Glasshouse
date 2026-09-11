@@ -90,6 +90,28 @@ html {
   -webkit-font-smoothing: antialiased;
 }
 
+/* NO SINGLE WORD MAY SET THE WIDTH OF THE PAGE.
+
+   DEFENSIVE, NOT A FIX. This was added while chasing an apparent overflow at 390px that
+   turned out not to exist -- the captures were cropped by headless Chrome's minimum window
+   width, not clipped by the layout (DESIGN.md F-8, withdrawn). Measured properly, with a
+   real 390px viewport, nothing on this site overflows.
+
+   It is kept because the reasoning behind it is still sound: this app prints 42-character
+   hex addresses, and an unbreakable 42-character string has a min-content width wider than
+   a phone. Nothing today places one where that would blow out a layout -- the footer is the
+   only unbroken one, and it wraps -- but the next address added to a narrow column would
+   have, silently.
+
+   `anywhere` and not `break-word` on purpose: only `anywhere` participates in min-content
+   sizing, so only `anywhere` stops a long token setting a container's minimum width.
+
+   Safe as a global: `anywhere` only breaks a word that would otherwise overflow, so
+   ordinary prose at ordinary widths is untouched. */
+html {
+  overflow-wrap: anywhere;
+}
+
 /* Every number that came from a chain, a test or a computation is monospace with tabular
    figures, so columns of them line up and a changing digit does not shift the ones beside
    it. That rule is from ui-spec section 2.1 and it is why this is global rather than a
@@ -97,6 +119,132 @@ html {
 .tnum {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+}
+
+/* ---- INTERACTIVE OR NOT: the one distinction this design language was missing ----
+   DESIGN.md F-3 and F-4, and the decision recorded there.
+
+   THE BUG THESE REPLACE. A provenance chip -- a <span> that does nothing -- and a <button>
+   were both "1px accent border, accent text, uppercase mono, small". They differed by a few
+   pixels of padding. People tried to click the chip and did not know the button was a
+   button.
+
+   WHY IT HAPPENED, and it is worth naming because it is a trap any austere design falls
+   into: uppercase, letter-spacing, monospace and small size read as ENGINEERING TONE, not as
+   affordance. No design system studied -- Primer, Carbon, Polaris, Atlassian, Radix -- uses
+   any of them as an interactivity signal. We were signalling with the only vocabulary we
+   had, and it was the wrong vocabulary.
+
+   THE RULE NOW, five redundant signals rather than none:
+     a label   has a soft fill, NO border, quiet text, a default cursor, and no states.
+     a control has a border, accent text, a pointer, a hover that INVERTS, and a focus ring.
+
+   ONE PRIMARY PER VIEW. `.btn-primary` is a filled accent and is the loudest thing on any
+   screen; two of them on one page means neither is primary. That is a rule about the page,
+   not about the CSS, and it is the half most likely to be forgotten. */
+
+/* A label. Never focusable, never clickable -- if you are reaching for :hover here, you
+   want a control instead. Carbon's read-only Tag is the model: not in the tab order, no
+   mouse affordance beyond the default cursor. */
+.chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-chip);
+  background: color-mix(in srgb, var(--color-glass) 14%, transparent);
+  color: var(--color-ink-soft);
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: default;
+}
+
+/* The shared control shape. Size is deliberately constant across every variant: hierarchy
+   here is carried by FILL, never by scale. A bigger button reads as clumsy against a
+   monospace grid, and every system studied varies fill and keeps size fixed. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 6px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+/* One per view. The only filled thing on the page. */
+.btn-primary {
+  background: var(--color-glass);
+  border-color: var(--color-glass);
+  /* The ground, not white: on the light theme the accent is dark enough for pale text, and
+     on the dark theme the accent is light enough that it needs dark text. `--color-ground`
+     flips with the theme and is correct in both without a second rule. */
+  color: var(--color-ground);
+  font-weight: 500;
+}
+.btn-primary:hover {
+  background: color-mix(in srgb, var(--color-glass) 88%, var(--color-ink));
+}
+
+/* The workhorse. A bordered surface that inverts on hover, which is the moment it proves
+   it was a control all along. */
+.btn-secondary {
+  background: transparent;
+  border-color: var(--color-glass);
+  color: var(--color-glass);
+}
+.btn-secondary:hover {
+  background: var(--color-glass);
+  color: var(--color-ground);
+}
+
+/* Primer's "invisible": for the many small actions that should disappear until reached for.
+   Bare text, with a wash appearing on hover so it is still discoverably a control. */
+.btn-tertiary {
+  background: transparent;
+  border-color: transparent;
+  color: var(--color-ink-soft);
+}
+.btn-tertiary:hover {
+  background: var(--color-glass-soft);
+  color: var(--color-ink);
+}
+
+.btn-danger {
+  background: transparent;
+  border-color: var(--color-brick);
+  color: var(--color-brick);
+}
+.btn-danger:hover {
+  background: var(--color-brick);
+  color: var(--color-ground);
+}
+
+/* Identical on every variant, on purpose. Primer and Radix are both strict that a focus
+   ring must never depend on which variant it is attached to -- a keyboard user should not
+   have to learn four indicators. :focus-visible so a mouse click does not draw it. */
+.btn:focus-visible {
+  outline: 2px solid var(--color-glass);
+  outline-offset: 2px;
+}
+
+/* Disabled says "not now", which is different from "not a control". It keeps the shape and
+   loses the affordance. */
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  background: var(--color-sunk);
+  border-color: var(--color-rule);
+  color: var(--color-ink-faint);
+  cursor: not-allowed;
+}
+.btn:disabled:hover,
+.btn[aria-disabled="true"]:hover {
+  background: var(--color-sunk);
+  color: var(--color-ink-faint);
 }
 
 /* A sealed bid is a value that EXISTS and cannot be read yet. Hatching says that. A

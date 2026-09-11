@@ -1,9 +1,16 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useBoard } from "@/components/BoardProvider";
 import { SourceChip } from "@/components/Auction";
 import { RoundsTable } from "@/components/RoundsTable";
+import {
+  ROUND_FILTERS,
+  RoundsFilterTabs,
+  unreadableCount,
+  type RoundFilterId,
+} from "@/components/RoundsFilter";
 import { Loading } from "@/components/Loading";
 
 /**
@@ -25,6 +32,20 @@ import { Loading } from "@/components/Loading";
  */
 export default function RoundsPage() {
   const { auctions, head, source, isFork, loading, error, refresh } = useBoard();
+
+  // The selected filter lives in state rather than the URL. A shareable /rounds?filter=
+  // would be better and is a deliberate omission for now: `useSearchParams` forces a
+  // Suspense boundary in a static export, and the one on /evidence already cost this
+  // project six prerendered figures down to two before it was caught
+  // (see the note at the top of app/evidence/page.tsx). Not worth re-learning that here
+  // for a filter whose default shows everything.
+  const [filterId, setFilterId] = useState<RoundFilterId>("all");
+  const filter = ROUND_FILTERS.find((f) => f.id === filterId) ?? ROUND_FILTERS[0];
+  const shown = useMemo(
+    () => auctions.filter((a) => filter.match(a, head)),
+    [auctions, head, filter],
+  );
+  const unreadable = unreadableCount(auctions);
 
   const caption =
     source === "chain"
@@ -83,7 +104,41 @@ export default function RoundsPage() {
           </p>
         ) : (
           <div className="mt-4">
-            <RoundsTable auctions={auctions} head={head} />
+            <RoundsFilterTabs
+              auctions={auctions}
+              head={head}
+              active={filterId}
+              onChange={setFilterId}
+            />
+            <p className="mt-2 text-[0.78rem] text-ink-faint">
+              {filter.blurb}{" "}
+              <span className="tnum text-ink-soft">
+                Showing {shown.length} of {auctions.length}.
+              </span>
+              {unreadable > 0 && (
+                <>
+                  {" "}
+                  <span className="text-amber">
+                    {unreadable} round{unreadable === 1 ? "" : "s"} could not be read, so
+                    they are not counted in any bid-based filter rather than being counted
+                    as having none.
+                  </span>
+                </>
+              )}
+            </p>
+
+            {shown.length === 0 ? (
+              // An empty result is a real answer about the chain, not a failure, and it
+              // says which question it is the answer to.
+              <p className="mt-4 border border-rule bg-raised rounded-card px-4 py-6 text-sm text-ink-soft">
+                No round matches &ldquo;{filter.label}&rdquo; in the {auctions.length} round
+                {auctions.length === 1 ? "" : "s"} this build can see.
+              </p>
+            ) : (
+              <div className="mt-3">
+                <RoundsTable auctions={shown} head={head} />
+              </div>
+            )}
           </div>
         )}
 

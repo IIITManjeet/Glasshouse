@@ -18,5 +18,22 @@ const nextConfig = {
   // Pinned because the repo root also has a lockfile and Next would otherwise infer the
   // wrong workspace root, quietly resolving modules from the contracts project.
   turbopack: { root: import.meta.dirname },
+  // DEV PARITY ONLY, and it has to be said plainly: `output: "export"` cannot honour
+  // rewrites, so this does nothing to the built site. Production gets /profile/:address
+  // from the edge rewrite in vercel.json, and that is the only thing serving it there.
+  //
+  // It exists because without it the two environments disagree about a URL the app itself
+  // generates: the address form in app/account/page.tsx navigates to /profile/<addr>, which
+  // 404s under `next dev` and works in production. A form that is broken only on localhost
+  // is how a real bug gets dismissed as "just the dev server".
+  //
+  // Keep this in step with vercel.json by hand. Two declarations of one route is a cost;
+  // the alternative is a dev server that lies about the routing.
+  async rewrites() {
+    return [
+      { source: "/profile/:address", destination: "/account/?a=:address" },
+      { source: "/profile/:address/", destination: "/account/?a=:address" },
+    ];
+  },
 };
 export default nextConfig;

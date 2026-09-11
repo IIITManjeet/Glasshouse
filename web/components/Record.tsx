@@ -91,7 +91,9 @@ export function Record({ address }: { address: string }) {
         <span className="font-mono text-[0.72rem] uppercase tracking-[0.14em] text-ink">
           The whole record
         </span>
-        <span className="border border-glass px-2 py-0.5 font-mono text-[0.64rem] uppercase tracking-[0.12em] text-glass">
+        {/* A label, not a control: .chip has a soft fill, no border and no hover, so it can
+            no longer be mistaken for the button it used to look identical to. */}
+        <span className="chip">
           Indexed · GlasshouseBook subgraph
           {res.head && ` · as of block ${num(res.head.number)}`}
         </span>

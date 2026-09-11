@@ -1,29 +1,13 @@
 "use client";
 
 import { type Auction, livePhase } from "@/lib/useAuctions";
+// The local copy of this used to point at Basescan and nowhere else. It now comes from
+// components/Address.tsx, which sends the address text to the bidder's own record here and
+// keeps Basescan on a separate arrow.
+import { AddressLink } from "./Address";
 
 const num = (n?: number | null) =>
   n === null || n === undefined || Number.isNaN(n) ? "—" : n.toLocaleString("en-US");
-
-// Duplicated from components/Auction.tsx rather than imported: that file exports no such
-// helper, and this task's brief is to touch nothing outside these two new files -- adding
-// an export there would mean editing a file that is out of scope.
-const short = (a?: string | null) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "—");
-const basescan = (a: string) => `https://basescan.org/address/${a}`;
-
-function AddressLink({ addr }: { addr: string }) {
-  return (
-    <a
-      href={basescan(addr)}
-      target="_blank"
-      rel="noopener noreferrer"
-      title={addr}
-      className="tnum text-glass underline decoration-rule underline-offset-2 hover:decoration-glass"
-    >
-      {short(addr)}
-    </a>
-  );
-}
 
 /**
  * The phase chip for one row.

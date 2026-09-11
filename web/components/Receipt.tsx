@@ -1,5 +1,7 @@
 "use client";
 
+import { AddressLink } from "./Address";
+
 import { useState } from "react";
 import type { Auction, Source } from "@/lib/useAuctions";
 
@@ -135,14 +137,11 @@ export function Receipt({ a, source }: { a: Auction; source: Source }) {
         <Field label="winner">
           {won ? (
             <>
-              <a
-                href={`https://basescan.org/address/${a.bestBidder}`}
-                target="_blank"
-                rel="noopener"
-                className="tnum text-glass hover:underline"
-              >
-                {short(a.bestBidder)}
-              </a>
+              {/* The winner's own record is the first destination now; Basescan is the
+                  arrow beside it. A judge reading this receipt is one click from what the
+                  index knows about this bidder, which is the question the receipt provokes
+                  and could not previously answer. */}
+              <AddressLink addr={a.bestBidder} />
               <Copy text={a.bestBidder!} label="winner address" />
               {winnerTx && (
                 <a

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import Link from "next/link";
+import { NavLink } from "@/components/NavLink";
 import { Newsreader, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
@@ -95,10 +96,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/" className="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-ink-faint hover:text-glass">
                 Glasshouse <span className="text-glass">/</span> 1inch SwapVM <span className="text-glass">/</span> opcode 0x2e
               </Link>
+              {/* NavLink marks the page you are on (DESIGN.md F-6). Four identical links
+                  gave a visitor arriving from a shared link no way to tell where they had
+                  landed, which is the cheapest orientation cue there is. */}
               <nav className="flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[0.7rem] uppercase tracking-[0.12em] text-ink-faint">
-                <Link href="/board" className="hover:text-glass">Board</Link>
-                <Link href="/rounds" className="hover:text-glass">Rounds</Link>
-                <Link href="/evidence" className="hover:text-glass">Evidence</Link>
+                <NavLink href="/board">Board</NavLink>
+                <NavLink href="/rounds">Rounds</NavLink>
+                <NavLink href="/evidence">Evidence</NavLink>
+                {/* The record page had no entry in this nav at all: it was reachable only
+                    from a link inside StatusBar, whose job is provenance rather than
+                    navigation, sat beside the rehearsal toggle. That hid the one surface
+                    where the subgraph's own fields live -- provenance, and bids sealed
+                    versus opened -- behind a URL you had to already know. */}
+                <NavLink href="/account">Bidders</NavLink>
               </nav>
             </header>
             {/* The provenance line, on every page, so any screenshot carries it. The

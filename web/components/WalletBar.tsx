@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAccount, useChainId, useConnect, useDisconnect, useSwitchChain } from "wagmi";
+import { useAccount, useChainId, useConnect, useDisconnect, useSwitchChain, type Connector } from "wagmi";
 import { base } from "wagmi/chains";
 // Plain ESM, deliberately untyped: bid.js is the same file the static page and the Node
 // tests load, and adding a .d.ts would create a second place for the shape to drift.
@@ -10,12 +10,15 @@ import { explainRevert } from "@/lib/bid.js";
 
 const short = (a?: string | null) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "—");
 
-// The visual idiom is Auction.tsx's: mono, small caps tracking, a rule border, theme tokens
-// only. No brand colour, no filled buttons except where urgency is the message.
-const BTN = "border px-3 py-1.5 font-mono text-[0.75rem] tracking-[0.02em] transition-colors";
-const BTN_IDLE = "border-glass text-glass hover:bg-glass-soft";
-const BTN_WARN = "border-brick text-brick hover:bg-brick-soft";
-const BTN_OFF = "cursor-not-allowed border-rule bg-sunk text-ink-faint";
+// These now come from the shared control primitives in app/globals.css (DESIGN.md F-3/F-4)
+// rather than being defined here. The old rule -- "no filled buttons except where urgency is
+// the message" -- produced a page where urgency was never the message and nothing was ever
+// emphasised, while a non-clickable provenance chip wore the same border and the same accent
+// text as this button. Connect wallet is the primary action of /board and now looks like it.
+const BTN = "btn";
+const BTN_IDLE = "btn-primary";
+const BTN_WARN = "btn-danger";
+const BTN_OFF = "";
 
 /**
  * The wallet surface: connect, the connected address, and the wrong-chain switch.
@@ -45,7 +48,7 @@ const BTN_OFF = "cursor-not-allowed border-rule bg-sunk text-ink-faint";
  */
 export function WalletBar({ className = "" }: { className?: string }) {
   const [mounted, setMounted] = useState(false);
-  const [hasInjected, setHasInjected] = useState(false);
+  const [available, setAvailable] = useState<readonly Connector[]>([]);
   const [copied, setCopied] = useState(false);
   const [note, setNote] = useState<string | null>(null);
 
@@ -59,11 +62,65 @@ export function WalletBar({ className = "" }: { className?: string }) {
 
   useEffect(() => {
     setMounted(true);
-    // Whether an injected provider exists is a browser fact, so it is read after mount:
-    // this app is a static export, the prerendered HTML has no `window`, and reading it
-    // during render would make the first client render disagree with the server's.
-    setHasInjected(typeof window !== "undefined" && !!(window as { ethereum?: unknown }).ethereum);
   }, []);
+
+  // WHICH CONNECTORS CAN ACTUALLY CONNECT, asked of the connectors rather than of
+  // `window.ethereum`.
+  //
+  // This used to be a single synchronous read of `window.ethereum` in a mount effect, and
+  // it was wrong in two ways that both present as "the button says no wallet found and
+  // cannot be clicked" while a wallet sits right there in the toolbar.
+  //
+  //   1. EXTENSIONS INJECT LATE. A one-shot read at mount can run before the extension has
+  //      written to `window`, and nothing ever re-read it, so the answer stayed `false` for
+  //      the life of the page.
+  //   2. EIP-6963 WALLETS NEED NOT SET `window.ethereum` AT ALL. That is the whole point of
+  //      the standard -- it replaced the single global that wallets used to fight over.
+  //      Rabby, and MetaMask with "use as default wallet" turned off, announce themselves
+  //      by event and may leave the global undefined. wagmi already discovers these
+  //      (`multiInjectedProviderDiscovery` is on by default) and puts them in `connectors`;
+  //      this component was ignoring that and asking the obsolete question instead.
+  //
+  // So: ask each connector for its provider, which is the question actually being answered,
+  // and re-ask whenever a wallet announces itself. `connectors[0]` is gone with it -- with
+  // discovery on, index 0 is whichever wallet happened to announce first, not necessarily
+  // one that works.
+  useEffect(() => {
+    let cancelled = false;
+
+    const probe = async () => {
+      const found: Connector[] = [];
+      for (const c of connectors) {
+        try {
+          if (await c.getProvider()) found.push(c);
+        } catch {
+          // A connector with no provider throws rather than returning undefined in some
+          // versions. Not an error worth showing: it is the answer "this one is absent".
+        }
+      }
+      if (!cancelled) setAvailable(found);
+    };
+
+    // Asking is what makes EIP-6963 wallets announce; they reply with an announce event.
+    try {
+      window.dispatchEvent(new Event("eip6963:requestProvider"));
+    } catch {
+      /* pre-6963 browser; the probe below still finds a legacy injected provider */
+    }
+    void probe();
+
+    const onAnnounce = () => void probe();
+    window.addEventListener("eip6963:announceProvider", onAnnounce);
+    // One late sweep for a legacy extension that injects after first paint and announces
+    // nothing, which no event can tell us about.
+    const t = setTimeout(() => void probe(), 1000);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("eip6963:announceProvider", onAnnounce);
+      clearTimeout(t);
+    };
+  }, [connectors]);
 
   // Errors become a sentence and then clear themselves; a wallet error that stays on screen
   // after the visitor has fixed it is noise. The wagmi hook's own error is reset with it so
@@ -92,13 +149,17 @@ export function WalletBar({ className = "" }: { className?: string }) {
   // place for that judgement.
   const wrongChain = isConnected && chainId !== undefined && chainId !== base.id;
 
-  const injected = connectors[0];
+  // The first connector that actually reported a provider. With EIP-6963 discovery on,
+  // `connectors[0]` was whichever wallet announced first -- including, when no wallet is
+  // installed at all, the bare injected() connector that can never connect.
+  const injected = available[0];
+  const hasInjected = available.length > 0;
 
   function body() {
     // Before mount the answer is genuinely unknown, and a disabled control has to say why
     // it is disabled, so it says that rather than showing a dead `Connect wallet`.
     if (!mounted) {
-      return <span className={`${BTN} ${BTN_OFF} inline-block`}>Reading wallet state…</span>;
+      return <span className={`${BTN}`} aria-disabled="true">Reading wallet state…</span>;
     }
 
     if (!hasInjected || !injected) {
@@ -106,7 +167,7 @@ export function WalletBar({ className = "" }: { className?: string }) {
         <button
           type="button"
           disabled
-          className={`${BTN} ${BTN_OFF}`}
+          className={`${BTN}`}
           title="Bidding needs a browser wallet on Base. Everything else on this page is read from the chain and works without one."
         >
           No wallet found — the board reads fine without one
@@ -117,7 +178,7 @@ export function WalletBar({ className = "" }: { className?: string }) {
     if (!isConnected) {
       if (connectStatus === "pending") {
         return (
-          <button type="button" disabled className={`${BTN} ${BTN_OFF}`}>
+          <button type="button" disabled className={`${BTN}`}>
             Confirm in wallet…
           </button>
         );
@@ -132,7 +193,7 @@ export function WalletBar({ className = "" }: { className?: string }) {
     if (wrongChain) {
       if (switchStatus === "pending") {
         return (
-          <button type="button" disabled className={`${BTN} ${BTN_OFF}`}>
+          <button type="button" disabled className={`${BTN}`}>
             Confirm in wallet…
           </button>
         );

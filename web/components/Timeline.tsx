@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AddressLink } from "./Address";
 import {
   fetchAuctionTimeline,
   subgraphConfigured,
@@ -121,7 +122,7 @@ export function Timeline({ maker, orderHash }: { maker: string; orderHash: strin
         <span className="font-mono text-[0.72rem] uppercase tracking-[0.14em] text-ink">
           What happened, in order
         </span>
-        <span className="border border-glass px-2 py-0.5 font-mono text-[0.64rem] uppercase tracking-[0.12em] text-glass">
+        <span className="chip">
           Indexed · GlasshouseBook subgraph
           {res.head && ` · as of block ${num(res.head.number)}`}
         </span>
@@ -157,15 +158,7 @@ export function Timeline({ maker, orderHash }: { maker: string; orderHash: strin
           {a.bids.map((b) => (
             <li key={b.commitIdx} className="flex flex-wrap items-baseline gap-x-2 text-[0.82rem]">
               <span className="tnum text-ink-faint">#{b.commitIdx}</span>
-              <a
-                href={`https://basescan.org/address/${b.bidder.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={b.bidder.id}
-                className="tnum text-glass underline decoration-rule underline-offset-2 hover:decoration-glass"
-              >
-                {short(b.bidder.id)}
-              </a>
+              <AddressLink addr={b.bidder.id} />
               <span className="font-mono text-[0.64rem] uppercase tracking-[0.1em] text-ink-faint">
                 {PROVENANCE_CHIP[b.bidder.provenance]}
               </span>

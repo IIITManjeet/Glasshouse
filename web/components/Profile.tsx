@@ -9,22 +9,12 @@ const num = (n?: number | null) =>
 // by components/RoundsTable.tsx: Auction.tsx exports no such helper, and this task's brief
 // is to touch nothing outside its own two new files.
 const short = (a?: string | null) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "—");
-const basescan = (a: string) => `https://basescan.org/address/${a}`;
 const eq = (a: string | null | undefined, b: string) => !!a && a.toLowerCase() === b.toLowerCase();
 
-function AddressLink({ addr }: { addr: string }) {
-  return (
-    <a
-      href={basescan(addr)}
-      target="_blank"
-      rel="noopener noreferrer"
-      title={addr}
-      className="tnum text-glass underline decoration-rule underline-offset-2 hover:decoration-glass"
-    >
-      {short(addr)}
-    </a>
-  );
-}
+// Was a local copy pointing at Basescan only; now the shared one, which leads with the
+// address's own record here. On this page that also means a visitor can walk from one
+// bidder to another rather than reaching a dead end at a block explorer.
+import { AddressLink } from "./Address";
 
 // The three the mapping emits, and ONLY those -- subgraph/src/provenance.ts is the single
 // place these values are produced. This said "UNLISTED" until web/lib/subgraph.ts was
