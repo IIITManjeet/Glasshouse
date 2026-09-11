@@ -38,7 +38,10 @@ export default function BoardPage() {
         <div>
           <p className="panel-id">GH 01 · Book 0xc4ea…FFbf · Base 8453</p>
           <h1 className="mt-2">The board</h1>
-          <p className="mt-3 max-w-xl text-ink-soft">
+          {/* `lede` sets the prose face inside the .tape register. A terminal shows VALUES in
+              monospace; its documentation is not set in monospace either, and this sentence
+              is documentation. See DESIGN.md F-5 -- the register stays, prose leaves it. */}
+          <p className="lede mt-3 max-w-xl text-ink-soft">
             The round happening right now, and the panel to join it. Phases are counted in
             blocks, because blocks are what the contract enforces — seconds are an estimate.
           </p>

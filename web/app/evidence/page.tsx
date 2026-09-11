@@ -141,7 +141,7 @@ export default function EvidencePage() {
         <h1 className="mt-2">
           Everything here is <em className="text-glass not-italic">checkable</em>, and says how.
         </h1>
-        <p className="mt-4 text-ink-soft">
+        <p className="lede mt-4 text-ink-soft">
           Some of this was read from Base and some came from a unit test with mock tokens and
           assigned valuations. Which is which is printed on each figure rather than left for you
           to guess — including where the numbers are less flattering.

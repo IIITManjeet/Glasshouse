@@ -83,7 +83,7 @@ export default function RoundsPage() {
           <button
             type="button"
             onClick={refresh}
-            className="rounded-control border border-rule px-2 py-1 font-mono text-[0.7rem] uppercase tracking-[0.12em] text-ink-soft hover:border-glass hover:text-glass"
+            className="btn btn-tertiary"
           >
             refresh
           </button>

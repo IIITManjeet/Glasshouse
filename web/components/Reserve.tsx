@@ -147,7 +147,7 @@ export function ReservePanel({ auctions, source, head }: { auctions: Auction[]; 
                 window.prompt("Copy this:", cast);
               }
             }}
-            className="rounded-control border border-rule px-2 py-1 font-mono text-[0.66rem] uppercase tracking-[0.12em] text-ink-soft hover:border-glass hover:text-glass"
+            className="btn btn-tertiary"
           >
             {copied ? "Copied ✓" : "Copy"}
           </button>

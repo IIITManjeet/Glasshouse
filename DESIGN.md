@@ -79,7 +79,7 @@ number beside every capture, so the next person cannot make this mistake quietly
 
 ---
 
-## F-7 🔴 The landing page's only call to action can render empty
+## F-7 ⚪ WITHDRAWN — the CTA panel does populate; the capture was taken too early
 
 **Symptom.** In capture, the panel between the bps figures and the "One round, end to end"
 diagram is an empty bordered box with a caption under it and nothing inside. That box is
@@ -616,3 +616,24 @@ is a handful of `font-sans` class additions, it leaves every value, address, blo
 and command exactly as it is, and it does not touch the register that carries the meaning.
 
 **Left open deliberately.** It needs a decision, not a patch.
+
+## F-7 ⚪ WITHDRAWN, and a limitation of the capture rig worth knowing
+
+The landing page's CTA panel was recorded as rendering empty, leaving the page with no
+action of any kind. Re-shot against production with a 9s settle, it populates correctly:
+`OPEN · Round — · 2 sealed · 0 opened · Open the board →`. The first capture caught `<Swap>`
+mid-transition. Third finding withdrawn this session for the same reason as F-8 and F-9.
+
+**The rig has one more blind spot, recorded so it is not reported as a bug.** The landing
+page wraps its sections in `<Reveal>`, which animates them in on scroll. A headless full-page
+capture never scrolls, so anything below the first viewport never intersects and stays at
+zero opacity — the capture shows a tall blank region where the "one round, end to end"
+diagram is. That is the animation working, not the page failing. Judging anything below the
+fold from these images requires scrolling the page first, which `shoot-screens.mjs` does not
+currently do.
+
+**The tally for the session: three findings recorded from screenshots, three withdrawn.**
+Every one was the tool or the environment rather than the product — a cropped window, a dev
+overlay, a transition caught early. The findings that survived were the ones found by reading
+code or by measuring inside the page. That is the lesson worth carrying forward, and it is
+why the rig now prints a measurement beside every image.

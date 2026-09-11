@@ -247,6 +247,23 @@ html {
   color: var(--color-ink-faint);
 }
 
+/* PROSE LEAVES THE MONOSPACE REGISTER. DESIGN.md F-5.
+
+   `.tape` sets the mono family on the tool routes deliberately -- "a landing page persuades,
+   a terminal reports" (components/Theme.tsx) -- and that decision stands. But monospace at
+   paragraph length is slow to read, and it flattens the one distinction this interface most
+   needs to keep: a sentence a person wrote versus a value a machine produced.
+
+   The resolution is narrow on purpose. A terminal shows VALUES in monospace; its
+   documentation is not set in monospace either. So the explanatory sentence under a heading
+   takes the prose face and everything else -- every address, block number, bps figure and
+   command -- stays exactly as it was. Slightly looser leading because the prose face at the
+   same size sits tighter than the mono did. */
+.lede {
+  font-family: var(--font-sans);
+  line-height: 1.6;
+}
+
 /* A sealed bid is a value that EXISTS and cannot be read yet. Hatching says that. A
    spinner would say "loading", which is a different and false claim. */
 .hatch {

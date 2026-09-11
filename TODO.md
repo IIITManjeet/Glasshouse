@@ -28,10 +28,11 @@ Findings referenced as F-n live in `DESIGN.md`.
 - [x] **F-9 withdrawn** — the floating circle is the Next.js dev indicator, injected by
   `next dev` and absent from production. Verified against the deployed site and the built
   chunks. Second finding withdrawn for the same reason as F-8.
-- [ ] **F-7 the landing page's only CTA can render empty.** Confirm in a real browser whether
-  it is a genuine empty state or a capture artefact before changing anything.
-- [ ] Apply `.btn` / `.chip` primitives to the remaining controls — `BidPanel`, `Reserve`'s
-  copy button, `DemoMode`, the rehearsal toggle in `StatusBar`.
+- [x] **F-7 withdrawn** — the CTA panel populates; the capture was taken mid-transition.
+- [x] `.btn-tertiary` applied to the three ad-hoc controls (`rounds` refresh, `Receipt`,
+      `Reserve`). `BidPanel` and the `StatusBar` rehearsal toggle still carry bespoke styles;
+      both are stateful toggles rather than plain buttons, so they want a `.btn-toggle`
+      variant rather than being forced into an existing one.
 - [ ] Art overlays, at most three, per the art direction in `DESIGN.md`. Last, and safe to cut.
 
 ## Frontend — done
@@ -52,7 +53,7 @@ Findings referenced as F-n live in `DESIGN.md`.
 
 ## Backend — open
 
-- [ ] **The keeper approves USDC to Aqua but never WETH** (`scripts/keeper.ts:191` checks and
+- [x] **The keeper now approves BOTH legs to Aqua.** Was USDC only (`scripts/keeper.ts:191` checks and
   approves only the USDC allowance). `ship` declares depth in BOTH tokens, so with a zero
   WETH allowance the very first round reverts — custom error `0x879f237b` carrying the router
   and the order hash, which reads like a duplicate-strategy error and is not one. Found on the
@@ -60,11 +61,35 @@ Findings referenced as F-n live in `DESIGN.md`.
   mainnet exactly once, on the first keeper round, unless the maker happens to have approved
   WETH beforehand. Fix: approve both tokens in the same pre-flight block that already does USDC.
 
-- [!] **Run the keeper against Base mainnet.** BLOCKED on a go-ahead: it costs real gas.
-  This is the single change that makes the whole product real — it flips `LIFECYCLE` and
-  `REPLAY` in `verify-run`, exercises the subgraph mapping on real data, fills the Record
-  page and gives the advisor a non-empty window. Mainnet still has 1 auction, 2 commits,
-  **0 reveals, 0 fills, 0 settlements**.
+- [!] **Run the keeper against Base mainnet — BLOCKED ON YOU, twice over.**
+
+  1. **The private key is in Hardhat's production keystore**, which prompts for a password
+     interactively. A non-interactive shell cannot decrypt it, so this command has to be run
+     by a human at a terminal. Nothing else in this list has that property.
+  2. **The maker holds 0 WETH on mainnet** and the keeper declares 0.0004 WETH of depth per
+     round, so `ship` reverts before anything else happens. Checked 2026-09-11: ETH
+     0.001364, WETH 0 (allowance 0), USDC 2.239349 (allowance 200).
+
+  Minimum-spend recipe, in order. Total cost is Base gas for about eight transactions, which
+  is cents, plus wrapping 0.0005 ETH that stays yours as WETH:
+
+  ```
+  # 1. wrap a little ETH so the maker can back one round's declared depth
+  cast send 0x4200000000000000000000000000000000000006 "deposit()"     --value 0.0005ether --rpc-url https://mainnet.base.org --interactive
+
+  # 2. one round only. The keeper approves both legs itself now.
+  KEEPER_MAX_ROUNDS=1 npx hardhat run scripts/keeper.ts --network base
+
+  # 3. prove it from the logs, independently of the subgraph
+  node scripts/verify-run.mjs --from 50965408
+  ```
+
+  After step 2, `LIFECYCLE` and `REPLAY` in verify-run flip from FAIL to pass, the subgraph
+  mapping runs on real data for the first time, the Record page has something to show and the
+  advisor gets a non-empty window. `PRICE_SET_BY` stays n/a until a second bidder reveals
+  above the reserve, which needs a second funded wallet.
+
+  Keep 0.0008 ETH or so unspent for gas; the wrap in step 1 comes out of the same balance.
 - [ ] **A second bidder revealing above the reserve on mainnet**, so `PRICE_SET_BY` has
   something to confirm. The fork proves the second-price arm works; mainnet has never seen it.
 - [ ] Cross-check the live subgraph's `Auction` entity against `verify-run`'s independent

@@ -184,14 +184,27 @@ async function main() {
 
   // One approval covers every round: ship moves nothing, and each fill pulls only what it
   // needs. Sized to the declared depth, not to infinity.
-  const allowance = await rpc(
-    () => pub.readContract({ address: USDC, abi: erc20Abi, functionName: "allowance", args: [maker, AQUA], blockNumber: head0 }),
-    "allowance",
-  );
-  if (allowance < BALANCE_USDC * 10n) {
-    console.log("  approving USDC to Aqua");
-    const r = await send(USDC, encodeFunctionData({ abi: erc20Abi, functionName: "approve", args: [AQUA, BALANCE_USDC * 100n] }), GAS.approve, "approve");
-    console.log(link(r.transactionHash));
+  //
+  // BOTH TOKENS, not just USDC. `ship` declares depth in the pair, so Aqua needs an
+  // allowance for each side; this checked only USDC and the WETH leg was left to whatever
+  // the maker happened to have approved previously. When that ran out the first round of a
+  // session reverted with custom error 0x879f237b carrying the router and the order hash --
+  // which reads like "this strategy was already shipped" and is not that at all. Found on a
+  // fork after a fill had consumed the standing WETH allowance; on mainnet it would have hit
+  // once, on the first round, and sent the operator hunting for a duplicate.
+  for (const [token, label, depth] of [
+    [USDC, "USDC", BALANCE_USDC],
+    [WETH, "WETH", BALANCE_WETH],
+  ] as const) {
+    const allowance = await rpc(
+      () => pub.readContract({ address: token, abi: erc20Abi, functionName: "allowance", args: [maker, AQUA], blockNumber: head0 }),
+      `${label} allowance`,
+    );
+    if (allowance < depth * 10n) {
+      console.log(`  approving ${label} to Aqua`);
+      const r = await send(token, encodeFunctionData({ abi: erc20Abi, functionName: "approve", args: [AQUA, depth * 100n] }), GAS.approve, `approve ${label}`);
+      console.log(link(r.transactionHash));
+    }
   }
 
   const state = loadState();
