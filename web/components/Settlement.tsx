@@ -368,7 +368,7 @@ export function Settlement({ a, head, source }: { a: Auction; head: number; sour
             the bids of round {a.round} as the Book recorded them, in commit order, read at
             block {num(head)}.
           </>
-        )}
+        )}{" "}
         Column height is the revealed bid; a hatched column is a bid that exists and cannot be
         read. The ochre line is <code className="font-mono">clearingBps</code> —{" "}
         <code className="font-mono">max(reserveBps, secondBps)</code> from

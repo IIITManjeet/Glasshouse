@@ -10,7 +10,8 @@
     "test:solidity": "npx hardhat test solidity",
     "size": "npx hardhat compile && node scripts/size-check.mjs",
     "test:js": "node --test test/js/*.test.js",
-    "lint:page": "node scripts/lint-provenance.mjs"
+    "lint:page": "node scripts/lint-provenance.mjs",
+    "verify:emit": "node scripts/verify-run.mjs --emit"
   },
   "dependencies": {
     "@1inch/aqua": "github:1inch/aqua#v1.0.0",

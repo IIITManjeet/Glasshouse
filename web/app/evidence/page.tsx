@@ -7,6 +7,7 @@ import { useBoard } from "@/components/BoardProvider";
 import { Receipt } from "@/components/Receipt";
 import { Timeline } from "@/components/Timeline";
 import { Settlement } from "@/components/Settlement";
+import { Verification } from "@/components/Verification";
 import { ReservePanel } from "@/components/Reserve";
 import { Leaderboard } from "@/components/Leaderboard";
 import { Comparison } from "@/components/Comparison";
@@ -101,6 +102,12 @@ function PinnedReceipt() {
             <Settlement a={shown} head={head} source={source} />
           </div>
           <Receipt a={shown} source={source} />
+          {/* The verifier's own findings, under the receipt it corroborates. Shown as a
+              recorded run rather than a live check, and failures first -- the tool's whole
+              worth is that it reports what it could not confirm. */}
+          <div className="mt-3">
+            <Verification />
+          </div>
           {/* The receipt is the OUTCOME; this is the SEQUENCE that produced it, and only the
               indexer can give it -- an eth_call returns storage as it is now, never the order
               it got that way. Suppressed for the rehearsal, which has no indexed round and
