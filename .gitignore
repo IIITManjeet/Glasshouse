@@ -57,3 +57,8 @@ scripts/shoot-screens.mjs
 # chosen. The direction and the rules that survive live in DESIGN.md; anything CHOSEN gets
 # committed to web/public/art/ and referenced from CSS.
 art-prompts/
+
+# Hackathon check-in answers. Draft correspondence, not part of the product, and it names
+# what is not working -- which belongs in an organiser's form and in TODO.md, not in the
+# history of a public repo.
+CHECKIN.txt

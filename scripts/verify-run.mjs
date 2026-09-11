@@ -398,20 +398,41 @@ async function main() {
     if (row.winnerMarginBps !== mine.derived.winnerMarginBps) {
       siteDisagrees.push("round " + row.round + " margin " + row.winnerMarginBps + " vs " + mine.derived.winnerMarginBps);
     }
-    if (row.clearingBps !== mine.derived.clearingBps) {
-      siteDisagrees.push("round " + row.round + " clearing " + row.clearingBps + " vs " + mine.derived.clearingBps);
+    // NOT compared against our own derived clearing price, because that would be a
+    // tautology and was one until this was written. reserveWindow() computes
+    // `max(secondBps, reserveBps)` from the rows we hand it -- and we build those rows from
+    // OUR `max(secondBps, reserveBps)`. Same formula, same inputs, so the two can never
+    // disagree and a "pass" would mean nothing. It is the same trap CLEARING_RULE fell into
+    // and this file already documents at PRICE_SET_BY.
+    //
+    // The independent number is the one the CONTRACT emitted at settle. Comparing the page's
+    // clearing price against AuctionSettled.clearingBps is a real check, because that value
+    // came from Solidity rather than from any JavaScript in this repository.
+    if (mine.settled && row.clearingBps !== mine.settledClearingBps) {
+      siteDisagrees.push(
+        "round " + row.round + " clearing " + row.clearingBps + " vs " + mine.settledClearingBps + " emitted by settle()",
+      );
     }
   }
+  const checkedAgainstChain = win.rows.filter((r) => byRound.get(r.round)?.settled).length;
   check(
     "SITE_DERIVATION",
     siteDisagrees.length === 0,
     siteDisagrees.length === 0
-      ? "web/lib/reserve-window.ts derives the same clearing price, competition class, thinness and winner margin as this independent replay, over " +
+      ? "web/lib/reserve-window.ts agrees with this replay on competition class, thinness and " +
+          "winner margin over " +
           win.rows.length +
-          " settled row(s). " +
+          " row(s) past their reveal window, and its clearing price matches the value settle() " +
+          "EMITTED on " +
+          checkedAgainstChain +
+          " settled round(s)" +
+          (checkedAgainstChain === 0
+            ? " -- none here, so the clearing price was not checked against the chain at all."
+            : ".") +
+          " " +
           win.unreadable +
           " row(s) dropped as unreadable."
-      : "the page's derivation disagrees with the replay: " + siteDisagrees.join("; "),
+      : "the page's derivation disagrees: " + siteDisagrees.join("; "),
   );
 
   // --- TRANSLITERATION DRIFT ------------------------------------------------------

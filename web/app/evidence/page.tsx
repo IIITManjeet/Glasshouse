@@ -98,7 +98,7 @@ function PinnedReceipt() {
               It is a figure with real values and a source line, not decoration: an image
               that merely resembled a chart is the one thing this page cannot carry. */}
           <div className="mb-3">
-            <Settlement a={shown} head={head} />
+            <Settlement a={shown} head={head} source={source} />
           </div>
           <Receipt a={shown} source={source} />
           {/* The receipt is the OUTCOME; this is the SEQUENCE that produced it, and only the

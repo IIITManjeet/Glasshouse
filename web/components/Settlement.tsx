@@ -1,6 +1,6 @@
 "use client";
 
-import { type Auction, livePhase } from "@/lib/useAuctions";
+import { type Auction, type Source, livePhase } from "@/lib/useAuctions";
 
 /**
  * THE MECHANISM, AS ONE PICTURE.
@@ -45,7 +45,17 @@ const H = 320;
 const num = (n: number) => n.toLocaleString("en-US");
 const short = (a?: string | null) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "—");
 
-export function Settlement({ a, head }: { a: Auction; head: number }) {
+export function Settlement({ a, head, source }: { a: Auction; head: number; source: Source }) {
+  // THE SOURCE IS A PROP BECAUSE THIS FIGURE CANNOT KNOW IT OTHERWISE, and getting that
+  // wrong is the one mistake this project cannot afford. The first version of this file
+  // hardcoded data-src="base" and told the reader the bids were "as the Book recorded
+  // them". On the evidence page the honest empty state -- no mainnet round has settled --
+  // invites a visitor to run the rehearsal, which feeds SIMULATED rounds straight into this
+  // component. The chart then asserted that synthetic numbers were read from Base, on the
+  // one page whose entire argument is that every figure names its true source.
+  //
+  // Every other panel there already switched on `source`; this one was added without it.
+  const simulated = source === "sim";
   const bids = [...(a.bids ?? [])].sort((x, y) => x.commitIdx - y.commitIdx);
   if (bids.length === 0) return null;
 
@@ -63,6 +73,14 @@ export function Settlement({ a, head }: { a: Auction; head: number }) {
 
   const slot = plotW / bids.length;
   const colW = Math.min(54, slot * 0.56);
+  // LABEL DENSITY FOLLOWS THE SLOT, because the labels do not shrink and the slot does.
+  // `#n · blk 51,204,303` is ~110px of 10px mono; at six bids the slot is ~95px and adjacent
+  // labels collide. Rather than truncate into ambiguity, whole facts are dropped in order of
+  // how much they are needed here: the commit block is recoverable from the receipt below,
+  // the bidder is recoverable from the ladder, the queue slot is what the price line points
+  // at and is never dropped.
+  const showBlock = slot >= 112;
+  const showBidder = slot >= 74;
   const x = (i: number) => PAD.left + slot * i + (slot - colW) / 2;
 
   const winner = a.bestBidder?.toLowerCase() ?? null;
@@ -90,12 +108,14 @@ export function Settlement({ a, head }: { a: Auction; head: number }) {
   const blocksLeft = Math.max(0, a.exclusiveEnd - head);
 
   return (
-    <figure data-src="base" className="rounded-card border border-rule bg-raised shadow-card">
+    <figure data-src={simulated ? "sim" : "base"} className="rounded-card border border-rule bg-raised shadow-card">
       <figcaption className="flex flex-wrap items-center justify-between gap-2 border-b border-rule px-4 py-2.5">
         <span className="font-mono text-[0.72rem] uppercase tracking-[0.14em] text-ink">
           Where the price came from
         </span>
-        <span className="chip">Round {a.round} · block {num(head)}</span>
+        <span className={simulated ? "chip chip-warn" : "chip"}>
+          {simulated ? "Simulated · not a chain read" : `Round ${a.round} · block ${num(head)}`}
+        </span>
       </figcaption>
 
       <div className="overflow-x-auto px-4 py-5">
@@ -167,10 +187,11 @@ export function Settlement({ a, head }: { a: Auction; head: number }) {
                   <rect x={x(i)} y={PAD.top} width={colW} height={plotH} fill="var(--color-brick)" opacity="0.16" mask="url(#fadeTop)" />
                 )}
 
-                {/* The winner gets a cap, not a colour. */}
-                {revealed && isWinner && (
-                  <line x1={x(i)} y1={top} x2={x(i) + colW} y2={top} stroke="var(--color-ink)" strokeWidth="2" />
-                )}
+                {/* The winner's cap is drawn in a LATER pass, after the price line. On a tie
+                    -- two bidders at the same bps -- clearing equals bestBps, so the line lands
+                    exactly on the cap and, being drawn later, painted it out. The one case
+                    where this chart's whole claim is hardest to read was the one case it
+                    erased its own mark in. */}
 
                 {revealed && (
                   <text x={x(i) + colW / 2} y={top - 7} textAnchor="middle" className="fill-[var(--color-ink)] font-mono text-[12px]">
@@ -182,11 +203,14 @@ export function Settlement({ a, head }: { a: Auction; head: number }) {
                     different facts and collapsing them loses one. The slot comes first: it
                     is fixed at commit and is what the price line points back to. */}
                 <text x={x(i) + colW / 2} y={H - PAD.bottom + 16} textAnchor="middle" className="fill-[var(--color-ink-faint)] font-mono text-[10px]">
-                  #{b.commitIdx} · blk {num(b.committedAtBlock)}
+                  #{b.commitIdx}
+                  {showBlock && ` · blk ${num(b.committedAtBlock)}`}
                 </text>
-                <text x={x(i) + colW / 2} y={H - PAD.bottom + 29} textAnchor="middle" className="fill-[var(--color-ink-faint)] font-mono text-[9px]">
-                  {short(b.bidder)}
-                </text>
+                {showBidder && (
+                  <text x={x(i) + colW / 2} y={H - PAD.bottom + 29} textAnchor="middle" className="fill-[var(--color-ink-faint)] font-mono text-[9px]">
+                    {short(b.bidder)}
+                  </text>
+                )}
                 <text
                   x={x(i) + colW / 2}
                   y={H - PAD.bottom + 42}
@@ -229,9 +253,16 @@ export function Settlement({ a, head }: { a: Auction; head: number }) {
                 price {clearing} bps
               </text>
               <text x={W - PAD.right + 12} y={y(clearing as number) + 12} className="fill-[var(--color-ink-faint)] font-mono text-[10px]">
+                {/* Name the slot when we can identify it, and fall back to the true-but-
+                    vaguer phrasing when we cannot. `bids` comes from a log scan that can be
+                    partial, so secondBps may be known from contract storage while the bid
+                    that produced it is missing from the ladder. "set by #?" would look like
+                    a rendering fault; the fallback is simply less specific. */}
                 {setByReserve
                   ? "set by the reserve"
-                  : `set by #${runnerUp ? runnerUp.commitIdx : "?"}`}
+                  : runnerUp
+                    ? `set by #${runnerUp.commitIdx}`
+                    : "set by the runner-up"}
               </text>
               {/* The surplus is LABELLED HERE, beside the price, and only SHADED on the
                   column. Inside the band it collided with the price line the moment the
@@ -280,6 +311,33 @@ export function Settlement({ a, head }: { a: Auction; head: number }) {
             </g>
           )}
 
+          {/* THE WINNER'S CAP, LAST, so nothing can paint over it -- see the note above. */}
+          {bids.map((b, i) => {
+            if (b.bps === null || b.bps === undefined) return null;
+            if (!winner || b.bidder?.toLowerCase() !== winner) return null;
+            return (
+              <line
+                key="wincap"
+                x1={x(i)}
+                y1={y(b.bps)}
+                x2={x(i) + colW}
+                y2={y(b.bps)}
+                stroke="var(--color-ink)"
+                strokeWidth="2"
+              />
+            );
+          })}
+
+          {/* A TIE IS NOT A BUG AND MUST NOT LOOK LIKE ONE. When the runner-up matched the
+              winner, the price IS the winning bid and there is no surplus -- the line sits on
+              the cap and the gap is genuinely zero. Said out loud, because a reader who has
+              understood the rest of the chart will otherwise assume the drawing failed. */}
+          {hasPrice && revealClosed && surplus === 0 && !setByReserve && (
+            <text x={W - PAD.right + 12} y={y(clearing as number) + 54} className="fill-[var(--color-ink-faint)] font-mono text-[10px]">
+              tied — no surplus
+            </text>
+          )}
+
           {/* The surplus: the winner's column ABOVE the price line, in the colour reserved
               for money moving to the maker. */}
           {surplus > 0 &&
@@ -297,8 +355,20 @@ export function Settlement({ a, head }: { a: Auction; head: number }) {
       </div>
 
       <p className="border-t border-rule px-4 py-3 text-[0.78rem] leading-relaxed text-ink-faint">
-        <strong className="font-medium text-ink-soft">What produced this:</strong> the bids of
-        round {a.round} as the Book recorded them, in commit order, read at block {num(head)}.
+        <strong className="font-medium text-ink-soft">What produced this:</strong>{" "}
+        {simulated ? (
+          <>
+            a <strong className="font-medium text-amber">simulated</strong> round from
+            web/lib/simulate.ts, replayed through the contract&rsquo;s own clearing rule. Nothing
+            here was read from any chain and the block numbers are not Base blocks — the
+            arithmetic is real, the round is not.
+          </>
+        ) : (
+          <>
+            the bids of round {a.round} as the Book recorded them, in commit order, read at
+            block {num(head)}.
+          </>
+        )}
         Column height is the revealed bid; a hatched column is a bid that exists and cannot be
         read. The ochre line is <code className="font-mono">clearingBps</code> —{" "}
         <code className="font-mono">max(reserveBps, secondBps)</code> from
