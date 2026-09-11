@@ -7,7 +7,7 @@
   "scripts": {
     "codegen": "graph codegen",
     "build": "graph build",
-    "deploy": "graph deploy glasshouse-base",
+    "deploy": "graph deploy glasshouse",
     "test": "graph test"
   },
   "dependencies": {

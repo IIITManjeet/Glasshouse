@@ -67,7 +67,7 @@ export async function checkPrerequisites(env, args) {
   if (!env.GRAPH_API_KEY) {
     missing.push(
       "GRAPH_API_KEY is not set. Create a Gateway API key in Studio, restricted to the " +
-        "glasshouse-base subgraph (subgraph-design.md section 8.1 step 3), and export it."
+        "glasshouse subgraph (subgraph-design.md section 8.1 step 3), and export it."
     );
   }
 

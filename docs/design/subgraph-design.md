@@ -1247,6 +1247,13 @@ Four consumers, one deployment. Deployment steps first, because the MCP depends 
    variable `GRAPH_API_KEY`. Never in `site/`.
 4. Record all four identifiers in `run.md` and in `subgraph/README.md`.
 
+> **AS BUILT, 2026-09-11.** The Studio subgraph was created as **`glasshouse`**, not
+> `glasshouse-base` as planned above, and the query URL is therefore
+> `https://api.studio.thegraph.com/query/1758826/glasshouse/version/latest`. Step 1 is done
+> (deployment `Qmc9Ah4ow5mXD7599hi3ewze7Fg77x1GivAqaCSAmmpK7E`, label `v0.5.1`); steps 2-3
+> are not. The runbook that supersedes this list, including which consumer may see which
+> URL, is in `subgraph/README.md`.
+
 ### 8.2 The page (`site/index.html`)
 
 Talks **directly to the subgraph** over HTTP GraphQL, at the Studio query URL, which

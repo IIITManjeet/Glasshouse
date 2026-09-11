@@ -140,7 +140,7 @@ rather than all three sharing one URL.
 ```sh
 npx graph auth <deploy-key>
 npx graph codegen && npx graph build
-npx graph deploy glasshouse-base --version-label v0.5.1
+npx graph deploy glasshouse --version-label v0.5.1
 ```
 
 `schema.graphql`, `src/` and `subgraph.yaml` have not changed since `40120fd` (2026-09-07),
@@ -153,8 +153,12 @@ compile from the same sources.
 Set `NEXT_PUBLIC_SUBGRAPH_URL` in the Vercel project to the Studio query URL:
 
 ```
-https://api.studio.thegraph.com/query/<studio-account-id>/glasshouse-base/v0.5.1
+https://api.studio.thegraph.com/query/1758826/glasshouse/version/latest
 ```
+
+`version/latest` is a moving pointer: deploy a new version to Studio and the page follows
+it without a rebuild. That is what we want while the round data is still changing, and it
+is the reason the value is not pinned to `v0.5.1`.
 
 Unset, `web/lib/subgraph.ts` reports `state: "off"` and `Record.tsx` renders nothing at all
 rather than an empty shape. Set, the account record goes live on the next deploy. Studio is
