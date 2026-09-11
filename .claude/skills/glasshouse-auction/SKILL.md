@@ -1,6 +1,6 @@
 ---
 name: glasshouse-auction
-description: Use when a Glasshouse maker or a judge asks "what reserve should I set for my next auction", "what phase is auction X in", or "explain the receipt for auction X". Answers by querying the live Glasshouse subgraph through the Subgraph MCP and running the integer reserve rule in site/reserve-rule.js — it never estimates a number from memory. NOT YET OPERATIONAL as of 2026-09-11: the subgraph IS published to The Graph Network now, but no Gateway API key has been created, so the Subgraph MCP fails auth. See "Current status" below before doing anything else.
+description: Use when a Glasshouse maker or a judge asks "what reserve should I set for my next auction", "what phase is auction X in", or "explain the receipt for auction X". Answers by querying the live Glasshouse subgraph through the Subgraph MCP and running the integer reserve rule in site/reserve-rule.js — it never estimates a number from memory. OPERATIONAL as of 2026-09-11: the subgraph is published and the Gateway key is set. The one catch is startup order -- an MCP server reads its environment once, so a session begun before GRAPH_API_KEY was set still fails auth. See "Current status" below.
 ---
 
 # Glasshouse auction skill
@@ -15,29 +15,35 @@ places that MCP is actually on the runtime path. Read `docs/design/subgraph-desi
 §7.2, §7.3, §8.1–§8.5 for the full spec this file summarizes; where the two disagree, the
 design doc is the one to trust and this file is stale.
 
-## Current status: one blocker left
-
-**Say this plainly, first, whenever this skill is invoked, before attempting anything:**
+## Current status: working, with one startup catch
 
 - ✅ **Published to The Graph Network** on 2026-09-11. Subgraph id
   `FPQdiZTAnR8ac6grgAF2x49bWqwDh87RzqUgQxAvoY2y`, deployment
   `Qmc9Ah4ow5mXD7599hi3ewze7Fg77x1GivAqaCSAmmpK7E` (`v0.5.1`). One indexer has allocated
   to it, so it is served and not merely listed. The publish is verifiable from the GNS
   logs on Arbitrum without trusting Studio — `subgraph/README.md` step 3 shows how.
-- ❌ **No Gateway API key.** `.mcp.json` sends `Authorization: Bearer ${GRAPH_API_KEY}`,
-  and with the variable unset the MCP fails with `auth error: malformed API key`. That is
-  the only thing still in the way.
-- The key must be set **before the session starts** — MCP servers read their environment
-  at startup, so exporting it mid-session does nothing until Claude Code is restarted.
-- Until the key exists, do not guess a reserve, a phase, or anything else from general
-  knowledge or from a stale local snapshot and present it as live. Report the missing
-  prerequisite and stop, exactly as `scripts/reserve-advisor.mjs` already does — see
-  "How this fails honestly" below.
+- ✅ **Gateway key set and verified.** `scripts/reserve-advisor.mjs` has been run end to
+  end against the published subgraph: MCP connect, schema, `_meta`, window query,
+  recommendation.
+- ⚠️ **Startup order is the one trap.** `.mcp.json` sends `Bearer ${GRAPH_API_KEY}` and an
+  MCP server reads its environment once, at startup. A session begun before the key was
+  set fails with `auth error: malformed API key` no matter what the shell now holds. If
+  you see that error, say so and ask for a restart — do not conclude the subgraph is
+  unpublished, because it is not.
+- **Use the `Qm…` deployment id.** The MCP's deployment tools take the 32-byte hash;
+  `normalizeDeploymentId()` in the advisor converts. Passing `Qm…` to the MCP directly
+  fails with `Schema not found in the response`, which sounds like a missing subgraph and
+  is not one.
+- If the MCP is unreachable for any reason, do not guess a reserve, a phase, or anything
+  else from general knowledge or a stale snapshot and present it as live. Report the
+  missing prerequisite and stop — see "How this fails honestly" below.
 
-⚠️ **Even once the key is set, the index is nearly empty**: one auction, two commits, zero
-reveals, zero settlements, and the keeper has never run against mainnet. Any question of
-the form "what does the data say" must answer from that, and a reserve recommendation drawn
-from a single unsettled auction should say so in the same breath as the number.
+⚠️ **The index is nearly empty and every answer must say so.** One auction, two commits,
+zero reveals, zero settlements; the keeper has never run against mainnet. A reserve drawn
+from this returns `NO_REVEALS` at the 50 bps floor, and that reason must be reported
+alongside the number rather than presented as a tuned recommendation.
+
+
 
 ## Setup a maker must complete once (outside this repo, never committed)
 

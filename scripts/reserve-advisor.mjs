@@ -13,7 +13,7 @@
 //
 // Run this with any of the three missing and it says exactly which, and stops - it does
 // not fall back to a cached number or a guess. The rule itself has no network dependency
-// and is exercised directly by `node --test test/js/`.
+// and is exercised directly by `npm run test:js`.
 
 import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
@@ -57,6 +57,42 @@ const RESERVE_WINDOW_QUERY = `
     }
   }
 `;
+
+const B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+
+/**
+ * `Qm...` in, `0x...` out. The MCP's deployment tools take the 32-byte hash, not the IPFS
+ * id -- `get_schema_by_deployment_id` documents its argument as `0x...`.
+ *
+ * WHY THIS EXISTS RATHER THAN "PASS THE RIGHT ONE". Every other file in this project names
+ * the deployment as `Qmc9Ah4ow5mXD7599hi3ewze7Fg77x1GivAqaCSAmmpK7E`: subgraph/README.md,
+ * the skill, subgraph-design.md, and the error message in checkPrerequisites below, which
+ * tells you to set GLASSHOUSE_DEPLOYMENT_ID to exactly that. Handing that documented value
+ * to the MCP failed with "Schema not found in the response" -- an error that names neither
+ * the id nor the format it wanted, and that reads like the subgraph is unpublished when it
+ * is published and serving. Converting here means the documented value works and one
+ * identifier stays in the docs, rather than a second one appearing only in this script.
+ *
+ * A `Qm` id is base58 of 34 bytes: a 0x1220 multihash prefix (sha2-256, 32 long) then the
+ * hash the contracts actually store. An input that is already 0x-prefixed is passed through.
+ */
+export function normalizeDeploymentId(id) {
+  if (!id || id.startsWith("0x")) return id;
+  if (!id.startsWith("Qm")) {
+    throw new Error(`deployment id "${id}" is neither a Qm... IPFS id nor a 0x... hash`);
+  }
+  let n = 0n;
+  for (const c of id) {
+    const i = B58.indexOf(c);
+    if (i < 0) throw new Error(`deployment id "${id}" is not valid base58 (character "${c}")`);
+    n = n * 58n + BigInt(i);
+  }
+  const bytes = n.toString(16).padStart(68, "0");
+  if (!bytes.startsWith("1220")) {
+    throw new Error(`deployment id "${id}" is not a sha2-256 multihash (prefix 0x${bytes.slice(0, 4)})`);
+  }
+  return `0x${bytes.slice(4)}`;
+}
 
 // One message per missing piece, so fixing this is one pass instead of hitting each wall
 // in turn. Order matches how expensive each check is: local env first, then a require
@@ -103,7 +139,15 @@ export function castSendLine(bookAddress, { reserveBps, maxBps = 500, commitBloc
 
 function printRecommendation(rec, { maker, head }) {
   console.log(`\nreserve-advisor: maker ${maker}, as of block ${head}\n`);
-  console.log(`  window            ${rec.n} settled auction(s)`);
+  // NOT "settled". RESERVE_WINDOW_QUERY selects on `revealEnd_lt: head` -- auctions whose
+  // reveal window has closed -- and deliberately not on `settled: true`, because `settled`
+  // means somebody called the permissionless settle() and the outcome does not depend on
+  // that happening: subgraph/README.md freezes the derived clearing price once
+  // `block > revealEnd` for exactly this reason. As of 2026-09-11 the Book has one auction
+  // past its reveal window and ZERO settlements, so the old wording printed "1 settled
+  // auction(s)" about a chain with none -- the kind of claim this project refuses
+  // everywhere else. The number was always right; the noun was not.
+  console.log(`  window            ${rec.n} auction(s) past their reveal window`);
   console.log(`  empty / weak / strong   ${rec.empty} / ${rec.weak} / ${rec.strong}`);
   console.log(`  unrevealed commitments  ${rec.unrevealed}`);
   console.log(
@@ -130,12 +174,12 @@ async function main() {
     for (const m of missing) console.error(`  - ${m}`);
     console.error(
       "\nThe reserve rule has no network dependency and is covered without any of the " +
-        "above by `node --test test/js/`.\n"
+        "above by `npm run test:js`.\n"
     );
     process.exit(1);
   }
 
-  const deploymentId = args.deployment ?? process.env.GLASSHOUSE_DEPLOYMENT_ID;
+  const deploymentId = normalizeDeploymentId(args.deployment ?? process.env.GLASSHOUSE_DEPLOYMENT_ID);
 
   const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
   const { SSEClientTransport } = await import("@modelcontextprotocol/sdk/client/sse.js");

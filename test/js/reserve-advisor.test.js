@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { parseArgs, checkPrerequisites, castSendLine } from "../../scripts/reserve-advisor.mjs";
+import { parseArgs, checkPrerequisites, castSendLine, normalizeDeploymentId } from "../../scripts/reserve-advisor.mjs";
 
 test("parseArgs: defaults match section 8.3 (K=8, floor=50, maxBps=500)", () => {
   const args = parseArgs([]);
@@ -67,4 +67,41 @@ test("castSendLine: substitutes the recommended reserve into the DEPLOY.md open(
 test("castSendLine: does not silently drop non-default windows", () => {
   const line = castSendLine("0xBOOK", { reserveBps: 60, commitBlocks: 60, revealBlocks: 60, exclusiveBlocks: 15, maxBps: 500 });
   assert.match(line, /\$TOKEN_IN 60 60 15 60 500 \$BOND/);
+});
+
+// The MCP's deployment tools take the 32-byte hash; every document in this project names
+// the deployment as a Qm... IPFS id. Handing the documented value straight to the MCP
+// failed with "Schema not found in the response", which names neither the id nor the
+// format it wanted and reads like the subgraph is unpublished. These pin the conversion.
+
+test("normalizeDeploymentId: the documented Qm id becomes the hash the GNS event carries", () => {
+  // Cross-checked against Arbitrum: the SubgraphPublished log for our subgraph
+  // (tx 0x14abd788bd19dffe372270a6d4ca4ec4fd72b81f0270183340da7d625d3b597c) carries this
+  // value as its subgraphDeploymentID. Derived two independent ways, same answer.
+  assert.equal(
+    normalizeDeploymentId("Qmc9Ah4ow5mXD7599hi3ewze7Fg77x1GivAqaCSAmmpK7E"),
+    "0xcd128c4faa5567a6cde0dd66f8a463ffc9a56750510c2d185f4493fe74dd4d49"
+  );
+});
+
+test("normalizeDeploymentId: a 0x id is passed through untouched", () => {
+  const id = "0xcd128c4faa5567a6cde0dd66f8a463ffc9a56750510c2d185f4493fe74dd4d49";
+  assert.equal(normalizeDeploymentId(id), id);
+});
+
+test("normalizeDeploymentId: leaves an absent id absent rather than inventing one", () => {
+  // checkPrerequisites is what reports a missing deployment id, and it must keep being the
+  // thing that reports it -- throwing here would replace a named prerequisite with a stack.
+  assert.equal(normalizeDeploymentId(undefined), undefined);
+  assert.equal(normalizeDeploymentId(""), "");
+});
+
+test("normalizeDeploymentId: refuses input that is neither form", () => {
+  assert.throws(() => normalizeDeploymentId("glasshouse"), /neither a Qm/);
+});
+
+test("normalizeDeploymentId: refuses a Qm id with a non-base58 character", () => {
+  // 0, O, I and l are not in the base58 alphabet, and are the characters a hand-copied id
+  // is most likely to acquire.
+  assert.throws(() => normalizeDeploymentId("Qm0c9Ah4ow5mXD7599hi3ewze7Fg77x1GivAqaCSAmmpK7E"), /base58/);
 });

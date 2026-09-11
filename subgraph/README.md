@@ -200,7 +200,25 @@ export GLASSHOUSE_DEPLOYMENT_ID=Qmc9Ah4ow5mXD7599hi3ewze7Fg77x1GivAqaCSAmmpK7E
 
 Never in `web/`, never in a `NEXT_PUBLIC_*` name, never in `site/`. `reserve-advisor.mjs`
 checks both and names each missing one rather than falling back to a cached number
-(`checkPrerequisites`, `scripts/reserve-advisor.mjs:64`).
+(`checkPrerequisites`).
+
+The `Qm…` form above is the one to use. The MCP's own deployment tools want the 32-byte
+hash, and the script converts (`normalizeDeploymentId`) so that the id printed in these
+documents is the id that works. Passing `Qm…` straight through used to fail with
+`Schema not found in the response`, which names neither the id nor the format it expected.
+
+**The key must be set before Claude Code starts.** An MCP server reads its environment once,
+at startup, so `setx` followed by a query in the same session still fails — `.mcp.json`
+resolves `${GRAPH_API_KEY}` to nothing and the Gateway answers `auth error: malformed API
+key`. Restart, then check with:
+
+```sh
+node scripts/reserve-advisor.mjs
+```
+
+Verified working end to end on 2026-09-11: MCP connect, schema fetch, `_meta`, the reserve
+window query, and a printed recommendation, all against the published subgraph through the
+Gateway.
 
 ### Status, as of 2026-09-11
 
@@ -214,13 +232,12 @@ checks both and names each missing one rather than falling back to a cached numb
 | Subgraph id (network) | `FPQdiZTAnR8ac6grgAF2x49bWqwDh87RzqUgQxAvoY2y` ✅ published 2026-09-11 |
 | Indexer allocation | ✅ one, Arbitrum block 504080949 |
 | Gateway query URL | `https://gateway.thegraph.com/api/<key>/subgraphs/id/FPQdiZTAnR8ac6grgAF2x49bWqwDh87RzqUgQxAvoY2y` |
-| `GRAPH_API_KEY` | ❌ not created — the last blocker |
+| `GRAPH_API_KEY` | ✅ created and verified against the Gateway |
+| `reserve-advisor.mjs` | ✅ runs end to end through the MCP |
 
-`@modelcontextprotocol/sdk` is installed as of 2026-09-08 and the subgraph is published, so
-the Gateway key is the **only** thing still stopping `scripts/reserve-advisor.mjs` and the
-`glasshouse-auction` skill. `.mcp.json` passes it as `Bearer ${GRAPH_API_KEY}`; unset, the
-MCP fails with `auth error: malformed API key`. MCP servers read their environment at
-startup, so the key must be set **before** the session begins, not during it.
+All four consumers now work: the page on Studio, the advisor and the skill on the Gateway.
+The only operational catch left is startup order — a session that began before
+`GRAPH_API_KEY` was set cannot see it, because an MCP server reads its environment once.
 
 ⚠️ **A nearly empty index is the expected state, not a fault.** The Book emitted nothing at
 all until 2026-09-08, and as of 2026-09-11 the whole of recorded history is:

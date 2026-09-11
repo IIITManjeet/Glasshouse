@@ -11,10 +11,6 @@ each one is in [`run.md`](./docs/archive/run.md).
 ## [Unreleased]
 
 ### Planned
-- A Gateway API key. The subgraph is now published and served, and the page is live on the
-  Studio endpoint, but `scripts/reserve-advisor.mjs` and the `glasshouse-auction` skill are
-  still dark: `.mcp.json` sends `Bearer ${GRAPH_API_KEY}` and the variable is unset. It has
-  to be set before the session starts, because MCP servers read their environment once.
 - Run the keeper against mainnet. It never has: the one auction on chain is a manual open
   from `DEPLOY.md` section 6, so the index holds one auction, two commits and zero reveals,
   and no round from `config/rounds.json` has been used.
@@ -33,12 +29,28 @@ each one is in [`run.md`](./docs/archive/run.md).
   later, so it is served rather than merely listed. Verified by decoding the GNS logs on
   Arbitrum and matching the deployment hash in them to `Qmc9Ah…pK7E`, rather than by
   trusting the Studio UI. The method is written down in `subgraph/README.md` step 3.
+- **The reserve advisor runs end to end**, which is the first time the composition claim is
+  demonstrated rather than asserted: `scripts/reserve-advisor.mjs` connects to the Subgraph
+  MCP, authenticates to the Gateway, fetches the schema, reads `_meta`, runs the reserve
+  window query against the published subgraph and prints a recommendation from the same
+  `recommendReserve()` the page uses.
 - **The account record reads the indexer in production.** `NEXT_PUBLIC_SUBGRAPH_URL` points
   at the Studio endpoint, deliberately not the Gateway: the site is `output: "export"`, so
   that value is inlined into a public chunk, and a Gateway URL carries its API key in the
   path. `subgraph/README.md` now tabulates which of the three consumers may see which URL.
 
 ### Fixed
+- The advisor could not use the deployment id its own documentation gave you. Every file
+  names the deployment as `Qmc9Ah…pK7E`, but the MCP's deployment tools take the 32-byte
+  hash, and passing the documented value failed with `Schema not found in the response` --
+  an error naming neither the id nor the expected format, and reading like the subgraph was
+  unpublished when it was published and serving. `normalizeDeploymentId()` converts, so the
+  id in the docs is the id that works.
+- The advisor called auctions "settled" that the chain says are not. Its window query
+  selects on `revealEnd_lt: head`, which is correct -- the derived clearing price freezes at
+  `revealEnd` and does not wait for anyone to call the permissionless `settle()` -- but it
+  printed "1 settled auction(s)" against a Book with zero settlements. The count was right
+  and the noun was wrong.
 - The account record labelled almost every visitor wrong. `web/lib/subgraph.ts` declared
   `Provenance` as `TEAM | INVITED | UNLISTED | OTHER`, but the mapping emits
   `TEAM | INVITED | UNKNOWN` (`subgraph/src/provenance.ts`). `UNKNOWN` is what an address
