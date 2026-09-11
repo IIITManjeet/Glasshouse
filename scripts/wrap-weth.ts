@@ -7,6 +7,7 @@ import { basePublicClient, rpc } from "./lib/chain.ts";
  * Wrap a little of the maker's ETH into WETH on Base.
  *
  *   npx hardhat run scripts/wrap-weth.ts --network base
+ *   WRAP_TARGET_WETH=0.0008 npx hardhat run scripts/wrap-weth.ts --network base
  *
  * WHY THIS EXISTS. `Aqua.ship` declares depth in BOTH legs of the pair, and the keeper
  * declares 0.0004 WETH per round. The maker holds USDC and ETH but zero WETH, so the
@@ -31,7 +32,12 @@ const MAKER = "0xeEbf737F92C8F0d9070f35a7D9BAf416923bEcDf" as const;
 // The keeper declares 0.0004 WETH of depth per round (BALANCE_WETH in keeper.ts). One
 // round needs exactly that; the extra is headroom so a second round does not need a
 // second trip to this script.
-const TARGET = parseEther("0.0005");
+//
+// Overridable because the live fill declares MORE than the keeper does -- 0.0008 WETH
+// (BALANCE_WETH in run-live-fill.ts) -- and a second hard-coded constant here would be a
+// second thing to keep in step with a number that lives somewhere else. run-live-fill's
+// depth guard prints the exact command with the right target in it when it refuses.
+const TARGET = parseEther(process.env.WRAP_TARGET_WETH ?? "0.0005");
 
 // Keep enough behind for the keeper's own seven transactions. At Base's current ~0.006
 // gwei that whole round costs well under 0.00002 ETH, so this is generous by two orders

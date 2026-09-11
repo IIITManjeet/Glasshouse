@@ -314,18 +314,60 @@ async function main() {
     );
   }
 
+  // DOES THE MAKER ACTUALLY HOLD THE DEPTH IT IS ABOUT TO DECLARE? BOTH LEGS.
+  //
+  // `ship` declares depth in the PAIR -- [WETH, USDC], [BALANCE_WETH, BALANCE_USDC] -- so
+  // the WETH leg has to be backed and approved exactly as the USDC leg above is. Only USDC
+  // was checked, and the WETH side was left to whatever the maker happened to be holding.
+  //
+  // That is the same omission as the keeper's (fixed in scripts/keeper.ts: it approved USDC
+  // only), and here it costs more. The ephemeral bidders are funded BELOW this point, so a
+  // maker short on WETH funds two throwaway wallets and only then reverts inside ship --
+  // which is the exact waste the virginity check above exists to avoid, arrived at from the
+  // other side. Caught on 2026-09-12 with the maker holding 0.0005 WETH against the 0.0008
+  // this run declares.
+  //
+  // Balance AND allowance: ship moves nothing, but a fill pulls from the maker, and an
+  // unapproved leg fails later rather than here.
+  for (const [token, label, need, decimals] of [
+    [WETH, "WETH", BALANCE_WETH, 18],
+    [USDC, "USDC", BALANCE_USDC, 6],
+  ] as const) {
+    const held = await pinned(
+      (blockNumber) => pub.readContract({ address: token, abi: erc20Abi, functionName: "balanceOf", args: [maker], blockNumber }),
+      head0, `maker ${label}`,
+    );
+    if ((held as bigint) < need) {
+      throw new Error(
+        `the maker holds ${formatUnits(held as bigint, decimals)} ${label} but this run declares ` +
+        `${formatUnits(need, decimals)} to Aqua. Nothing has been spent. ` +
+        (label === "WETH"
+          ? `Wrap the shortfall first: WRAP_TARGET_WETH=${formatUnits(need, 18)} npx hardhat run scripts/wrap-weth.ts --network base`
+          : `Send ${label} on Base to ${maker} first.`),
+      );
+    }
+  }
+
   // --- approvals ---------------------------------------------------------------------
-  const allowance = await pinned(
-    (blockNumber) => pub.readContract({ address: USDC, abi: erc20Abi, functionName: "allowance", args: [maker, AQUA], blockNumber }),
-    head0, "USDC allowance",
-  );
-  if (allowance < BALANCE_USDC) {
-    console.log("  approving USDC to Aqua");
-    const h = await makerWallet.sendTransaction({
-      to: USDC, gas: GAS.approve, data: encodeFunctionData({ abi: erc20Abi, functionName: "approve", args: [AQUA, BALANCE_USDC] }),
-    });
-    await mined(h, "USDC approve");
-    console.log(link(h));
+  // BOTH LEGS, for the same reason the balance check above covers both: a fill pulls from
+  // the maker on the WETH side too, and an allowance of zero there fails at the swap --
+  // the last transaction of the run, after every other cost has been paid.
+  for (const [token, label, need] of [
+    [USDC, "USDC", BALANCE_USDC],
+    [WETH, "WETH", BALANCE_WETH],
+  ] as const) {
+    const allowance = await pinned(
+      (blockNumber) => pub.readContract({ address: token, abi: erc20Abi, functionName: "allowance", args: [maker, AQUA], blockNumber }),
+      head0, `${label} allowance`,
+    );
+    if ((allowance as bigint) < need) {
+      console.log(`  approving ${label} to Aqua`);
+      const h = await makerWallet.sendTransaction({
+        to: token, gas: GAS.approve, data: encodeFunctionData({ abi: erc20Abi, functionName: "approve", args: [AQUA, need] }),
+      });
+      await mined(h, `${label} approve`);
+      console.log(link(h));
+    }
   }
 
   // --- ephemeral bidders, each with its OWN random salt -------------------------------
