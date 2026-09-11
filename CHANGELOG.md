@@ -25,6 +25,21 @@ each one is in [`run.md`](./docs/archive/run.md).
 - The reserve panel reading the index rather than re-deriving. `web/lib/reserve-window.ts`
   is still a transliteration of `subgraph/src/helpers.ts`; the subgraph is published now, so
   the condition its header made deletion conditional on has arrived.
+- The landing page and the evidence page teach the mechanism in two different visual
+  vocabularies. `components/Mechanism.tsx` draws a three-panel commit/reveal/settle
+  diagram; `components/Settlement.tsx` draws the shared basis-point scale with the price
+  line. Same idea, learned twice. The settlement vocabulary should absorb the other, as a
+  static worked example on the landing page.
+- The 300 ms reveal animation from the design decision. Deliberately unbuilt for now: the
+  chart renders a state from data rather than a transition between states, so animating it
+  means tracking a previous render purely to have something to animate from.
+
+## [0.7.0] - 2026-09-12
+
+The session that made the product legible: an independent verifier, a navigable record,
+controls that look like controls, and the mechanism drawn as one picture. Also the session
+in which three findings were recorded from screenshots and all three withdrawn, which is
+written down in `DESIGN.md` because the pattern cost more than any single bug.
 
 ### Added
 - **A per-event timeline on the receipt** (`web/components/Timeline.tsx`), reading
@@ -364,7 +379,9 @@ invariant the design rests on is demonstrated rather than argued.
 - Fills record through `IMakerHooks.postTransferIn`, which `swap()` calls and `quote()`
   does not - the instruction itself cannot emit, since `LOG` reverts under `STATICCALL`.
 
-[Unreleased]: https://github.com/IIITManjeet/Glasshouse/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/IIITManjeet/Glasshouse/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/IIITManjeet/Glasshouse/releases/tag/v0.7.0
+[0.6.0]: https://github.com/IIITManjeet/Glasshouse/releases/tag/v0.6.0
 [0.5.0]: https://github.com/IIITManjeet/Glasshouse/releases/tag/v0.5.0
 [0.4.0]: https://github.com/IIITManjeet/Glasshouse/releases/tag/v0.4.0
 [0.3.0]: https://github.com/IIITManjeet/Glasshouse/releases/tag/v0.3.0
