@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useBoard } from "@/components/BoardProvider";
 import { SourceChip } from "@/components/Auction";
 import { Profile } from "@/components/Profile";
@@ -61,7 +61,27 @@ function AddressForm({ initial }: { initial: string }) {
  */
 function AccountView() {
   const params = useSearchParams();
-  const raw = params.get("a");
+  const pathname = usePathname() ?? "";
+
+  // THE ADDRESS CAN ARRIVE BY TWO ROUTES, AND ONLY ONE OF THEM IS A QUERY STRING.
+  //
+  // This read `?a=` and nothing else, which meant /profile/<address> -- the pretty URL, the
+  // one the status bar links to, the one the address form navigates to, and the one every
+  // address link in the app now points at -- rendered "No address in the URL" in production.
+  // It had been broken the whole time and looked like a page that simply failed to load.
+  //
+  // The reason is worth writing down because the rewrite LOOKS like it should work. Vercel
+  // rewrites /profile/:address to /account/?a=:address on the EDGE: it decides which file to
+  // serve. It does not change the browser's location, so the client still sees
+  // /profile/0x.../ with an empty search string, and useSearchParams -- which reads the
+  // browser, not the edge -- correctly reports no parameter. Nothing is misconfigured; the
+  // query string genuinely does not exist on the client.
+  //
+  // So the path is read as a first-class source. `?a=` still wins when present, because that
+  // is the form the lookup box submits and the only one that exists under `next dev` for a
+  // hand-typed URL.
+  const fromPath = /^\/profile\/(0x[0-9a-fA-F]{40})\/?$/.exec(pathname)?.[1] ?? null;
+  const raw = params.get("a") ?? fromPath;
   const { auctions, head, source, isFork, loading, error } = useBoard();
 
   if (!raw) {

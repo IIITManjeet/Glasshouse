@@ -637,3 +637,38 @@ Every one was the tool or the environment rather than the product — a cropped 
 overlay, a transition caught early. The findings that survived were the ones found by reading
 code or by measuring inside the page. That is the lesson worth carrying forward, and it is
 why the rig now prints a measurement beside every image.
+
+## F-10 🟢 `/profile/<address>` rendered "No address in the URL" in production — the whole time
+
+**The first finding this session that was real, found the way the withdrawn three should
+have been: by measuring the live page rather than looking at a picture of it.**
+
+**Symptom.** `https://glasshouse-ashy.vercel.app/profile/0xeEbf…cDf/` rendered the
+no-address empty state. Reported as "something was rendering and it was going away", which
+is what a page looks like when the shell paints and the content never arrives.
+
+**How it was caught.** A DevTools-Protocol probe that loads the page and samples
+`document.body.innerText` every two seconds for forty. The text settled at 672 characters
+and never moved: no record, no profile, no rounds, no loading state. Nothing was
+disappearing — nothing ever appeared. An earlier screenshot had shown the page working
+because it used `/account/?a=…`, which is a different URL.
+
+**Cause, and it is worth understanding because the rewrite LOOKS correct.** `vercel.json`
+rewrites `/profile/:address` to `/account/?a=:address` at the edge: it decides which file to
+serve. It does not change the browser's location. The client still sees `/profile/0x…/` with
+an empty search string, so `useSearchParams()` — which reads the browser, not the edge —
+correctly reports no parameter, and the page correctly renders its no-address state. Nothing
+was misconfigured. The query string genuinely does not exist on the client.
+
+**Why it mattered more than it looks.** That is the URL the status bar links to for a
+connected wallet, the URL the address form navigates to, and — since `components/Address.tsx`
+landed — the URL behind *every address in the app*. Making addresses link to the in-app
+record had quietly pointed all of them at a page that could not read an address.
+
+**Fixed.** `app/account/page.tsx` reads the address from the pathname as a first-class
+source, with `?a=` still winning when present because that is what the lookup box submits.
+
+**The lesson, which is the opposite of the previous three.** Those were invented by trusting
+a screenshot. This one was invisible in every screenshot I took, because I happened to shoot
+the working URL. A page can be broken at one address and fine at another, and only loading
+the actual URL a person reported will tell you which.
