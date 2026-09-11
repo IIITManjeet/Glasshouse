@@ -79,7 +79,18 @@ const GAS = {
   dock: 200_000n,
 } as const;
 
-const STATE_FILE = new URL("../.keeper-state.json", import.meta.url);
+// THE FORK AND MAINNET MUST NOT SHARE A STATE FILE.
+//
+// `nextRound` is a cursor into config/rounds.json, and the fork deliberately runs at
+// chainId 8453 with the same Book address as mainnet -- so nothing about the connection
+// distinguishes a rehearsal from the real thing. With one shared file, rehearsing round 0
+// on a fork advances the cursor to 1, and the next mainnet run silently skips round 0: the
+// rehearsal would consume the very round it was rehearsing. DRY_RUN is the only signal
+// that separates them, so it picks the file.
+const STATE_FILE = new URL(
+  process.env.DRY_RUN === "1" ? "../.keeper-state.dryrun.json" : "../.keeper-state.json",
+  import.meta.url,
+);
 const ROUNDS = JSON.parse(readFileSync(new URL("../config/rounds.json", import.meta.url), "utf8"));
 const bookAbi = JSON.parse(
   readFileSync(new URL("../subgraph/abis/GlasshouseBook.json", import.meta.url), "utf8"),

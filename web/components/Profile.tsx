@@ -26,7 +26,14 @@ function AddressLink({ addr }: { addr: string }) {
   );
 }
 
-export type Provenance = "TEAM" | "INVITED" | "UNLISTED";
+// The three the mapping emits, and ONLY those -- subgraph/src/provenance.ts is the single
+// place these values are produced. This said "UNLISTED" until web/lib/subgraph.ts was
+// corrected for the identical mistake: there is no such value, and the one an address not
+// on our list actually gets is UNKNOWN, which is nearly every real visitor. Harmless only
+// because today's chain source never sets the field; it would have mislabelled the moment
+// anything subgraph-backed fed this component, which is now a thing that exists
+// (components/Timeline.tsx).
+export type Provenance = "TEAM" | "INVITED" | "UNKNOWN";
 
 /**
  * `useAuctions()`'s `Auction`/`Bid` types (lib/useAuctions.ts) carry no provenance field --
@@ -35,7 +42,7 @@ export type Provenance = "TEAM" | "INVITED" | "UNLISTED";
  * that GlasshouseBook itself never stores. This intersection type says the field MAY be
  * present without asserting it always is, so a bid object from a future provenance-aware
  * source is picked up automatically, and today's chain/snapshot source -- which never sets
- * it -- renders no chip at all rather than a defaulted "UNLISTED". Defaulting would claim
+ * it -- renders no chip at all rather than a defaulted "UNKNOWN". Defaulting would claim
  * "we checked our list and this is not on it" when the true statement is "this source
  * cannot say" (subgraph/README.md's "Provenance labels"; docs/design/ui-spec.md section 3.4,
  * which corrected this exact confusion once already).

@@ -17,8 +17,11 @@ ignition/deployments/*/build-info/
 # Throwaway bidder keys from a live run; worth cents, but written so a crashed run is sweepable
 .ephemeral-bidders.json
 
-# Keeper round state, including the house bid salts it must be able to reveal with
+# Keeper round state, including the house bid salts it must be able to reveal with.
+# Two files: the fork rehearsal (DRY_RUN=1) keeps its own cursor so it cannot consume a
+# round out of the mainnet one. See the STATE_FILE comment in scripts/keeper.ts.
 .keeper-state.json
+.keeper-state.dryrun.json
 
 # Next.js build output and deps
 web/node_modules/

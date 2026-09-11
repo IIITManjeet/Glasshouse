@@ -5,9 +5,9 @@
 // data. A .js file rather than .json on purpose -- fetch() of a sibling file fails
 // under file://, and a judge opening index.html directly is a case that has to work.
 window.GLASSHOUSE_SNAPSHOT = {
-  "producedAt": "2026-09-08T21:03:42.554Z",
+  "producedAt": "2026-09-11T16:01:53.591Z",
   "producedBy": "scripts/make-snapshot.mjs, from GlasshouseBook logs on Base",
-  "head": 51056035,
+  "head": 51176568,
   "book": "0xc4ea91Fe700918220423ac307C6B1c59650FFbfe",
   "auctions": [
     {

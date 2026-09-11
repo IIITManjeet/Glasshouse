@@ -243,14 +243,18 @@ rather than re-derived. That preflight passes end-to-end against real Base state
 
 **Also honest:**
 
-- **The subgraph is deployed to Studio, not published to The Graph Network.** Deployment
+- **The subgraph is published to The Graph Network, and the index is nearly empty.** Subgraph
+  id `FPQdiZTAnR8ac6grgAF2x49bWqwDh87RzqUgQxAvoY2y`, deployment
   `Qmc9Ah4ow5mXD7599hi3ewze7Fg77x1GivAqaCSAmmpK7E`, label `v0.5.1`, indexing the Book from
-  block 50,965,408. Publishing is an on-chain transaction on Arbitrum One and we do not hold
-  ETH there. The Subgraph MCP requires a *published* subgraph plus a Gateway key, so **the MCP
-  composition path is not operational.** The board therefore reads the chain directly today —
-  which is also the right long-run source for a ticking card (polling an indexer every 12 s is
-  7,200 queries/day/tab against a 3,000/day cap), but it means the subgraph's derived history
-  is not what you see live.
+  block 50,965,408; an indexer has allocated to it, so it is served rather than merely listed
+  (`subgraph/README.md` step 3 verifies this from the GNS logs on Arbitrum rather than from the
+  Studio UI). The MCP composition path is operational — `scripts/reserve-advisor.mjs` runs
+  against it end to end. What the index *holds* is the honest part: one auction, two commits,
+  **zero reveals, zero fills, zero settlements**, because the keeper has never run against
+  mainnet. Every figure drawn from it says so. The board still reads the chain directly, which
+  is the right long-run source for a ticking card (polling an indexer every 12 s is 7,200
+  queries/day/tab against a 3,000/day cap), so the subgraph's derived history is not what you
+  see live.
 - **The settlement replay runs off chain.** `settlementMatchesDerivation`
   (`subgraph/src/book.ts:503-506`, and `scripts/make-snapshot.mjs:168`) re-derives the
   contract's own top-2 rule from the raw reveals and compares it against what `settle()`
@@ -326,7 +330,7 @@ Deployment to mainnet is [`DEPLOY.md`](./DEPLOY.md).
 | Track | What we submit |
 |---|---|
 | **1inch** | Opcode `0x2e` on a redeployed `AquaSwapVMRouter` against the official Aqua, with a fill demonstrated on a fork (`test/fork/AquaBaseFork.t.sol`) — both explicitly permitted by the requirements. No 1inch source vendored. |
-| **The Graph** | `subgraph/` over `GlasshouseBook`: all eight events, plus the independent settlement replay. Deployed to Studio; **not published**, so the MCP composition path is not live (see above). |
+| **The Graph** | `subgraph/` over `GlasshouseBook`: all eight events, plus the independent settlement replay. **Published to The Graph Network** (`FPQdiZTAnR8ac6grgAF2x49bWqwDh87RzqUgQxAvoY2y`) and served by an allocated indexer, so the Subgraph MCP composition path is live: `scripts/reserve-advisor.mjs` and `.claude/skills/glasshouse-auction` are two consumers of it. The index is nearly empty (see above). |
 | **Uniswap** | `scripts/uniswap-benchmark.mjs` quotes the deployed v3 `QuoterV2` on Base as an *external* anchor for the price-improvement claim, which is otherwise measured only against SwapVM's own instructions. `scripts/get-usdc.ts` buys the maker's fill inventory through `SwapRouter02`. [`FEEDBACK.md`](./FEEDBACK.md) is the developer feedback, including a real struct-incompatibility bug we hit between `SwapRouter` and `SwapRouter02`. |
 
 ## Documentation

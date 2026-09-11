@@ -2,17 +2,17 @@
 //
 // The rule was written against the subgraph's Q3 result: rows already carrying
 // `competition`, `thin`, `winnerMarginBps` and the per-provenance reveal counts, because
-// subgraph/src/helpers.ts derives all of them in the mapping. The subgraph is deployed to
-// Studio and not published, so nothing can query it, and the page reads the Book directly
-// instead -- which gives it the raw fields and none of the derived ones.
+// subgraph/src/helpers.ts derives all of them in the mapping. The page reads the Book
+// directly instead -- which gives it the raw fields and none of the derived ones.
 //
 // So they are derived here, and they are a TRANSLITERATION of the mapping, not a second
 // opinion: `classify` and `isThin` below are subgraph/src/helpers.ts:244-261 line for
 // line, and the clearing rule is applyDerivedClearing(), which is itself verbatim from
-// GlasshouseBook.sol:229. Three copies of one rule is one too many, and the moment the
-// subgraph is published this file should be deleted rather than kept in sync. Until then
-// the alternative is a reserve panel that cannot run at all, and the rule matters more to
-// a maker than the duplication does.
+// GlasshouseBook.sol:229. Three copies of one rule is one too many, and the condition this
+// file's deletion was made conditional on HAS NOW ARRIVED: the subgraph was published on
+// 2026-09-11, so the panel could read the derived fields instead of re-deriving them. Until
+// that swap is made this is a live divergence risk -- any edit to helpers.ts:244-261 must be
+// mirrored here or the panel and the index will quietly disagree.
 
 import type { CompetitionClass, ReserveRow } from "./reserve-rule";
 import type { Auction } from "./useAuctions";
@@ -51,24 +51,39 @@ function isThin(competition: CompetitionClass, winnerMarginBps: number, clearing
 }
 
 /**
- * The settled rows of the board, newest first, in the rule's shape.
+ * The rows of the board whose reveal window has CLOSED, newest first, in the rule's shape.
  *
- * Only settled auctions count. A round still in its reveal window has a `bestBps` that a
- * later reveal can displace, and feeding a provisional winner into a rule that recommends
- * a reserve "one below the lowest winner we had" would recommend against a winner who is
- * not the winner yet.
+ * THE FILTER IS `revealEnd < head`, NOT `settled`, and the difference is not cosmetic.
+ * This function used to select on `settled`, reasoning that a round still in its reveal
+ * window has a `bestBps` a later reveal can displace, so feeding a provisional winner into
+ * a rule that recommends "one bps below the lowest winner we had" would recommend against
+ * a winner who is not the winner yet. That reasoning is right, and `settled` was the wrong
+ * expression of it: the property it describes is "the reveal set is final", which is
+ * exactly `revealEnd < head`. `settled` is that property PLUS an unrelated event -- someone
+ * calling the permissionless `settle()` -- so it over-filtered.
+ *
+ * It also made this disagree with `scripts/reserve-advisor.mjs`, which runs the design
+ * doc's Q3 (`docs/design/subgraph-design.md` §7.2, line 1110: `where: { maker, revealEnd_lt:
+ * $head }`, "what makes every row's reveal set final"). §7.2 requires the page and the
+ * advisor to "agree to the basis point on the same head block", and the header of
+ * reserve-rule.ts claims they "can never quietly disagree". With a live keeper they would
+ * have disagreed on every round, for the 15-plus blocks each one spends past its reveal
+ * window and not yet settled. scripts/verify-run.mjs found this; the spec decided it.
  *
  * Rows whose reveals could not be READ are dropped rather than counted as zero-reveal
  * auctions. `revealedCount === null` means an eth_getLogs call failed; scoring it as NONE
  * would push the rule toward its NO_REVEALS arm on the strength of a network error. The
  * count of dropped rows comes back so the panel can say how many it could not see.
+ *
+ * `head` is the block the caller's rows are as of -- the same number the panel prints, not
+ * a fresh read, so the window and the caption cannot describe different blocks.
  */
-export function reserveWindow(auctions: readonly Auction[]): ReserveWindow {
+export function reserveWindow(auctions: readonly Auction[], head: number): ReserveWindow {
   const rows: ReserveWindowRow[] = [];
   let unreadable = 0;
 
   for (const a of auctions) {
-    if (!a.settled) continue;
+    if (!(a.revealEnd < head)) continue;
     if (a.revealedCount === null || a.revealedCount === undefined) {
       unreadable++;
       continue;

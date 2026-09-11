@@ -37,6 +37,22 @@ export default defineConfig({
   paths: {
     sources: "./src",
   },
+  // Hardhat's Solidity test runner does NOT read foundry.toml, so the `fs_permissions`
+  // grant there covers `forge test` and nothing else. Without this block
+  // test/fork/GenerateRounds.t.sol fails under `npm test` with "the path
+  // config/rounds.json is not allowed to be accessed for write operations" while passing
+  // under `forge test` -- two runners over the same suite disagreeing, which is worse than
+  // either result on its own.
+  //
+  // Narrower than foundry.toml deliberately: `readWriteFile` grants the ONE file the
+  // generator writes, not the whole ./config directory.
+  test: {
+    solidity: {
+      fsPermissions: {
+        readWriteFile: ["./config/rounds.json"],
+      },
+    },
+  },
   networks: {
     localhost: {
       type: "http",

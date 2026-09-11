@@ -141,9 +141,9 @@ export function livePhase(a: Auction, head: number): string {
  * first version of this and was wrong.
  *
  * Reads go straight to the Book over eth_call rather than to the subgraph. That is not a
- * shortcut: the subgraph is deployed to Studio but not published, so it cannot answer, and
- * even once it can, an indexer is a block or two behind and this card is counting down in
- * blocks. The chain is the correct source for a live phase; the subgraph's job is history.
+ * shortcut and not a limitation: the subgraph is published and answers queries, but an
+ * indexer is a block or two behind the head and this card is counting down in blocks. The
+ * chain is the correct source for a live phase; the subgraph's job is history.
  */
 export function useAuctions(): Board {
   const [auctions, setAuctions] = useState<Auction[]>([]);

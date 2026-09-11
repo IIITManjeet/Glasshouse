@@ -256,7 +256,7 @@ export function Receipt({ a, source }: { a: Auction; source: Source }) {
             <span className="font-medium text-brick">settlement DISAGREES with the replay — shown, not hidden</span>
           ) : (
             <span className="text-ink-faint">
-              not run — the replay is the subgraph&rsquo;s, and it is not published yet
+              not run — the replay is the subgraph&rsquo;s, and this view reads the chain, which cannot do it
             </span>
           )}
         </Field>

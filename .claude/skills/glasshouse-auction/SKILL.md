@@ -1,6 +1,6 @@
 ---
 name: glasshouse-auction
-description: Use when a Glasshouse maker or a judge asks "what reserve should I set for my next auction", "what phase is auction X in", or "explain the receipt for auction X". Answers by querying the live Glasshouse subgraph through the Subgraph MCP and running the integer reserve rule in site/reserve-rule.js — it never estimates a number from memory. OPERATIONAL as of 2026-09-11: the subgraph is published and the Gateway key is set. The one catch is startup order -- an MCP server reads its environment once, so a session begun before GRAPH_API_KEY was set still fails auth. See "Current status" below.
+description: Use when a Glasshouse maker or a judge asks "what reserve should I set for my next auction", "what phase is auction X in", or "explain the receipt for auction X". Answers by querying the live Glasshouse subgraph through the Subgraph MCP and running the integer reserve rule in web/lib/reserve-rule.ts — it never estimates a number from memory. OPERATIONAL as of 2026-09-11: the subgraph is published and the Gateway key is set. The one catch is startup order -- an MCP server reads its environment once, so a session begun before GRAPH_API_KEY was set still fails auth. See "Current status" below.
 ---
 
 # Glasshouse auction skill
@@ -63,7 +63,7 @@ alongside the number rather than presented as a tuned recommendation.
 
 The skill's job is to fetch facts through the Subgraph MCP and read them aloud correctly.
 The one piece of arithmetic it performs — the reserve recommendation — is not something
-the model computes itself: it is `recommendReserve()` in `site/reserve-rule.js`, integer
+the model computes itself: it is `recommendReserve()` in `web/lib/reserve-rule.ts`, integer
 arithmetic over indexed rows, unit-tested in `test/js/reserve-rule.test.js`. **Per
 `run.md` F-155: never call this rule, or its output, "AI" or an "AI decision".** The
 model's contribution is orchestration and plain-language explanation of a fact the rule

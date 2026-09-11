@@ -8,10 +8,10 @@
 // sees real indexed history rather than an empty page or a spinner. It is never presented
 // as live data; the page tags it SOURCE - SNAPSHOT IN REPO - AS OF BLOCK N.
 //
-// It reads the CHAIN rather than the subgraph on purpose: the subgraph is deployed to
-// Studio but not yet published to The Graph Network, and the Studio query URL carries an
-// account id that is not in this repository. Reading logs directly needs neither, and the
-// shapes below match the Q1 fields exactly, so swapping the source later changes nothing
+// It reads the CHAIN rather than the subgraph on purpose: a query URL carries either a
+// Studio account id or a Gateway API key, and neither may live in this repository -- and
+// this script's output is committed. Reading logs directly needs no credential at all, and
+// the shapes below match the Q1 fields exactly, so swapping the source later changes nothing
 // on the page.
 //
 //   node scripts/make-snapshot.mjs
@@ -44,10 +44,14 @@ const bookAbi = JSON.parse(
 //   base.drpc.org            temporary internal error
 //   1rpc.io/base             -32602  eth_getLogs is limited to a 0-50 block range
 //   base.meowrpc.com         -32000  eth_getLogs is not supported
-//   mainnet.base.org         works, capped at a 10,000 block range
+//   mainnet.base.org         works, capped at a block range it does not promise to keep
 //
-// So this uses Base's own endpoint, chunked under its cap. BASE_RPC_URL overrides it for
-// anyone with an archive provider.
+// So this uses Base's own endpoint. THE CAP IS NOT A CONSTANT: it was 10,000 blocks when
+// this list was written and is 2,000 today, which silently broke this scan -- the failure
+// is an RPC error naming the new cap, not an empty result, but it stops the snapshot being
+// regenerated at all. So the size below is a STARTING size, and readLogs() renegotiates it
+// down from whatever the endpoint reports. BASE_RPC_URL overrides the endpoint for anyone
+// with an archive provider, and a larger cap there is used as-is.
 const LOGS_RPC = process.env.BASE_RPC_URL ?? "https://mainnet.base.org";
 const CHUNK = 9_000n;
 
@@ -64,13 +68,27 @@ async function main() {
 
   console.log(`  scanning ${BOOK} from ${DEPLOY_BLOCK} to ${head}`);
   const logs = [];
-  for (let from = DEPLOY_BLOCK; from <= head; from += CHUNK + 1n) {
-    const to = from + CHUNK > head ? head : from + CHUNK;
-    const chunk = await rpc(
-      () => client.getLogs({ address: BOOK, fromBlock: from, toBlock: to }),
-      `logs ${from}-${to}`,
-    );
-    logs.push(...chunk);
+  let chunk = CHUNK;
+  for (let from = DEPLOY_BLOCK; from <= head; ) {
+    const to = from + chunk > head ? head : from + chunk;
+    try {
+      logs.push(
+        ...(await rpc(
+          () => client.getLogs({ address: BOOK, fromBlock: from, toBlock: to }),
+          `logs ${from}-${to}`,
+        )),
+      );
+      from = to + 1n;
+    } catch (e) {
+      // The endpoint caps eth_getLogs and says so in the error. Take the cap it names
+      // rather than failing the whole scan, and halve only if it named nothing usable.
+      const m = /limited to (?:a )?([\d,_]+)\s*(?:block\s*)?range/i.exec(String(e?.message ?? e));
+      const allowed = m ? BigInt(m[1].replace(/[,_]/g, "")) : null;
+      const next = allowed && allowed > 0n ? allowed : chunk / 2n;
+      if (next >= chunk || next < 1n) throw e;
+      console.log(`  endpoint caps eth_getLogs at ${next} blocks; continuing at that size`);
+      chunk = next;
+    }
   }
   console.log(`  ${logs.length} log(s)`);
 
@@ -222,9 +240,9 @@ async function main() {
 
   // THE ROUND MANIFEST: which order hashes exist, so the page can ask the chain directly.
   //
-  // The page is meant to read the subgraph, but it is deployed to Studio and not
-  // published, so today there is nothing to query. Meanwhile the keeper opens rounds
-  // continuously, and a board that cannot see them is not a board. The Book exposes
+  // The page reads the chain for a live phase rather than the subgraph, because an indexer
+  // is a block or two behind a card that counts down in blocks (web/lib/chain.js). The Book
+  // exposes
   // auctions(maker, orderHash) as a view, so the page can read every round over plain
   // eth_call -- but only if it knows which hashes to ask about, and those are
   // deterministic and precomputed rather than discoverable. Hence this.

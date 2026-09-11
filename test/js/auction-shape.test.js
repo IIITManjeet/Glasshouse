@@ -176,16 +176,18 @@ test("the simulation is a pure function of the block, so it never runs backwards
 
 test("the reserve window drops unreadable rows rather than scoring them as no-reveal", async () => {
   const { reserveWindow } = await import("../../web/lib/reserve-window.ts");
+  const HEAD = 1000;
   const rows = [
-    // Settled, two reveals, winner 400 over a runner-up at 250.
-    { settled: true, revealedCount: 2, committedCount: 3, bestBidder: "0xa", bestBps: 400, secondBps: 250, reserveBps: 50, round: 1 },
-    // Settled, but eth_getLogs failed. NOT a zero-reveal auction.
-    { settled: true, revealedCount: null, committedCount: 2, bestBidder: null, bestBps: 0, secondBps: 0, reserveBps: 50, round: 2 },
-    // Still running: a later reveal can still displace this winner.
-    { settled: false, revealedCount: 1, committedCount: 2, bestBidder: "0xb", bestBps: 300, secondBps: 0, reserveBps: 50, round: 3 },
+    // Reveal window closed, two reveals, winner 400 over a runner-up at 250.
+    { revealEnd: 900, settled: true, revealedCount: 2, committedCount: 3, bestBidder: "0xa", bestBps: 400, secondBps: 250, reserveBps: 50, round: 1 },
+    // Closed, but eth_getLogs failed. NOT a zero-reveal auction.
+    { revealEnd: 910, settled: true, revealedCount: null, committedCount: 2, bestBidder: null, bestBps: 0, secondBps: 0, reserveBps: 50, round: 2 },
+    // Still IN its reveal window: a later reveal can still displace this winner, so the
+    // rule must not see it. revealEnd is not less than head.
+    { revealEnd: 1200, settled: false, revealedCount: 1, committedCount: 2, bestBidder: "0xb", bestBps: 300, secondBps: 0, reserveBps: 50, round: 3 },
   ];
-  const w = reserveWindow(rows);
-  assert.equal(w.rows.length, 1, "one settled, readable round");
+  const w = reserveWindow(rows, HEAD);
+  assert.equal(w.rows.length, 1, "one readable round past its reveal window");
   assert.equal(w.unreadable, 1);
   assert.equal(w.rows[0].competition, "CONTESTED");
   assert.equal(w.rows[0].clearingBps, 250);
@@ -193,4 +195,39 @@ test("the reserve window drops unreadable rows rather than scoring them as no-re
   // isThin: CONTESTED and margin > clearing. 150 is not greater than 250.
   assert.equal(w.rows[0].thin, false);
   assert.equal(w.rows[0].unrevealedCount, 1);
+});
+
+test("the reserve window counts a round past its reveal window that nobody has settled yet", async () => {
+  // THE REGRESSION THIS PINS. reserveWindow() used to filter on `settled`, which is
+  // `revealEnd < head` PLUS an unrelated event: somebody calling the permissionless
+  // settle(). The design doc's Q3 window is `revealEnd_lt: $head`
+  // (docs/design/subgraph-design.md section 7.2), which is what scripts/reserve-advisor.mjs
+  // queries -- so the page and the advisor disagreed about `n` for every round in the gap
+  // between its reveal window closing and someone settling it. With a live keeper that gap
+  // is at least the 15-block exclusive window plus a settle transaction, on every round,
+  // and section 7.2 requires the two routes to "agree to the basis point on the same head
+  // block". scripts/verify-run.mjs found the divergence; this keeps it fixed.
+  const { reserveWindow } = await import("../../web/lib/reserve-window.ts");
+  const row = {
+    revealEnd: 900,
+    settled: false,
+    revealedCount: 1,
+    committedCount: 1,
+    bestBidder: "0xa",
+    bestBps: 400,
+    secondBps: 0,
+    reserveBps: 50,
+    round: 7,
+  };
+  const w = reserveWindow([row], 1000);
+  assert.equal(w.rows.length, 1, "past revealEnd counts even though settle() has not been called");
+  assert.equal(w.rows[0].competition, "SOLE");
+  // One reveal: secondBps is 0, so the reserve is the price.
+  assert.equal(w.rows[0].clearingBps, 50);
+  assert.equal(w.rows[0].thin, true, "SOLE is always thin");
+
+  // And the boundary is strict: revealEnd == head is still IN the reveal window, because
+  // revealEnd is the last block of reveal, inclusive (subgraph/schema.graphql).
+  assert.equal(reserveWindow([row], 900).rows.length, 0, "revealEnd == head is not yet final");
+  assert.equal(reserveWindow([row], 901).rows.length, 1, "one block later it is");
 });

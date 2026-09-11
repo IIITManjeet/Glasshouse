@@ -4,10 +4,22 @@
 // free so the page and the advisor run the identical function over the identical window
 // and can never quietly disagree about the number they show a maker.
 //
-// THAT CLAIM USED TO BE FALSE. There were two byte-identical copies of this file, and the
-// advisor imported `site/reserve-rule.js` while the page imported `web/lib/reserve-rule.js`.
-// Identical today, one `sed` away from not being, and nothing would have failed. One file
+// THAT CLAIM HAS BEEN FALSE TWICE, IN TWO DIFFERENT WAYS, AND BOTH ARE WORTH KEEPING HERE.
+//
+// First the FUNCTION was not shared: two byte-identical copies of this file, with the
+// advisor importing `site/reserve-rule.js` and the page importing `web/lib/reserve-rule.ts`.
+// Identical then, one `sed` away from not being, and nothing would have failed. One file
 // now, and both read it.
+//
+// Then the WINDOW was not shared, which is the subtler half and survived the first fix
+// untouched. The advisor queried the design doc's Q3 (`revealEnd_lt: $head`,
+// subgraph-design.md section 7.2) while `web/lib/reserve-window.ts` filtered on `settled`
+// -- the same property plus an unrelated event, someone calling the permissionless
+// settle(). Same function, different rows, so "identical window" was simply untrue: with a
+// live keeper they would have disagreed on every round for the 15-plus blocks each spends
+// past its reveal window and unsettled. The page now uses `revealEnd < head` too, and
+// test/js/auction-shape.test.js pins it. scripts/verify-run.mjs is what caught it -- which
+// is the argument for that script existing at all.
 //
 // The three regimes this rule leans on are test/ReserveMatrix.t.sol, not a guess:
 //   - five competitive bidders (400/250/100/60/30): clearing is 250 bps at every reserve

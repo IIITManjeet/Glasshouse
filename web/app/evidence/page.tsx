@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useBoard } from "@/components/BoardProvider";
 import { Receipt } from "@/components/Receipt";
+import { Timeline } from "@/components/Timeline";
 import { ReservePanel } from "@/components/Reserve";
 import { Leaderboard } from "@/components/Leaderboard";
 import { Comparison } from "@/components/Comparison";
@@ -91,6 +92,16 @@ function PinnedReceipt() {
       {shown ? (
         <>
           <Receipt a={shown} source={source} />
+          {/* The receipt is the OUTCOME; this is the SEQUENCE that produced it, and only the
+              indexer can give it -- an eth_call returns storage as it is now, never the order
+              it got that way. Suppressed for the rehearsal, which has no indexed round and
+              whose block numbers are not Base blocks: a timeline there would be the one panel
+              on this page that could not carry its own provenance. */}
+          {source !== "sim" && (
+            <div className="mt-3">
+              <Timeline maker={shown.maker} orderHash={shown.orderHash} />
+            </div>
+          )}
           {skipped > 0 && (
             <p className="mt-2 text-[0.8rem] text-ink-faint">
               {skipped} more recent round{skipped === 1 ? "" : "s"} settled with no winner — every
@@ -121,7 +132,7 @@ function PinnedReceipt() {
 }
 
 export default function EvidencePage() {
-  const { auctions, source, error } = useBoard();
+  const { auctions, source, head, error } = useBoard();
 
   return (
     <main>
@@ -216,7 +227,7 @@ export default function EvidencePage() {
             There is no maker dashboard. The advisor reads the rounds that already happened and
             prints the command, with the reason it recommends what it does.
           </p>
-          <ReservePanel auctions={auctions} source={source} />
+          <ReservePanel auctions={auctions} source={source} head={head} />
         </section>
       </Reveal>
 

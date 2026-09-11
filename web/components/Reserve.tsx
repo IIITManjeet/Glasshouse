@@ -37,14 +37,17 @@ const REASONS: Record<string, string> = {
 const BOOK = "0xc4ea91Fe700918220423ac307C6B1c59650FFbfe";
 const ROUTER = "0x5c3baE054e8b4915a13726B397b1AeA864247DBf";
 
-export function ReservePanel({ auctions, source }: { auctions: Auction[]; source: Source }) {
+export function ReservePanel({ auctions, source, head }: { auctions: Auction[]; source: Source; head: number }) {
   const [copied, setCopied] = useState(false);
   const simulated = source === "sim";
 
+  // `head` is passed in rather than read here so the window and the block this panel names
+  // are the same number. The filter is `revealEnd < head` -- the design doc's Q3 window
+  // (subgraph-design.md section 7.2) -- which is what the advisor uses too.
   const { rec, window: win } = useMemo(() => {
-    const w = reserveWindow(auctions);
+    const w = reserveWindow(auctions, head);
     return { rec: recommendReserve(w.rows, { floorBps: 50, maxBps: 500, K: 8 }), window: w };
-  }, [auctions]);
+  }, [auctions, head]);
 
   const cast =
     `cast send ${BOOK} \\\n` +
@@ -113,8 +116,10 @@ export function ReservePanel({ auctions, source }: { auctions: Auction[]; source
           </div>
         )}
         <div className="mt-1 text-ink-faint">
-          Bidder breakdown (team / invited / unlisted) is not shown: that list is ours and lives in the
-          subgraph, which is deployed to Studio and not published, so a chain read cannot answer it.
+          Bidder breakdown (team / invited / unknown) is not shown: that list is ours and lives in the
+          subgraph, which this panel does not read — its rows come from the board&rsquo;s chain read, and a
+          chain read cannot answer it. <code className="font-mono">scripts/reserve-advisor.mjs</code> queries
+          the published subgraph and does report the split.
         </div>
       </div>
 
@@ -160,7 +165,7 @@ export function ReservePanel({ auctions, source }: { auctions: Auction[]; source
         on this board — at most the newest K = 8, floor 50 bps, ceiling 500. The window rows are derived from
         raw contract fields by <code className="font-mono">web/lib/reserve-window.js</code>, which
         transliterates the subgraph&rsquo;s own mapping (<code className="font-mono">subgraph/src/helpers.ts</code>)
-        because the subgraph cannot be queried yet.{" "}
+        because this panel&rsquo;s rows come from the board&rsquo;s chain read rather than from the index.{" "}
         {simulated
           ? "The rounds it read are simulated, so this number is a rehearsal of the advice, not advice."
           : "The three regime thresholds come from test/ReserveMatrix.t.sol, not from a guess."}

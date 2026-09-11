@@ -1,16 +1,17 @@
 // Reading auctions straight from the Book, over plain eth_call.
 //
-// WHY THE PAGE TALKS TO THE CHAIN AT ALL. The subgraph is the intended source, but it is
-// deployed to Studio and not published to The Graph Network, so today there is nothing to
-// query -- while the keeper opens rounds continuously. A board that cannot see the round
-// happening right now is not a board.
+// WHY THE PAGE TALKS TO THE CHAIN AT ALL. Not because the subgraph cannot answer -- it was
+// published to The Graph Network on 2026-09-11 and is served by an allocated indexer. The
+// keeper opens rounds continuously and this card counts down in blocks, and an indexer is a
+// block or two behind the head. A board that cannot see the round happening right now is not
+// a board.
 //
 // This is possible without an indexer only because the round hashes are DETERMINISTIC and
 // precomputed (site/data/rounds.js, generated from config/rounds.json, itself built by
 // upstream's MakerTraitsLib). There is nothing to discover: the page already knows every
 // order hash the keeper will ever open, so it can ask the Book about each one.
 //
-// It also stays the right source once the subgraph IS published. Polling an indexer every
+// That reasoning did not change when the subgraph was published. Polling an indexer every
 // 12 s costs 7,200 queries a day per open tab against a 3,000/day cap; the chain has no
 // such limit, and for a live phase it is fresher anyway. The subgraph's job is history and
 // the things it derives, not the ticking card.

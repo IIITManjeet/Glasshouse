@@ -19,11 +19,30 @@ each one is in [`run.md`](./docs/archive/run.md).
 - `site/index.html` as a real route rather than a hand-written file synced into `public/`.
   It is the last thing keeping two palettes, two font strategies and two provenance
   conventions alive at once.
-- Per-event timeline on the receipt. The transaction links themselves shipped in
-  `1ef507d`; `bidsFor()` in `chain.js` now keeps `transactionHash` as `commitTx` and
-  `revealTx`, so what is left is the ordered per-event timeline, not the plumbing.
+- A second reveal on mainnet. The fork rehearsal now exercises the second-price arm
+  (`secondBps > reserveBps`) and a real fill, but no mainnet auction has ever had two
+  bidders reveal, so `PRICE_SET_BY` in `scripts/verify-run.mjs` has nothing to confirm there.
+- The reserve panel reading the index rather than re-deriving. `web/lib/reserve-window.ts`
+  is still a transliteration of `subgraph/src/helpers.ts`; the subgraph is published now, so
+  the condition its header made deletion conditional on has arrived.
 
 ### Added
+- **A per-event timeline on the receipt** (`web/components/Timeline.tsx`), reading
+  `AuctionEvent` and the full `Bid` ladder from the index. It recomputes nothing: the price
+  after each reveal is `clearingBpsAfter`, which the mapping records at the moment that
+  reveal is applied precisely so a UI need not become a fourth copy of the clearing rule.
+  This is the one panel with no chain fallback, and it says so — an `eth_call` returns
+  storage as it is now, never the order it became that way.
+- **`scripts/verify-run.mjs`**, which re-derives every auction outcome from the raw logs
+  without importing any of the three implementations of the clearing rule, then asks whether
+  each agrees. It reports three states, not two: a check with nothing to run on is `n/a`
+  with the reason, never a pass, because "6 of 8 passed" about a chain with zero reveals is
+  the flattering answer and the useless one. Against a fork carrying a full keeper round and
+  a live fill: 7 passed, 0 failed, 1 n/a. Against mainnet: 3 passed, 2 failed, 3 n/a.
+- **`scripts/run-checks.mjs`** behind `npm test`, running all three suites instead of
+  `&&`-chaining them. A red Solidity test used to hide both the JS tests and the provenance
+  lint — the lint being the thing that checks every figure still names its source.
+
 - **The subgraph is published to The Graph Network** (2026-09-11), subgraph id
   `FPQdiZTAnR8ac6grgAF2x49bWqwDh87RzqUgQxAvoY2y`, and an indexer allocated to it 117 blocks
   later, so it is served rather than merely listed. Verified by decoding the GNS logs on
@@ -40,6 +59,32 @@ each one is in [`run.md`](./docs/archive/run.md).
   path. `subgraph/README.md` now tabulates which of the three consumers may see which URL.
 
 ### Fixed
+- **The page and the advisor recommended reserves from different windows** while
+  `reserve-rule.ts` claimed they "can never quietly disagree". `reserveWindow()` filtered on
+  `settled`; the advisor queries the design doc's Q3 (`revealEnd_lt: $head`,
+  `subgraph-design.md` §7.2). `settled` is that property plus an unrelated event — somebody
+  calling the permissionless `settle()` — so with a live keeper they would have disagreed on
+  every round for the fifteen-plus blocks each spends past its reveal window and unsettled.
+  On mainnet today the advisor said `n=1, NO_REVEALS` and the page said `n=0, NO_HISTORY`.
+  The page now uses `revealEnd < head` and both say `n=1, 50 bps, NO_REVEALS`.
+- **`npm test` was red where `forge test` was green.** Hardhat's Solidity runner does not
+  read `foundry.toml`, so `GenerateRounds.t.sol` failed on a write permission that
+  `fs_permissions` had already granted. `hardhat.config.ts` now grants it too, narrower: the
+  one file, not the directory.
+- **The snapshot generator had stopped working.** `mainnet.base.org` tightened its
+  `eth_getLogs` cap from 10,000 blocks to 2,000; `make-snapshot.mjs` asked for 9,000 and
+  failed the whole scan. Both it and the verifier now take the cap out of the error and
+  continue at that size.
+- **The fork rehearsal could consume the round it was rehearsing.** The keeper's
+  `nextRound` cursor lived in one file for both mainnet and the fork, which run at the same
+  chain id against the same Book address. `DRY_RUN=1` now keeps its own.
+- **Eleven places still said the subgraph was unpublished**, four of them visible on the
+  page and one the Graph track row in `README.md`. Corrected to what is now true, including
+  why each consumer still reads the chain where it does.
+- **`Profile.tsx` declared a provenance value that does not exist** (`UNLISTED`; the mapping
+  emits `UNKNOWN`) — the same fault fixed in `subgraph.ts` earlier, harmless only until
+  something subgraph-backed fed that component, which now exists.
+
 - The advisor could not use the deployment id its own documentation gave you. Every file
   names the deployment as `Qmc9Ah…pK7E`, but the MCP's deployment tools take the 32-byte
   hash, and passing the documented value failed with `Schema not found in the response` --
