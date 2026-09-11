@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useBoard } from "@/components/BoardProvider";
 import { Receipt } from "@/components/Receipt";
 import { Timeline } from "@/components/Timeline";
+import { Settlement } from "@/components/Settlement";
 import { ReservePanel } from "@/components/Reserve";
 import { Leaderboard } from "@/components/Leaderboard";
 import { Comparison } from "@/components/Comparison";
@@ -46,7 +47,7 @@ const SECTIONS = [
  * is describing.
  */
 function PinnedReceipt() {
-  const { auctions, source, loading, setDemo } = useBoard();
+  const { auctions, source, head, loading, setDemo } = useBoard();
   const params = useSearchParams();
 
   const asked = params.get("round");
@@ -91,6 +92,14 @@ function PinnedReceipt() {
 
       {shown ? (
         <>
+          {/* The mechanism as one picture, above the receipt. The receipt proves the
+              numbers; this shows where the price CAME from -- a line drawn at the
+              runner-up's height, passing through the winner's column without touching it.
+              It is a figure with real values and a source line, not decoration: an image
+              that merely resembled a chart is the one thing this page cannot carry. */}
+          <div className="mb-3">
+            <Settlement a={shown} head={head} />
+          </div>
           <Receipt a={shown} source={source} />
           {/* The receipt is the OUTCOME; this is the SEQUENCE that produced it, and only the
               indexer can give it -- an eth_call returns storage as it is now, never the order

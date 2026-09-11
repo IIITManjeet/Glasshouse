@@ -672,3 +672,70 @@ source, with `?a=` still winning when present because that is what the lookup bo
 a screenshot. This one was invisible in every screenshot I took, because I happened to shoot
 the working URL. A page can be broken at one address and fine at another, and only loading
 the actual URL a person reported will tell you which.
+
+---
+
+# The action-to-representation decision (Fable, 2026-09-12)
+
+The art direction above was wrong twice, in the same way, and the correction is worth more
+than either attempt.
+
+**First it decorated the NAME.** A glasshouse is a building, so it drew a building — palm
+house, ferns, terracotta, Victorian ironwork.
+
+**Then it decorated the WORD.** Told to represent the auction instead, it drew envelopes with
+wax seals. That is the identical error one level down: envelopes illustrate "sealed" exactly
+the way ferns illustrate "glasshouse". They say a bid is hidden. They say nothing whatever
+about the only surprising thing this product does, which is that the winner pays somebody
+else's number.
+
+## The decision
+
+**One central idea:** every bid lives on one shared vertical scale of basis points, and the
+price is a horizontal line that settles at the SECOND mark from the top, never touching the
+winner.
+
+**No imagery at all.** An abstract generated image that resembles a chart is precisely what
+this project forbids — `lint-provenance.mjs` exists so every figure names what produced it,
+and decoration shaped like data defeats that at a glance. The mechanism chart IS the imagery.
+
+**Keep the name, keep the palette, abandon the botanical direction.** The only permitted
+reading of "glasshouse" is literal and stated once in copy: the walls are glass, every figure
+shows what produced it, and a sealed bid is the one frosted pane. Do not illustrate that
+either.
+
+## The vocabulary, one meaning per colour
+
+| Signal | Means | Nothing else may use it |
+|---|---|---|
+| teal | a revealed, on-chain value | — |
+| ochre | money moving to the maker: the price line, and the surplus above it | not for warnings |
+| terracotta | a forfeit | not for errors or emphasis |
+| diagonal hatch | a value that exists and cannot be read | not for "loading" |
+| ink cap, no colour | the winner | colour is reserved for money; a crown spends it on applause |
+
+**Columns never reorder.** The x-axis is commit order and stays commit order through reveal
+and settle. Sorting by value would be a lie about what the contract knows, and when.
+
+**The single element carrying the most meaning** is the price line: drawn at the runner-up's
+height, extending across the whole chart, passing through the winner's column without moving
+it. That is the claim "what you bid decides whether you win, not what you pay" turned from a
+sentence to be believed into a line whose source you can see.
+
+## Built
+
+`web/components/Settlement.tsx`, above the receipt on `/evidence`. Every state in the table
+above, from the round data the board already has, inside a `<figure data-src>` with its own
+provenance caption — a figure, not decoration.
+
+Two defects caught by looking at the rendered result, both invisible in the diff: the surplus
+label collided with the price line whenever the gap was small (which is the *common* case,
+since a small gap means the runner-up bid close to the winner — so the annotation failed
+exactly when the auction was most competitive), and the longer replacement label was clipped
+by the right gutter.
+
+## Still open
+
+The landing hero could be this same chart rendered from the most recently settled round, with
+the same provenance line. That is the one remaining place a generated image would otherwise
+have gone.
