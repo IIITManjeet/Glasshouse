@@ -201,7 +201,7 @@ The keeper is a script you run. It is not a hosted service, and it is not runnin
 
 ## What is proven, and what is not
 
-**Verified by `forge test` — 97 tests, 9 suites, 0 failures.** Plus `npm run test:js`, 48
+**Verified by `forge test` — 97 tests, 9 suites, 0 failures.** Plus `npm run test:js`, 50
 tests, 0 failures, over the shared ESM (`phase`, the reserve rule, the advisor, and the
 call budget one poll of the board is allowed to spend).
 
@@ -236,11 +236,18 @@ cast logs --from-block 51008600 --to-block 51008700 \
 ```
 
 That round's order hash is `0x…01a07d2dfab2`, which is not the hash of any real order, so no
-SwapVM program ever ran against it and no fill was ever possible. `scripts/run-live-fill.ts` is
-the script that closes this gap — one auction against `router.hash(order)` for an order really
+SwapVM program ever ran against it and no fill was ever possible. `scripts/run-live-fill.ts`
+closed that gap on 2026-09-12: one auction against `router.hash(order)` for an order really
 shipped to Aqua, with every byte of the encoding taken from `test/fork/LiveFillPreflight.t.sol`
-rather than re-derived. That preflight passes end-to-end against real Base state on a fork
-(`test_Preflight_TheLiveRunFills`). The mainnet execution has not happened.
+rather than re-derived, and the on-chain `router.hash(order)` asserted equal to the preflight's
+before anything was spent.
+
+**Order `0x58296d32…`, on Base mainnet.** Two bidders committed sealed. The winner revealed
+400 bps, the rival 250, and the auction cleared at **250 — the rival's bid, not the winner's**.
+The winner then filled inside the exclusive window: 0.00001 WETH in, 24,096 USDC out, the exact
+amounts the preflight predicted. `fillPhase` is `EXCLUSIVE` and `fillByWinner` is true, so the
+window did the thing it exists to do. That is the whole claim of this project happening once,
+with real money, on a public chain.
 
 **Also honest:**
 
@@ -250,22 +257,27 @@ rather than re-derived. That preflight passes end-to-end against real Base state
   block 50,965,408; an indexer has allocated to it, so it is served rather than merely listed
   (`subgraph/README.md` step 3 verifies this from the GNS logs on Arbitrum rather than from the
   Studio UI). The MCP composition path is operational — `scripts/reserve-advisor.mjs` runs
-  against it end to end. What the index *holds* is the honest part: as of block 51,185,203,
-  **two auctions, three commits, one reveal, one settlement, and still zero fills**. The
-  keeper ran its first mainnet round on 2026-09-12 (round 0, order hash `0x50d52b02…`), which
-  is the first time the AssemblyScript mapping has run on a real settlement. The index remains
-  nearly empty and every figure drawn from it says so.
+  against it end to end. What the index *holds* is the honest part: as of block 51,188,030,
+  **three auctions, five commits, three reveals, two settlements and one fill**. Everything
+  but the first of those landed on 2026-09-12, when the keeper ran its first mainnet round
+  and the live fill followed it. The index is still nearly empty, and every figure drawn
+  from it says so.
 
-  That round is also where three independent implementations of the clearing rule met real
-  data for the first time, and agreed. The subgraph's own replay reports
-  `settlementMatchesDerivation: true`; `scripts/verify-run.mjs`, which re-derives the outcome
-  from the raw reveals without importing any of the three, reports `REPLAY` pass against what
-  `settle()` emitted; and `web/lib/reserve-window.ts` agrees with that replay on competition
-  class, thinness and winner margin. One bidder, `bestBps` 168, `secondBps` 0, cleared at the
-  reserve of 50 — `competition: SOLE`, `thin: true`. Which is exactly why it is not yet the
-  demonstration that matters: a lone bidder clears at the reserve, so the second-price arm is
-  still unexercised on mainnet and `verify-run`'s `PRICE_SET_BY` check FAILS rather than
-  passing, saying so. That needs a second funded wallet. The board still reads the chain directly, which
+  Those rounds are where three independent implementations of the clearing rule met real
+  data and agreed. The subgraph's own replay reports `settlementMatchesDerivation: true` on
+  both settled auctions; `scripts/verify-run.mjs`, which re-derives the outcome from the raw
+  reveals without importing any of the three, reports `REPLAY` pass against what `settle()`
+  emitted; and `web/lib/reserve-window.ts` agrees with that replay on competition class,
+  thinness and winner margin.
+
+  The two settled rounds are deliberately different, and the contrast is the point.
+  `0x50d52b02…` had one bidder — the disclosed house bid — and a second-price auction with
+  one bidder clears at the reserve by definition: `bestBps` 168, `secondBps` 0, cleared at
+  50, `competition: SOLE`, `thin: true`. `0x58296d32…` had two, and cleared at the
+  **runner-up's 250 rather than the winner's 400**: `competition: CONTESTED`, `thin: false`,
+  `reserveBound: false`. `verify-run`'s `PRICE_SET_BY` check names both — "1 of 2 settled
+  auctions cleared at the RUNNER-UP's bid, 1 cleared at the reserve" — rather than reporting
+  only the flattering one. The board still reads the chain directly, which
   is the right long-run source for a ticking card (polling an indexer every 12 s is 7,200
   queries/day/tab against a 3,000/day cap), so the subgraph's derived history is not what you
   see live.
@@ -313,7 +325,7 @@ Requires **Node ≥ 22.13.0** (Hardhat 3) and [Foundry](https://getfoundry.sh).
 ```bash
 npm install
 forge test                    # 97 tests; the fork suites need internet
-npm run test:js               # 48 tests
+npm run test:js               # 50 tests
 node scripts/size-check.mjs   # EIP-170 guard, runs on every build
 ```
 

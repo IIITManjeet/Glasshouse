@@ -117,17 +117,38 @@ Findings referenced as F-n live in `DESIGN.md`.
 
   Snapshot regenerated and committed, so `/evidence` shows this rather than the old 3/2/3.
 
-- [ ] **A second bidder revealing above the reserve on mainnet**, so `PRICE_SET_BY` has
-  something to confirm. The fork proves the second-price arm works; mainnet has never seen it.
+- [x] **A second bidder revealed above the reserve on mainnet, and the winner filled.**
+  2026-09-12, order `0x58296d32…` via `scripts/run-live-fill.ts`. Winner 400 bps, rival 250,
+  cleared at **250 — the rival's bid**. Filled inside the exclusive window: 0.00001 WETH in,
+  24,096 USDC out, exactly what the preflight predicted. `fillPhase: EXCLUSIVE`,
+  `fillByWinner: true`.
+
+  `verify-run` is now **7 passed / 0 failed / 1 n/a**. `PRICE_SET_BY` passes and names both
+  outcomes rather than only the good one: "1 of 2 settled auctions cleared at the RUNNER-UP's
+  bid, 1 cleared at the reserve". The subgraph agrees independently —
+  `settlementMatchesDerivation: true`, `competition: CONTESTED`, `thin: false`.
+
+  No second wallet was needed: `run-live-fill.ts` generates and funds ephemeral bidders
+  itself. That had been mis-scoped in this list as blocked on funding a second account.
 - [ ] Cross-check the live subgraph's `Auction` entity against `verify-run`'s independent
-  derivation for the same auction. Only way to exercise the AssemblyScript mapping on real
-  data; replaces the regex drift guard with a real one. **No longer blocked** -- round 0
-  settled on mainnet 2026-09-12, so the mapping finally has a settlement to run on.
+  derivation for the same auction, AS A SCRIPT. Replaces the regex drift guard with a real
+  one. Done by hand on 2026-09-12 against both settled rounds and they agree on every field
+  compared; what is missing is the automation, which needs `verify-run.mjs` to export its
+  derivation so the checker is not a fourth copy of the rule.
 - [ ] ~~`web/lib/bid.js` and `chain.js` to TypeScript~~ — **recommend NOT doing this before
       submission.** 1,400 lines of wallet and signing code, nearly all of it untested (only
       `decodeAuction` and the poll's call budget are covered), on the path every bid takes. A type migration there is a large diff with no observable benefit to a
       judge and a real chance of breaking the one flow that must work live. It is the right
       thing to do the week after, not the day before.
+
+- [ ] **Bonds have never been exercised, on any chain.** Every round the keeper and the live
+  fill open uses `bond = 0`, so `claimBond`, `claimForfeit` and `claimUnrevealed` have never
+  run and `verify-run`'s `BONDS` check is permanently n/a rather than passing. It is the last
+  contract surface with no live evidence behind it. One bonded round would close it; saying so
+  plainly is the alternative.
+- [ ] **Run the keeper continuously**, so a visitor arriving at the board finds a round
+  accepting bids. It has run exactly one round and stopped, which is the one thing the
+  keeper's own header says it exists to prevent. ~0.0000028 ETH/round.
 
 ## Backend — done
 

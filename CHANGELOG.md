@@ -36,7 +36,38 @@ each one is in [`run.md`](./docs/archive/run.md).
   allowed to cost, not just what it returns. First coverage of `web/lib/chain.js` beyond
   `decodeAuction`.
 
+- **The second-price claim, on Base mainnet.** Order `0x58296d32…`, 2026-09-12, via
+  `scripts/run-live-fill.ts`. Two bidders committed sealed; the winner revealed 400 bps and
+  the rival 250; the auction cleared at **250 — the rival's bid, not the winner's** — and the
+  winner filled inside the exclusive window for 0.00001 WETH in, 24,096 USDC out, the exact
+  amounts `test/fork/LiveFillPreflight.t.sol` predicted. `fillPhase: EXCLUSIVE`,
+  `fillByWinner: true`.
+
+  `scripts/verify-run.mjs` now reads **7 passed / 0 failed / 1 n/a**. `PRICE_SET_BY` passes
+  and reports both settled rounds rather than only the flattering one: "1 of 2 settled
+  auctions cleared at the RUNNER-UP's bid, 1 cleared at the reserve." The subgraph agrees
+  independently, with `settlementMatchesDerivation: true` on both.
+
+  The one check still n/a is `BONDS`: every round so far runs with `bond = 0`, so
+  `claimBond` / `claimForfeit` / `claimUnrevealed` remain unexercised, and the verifier says
+  so rather than counting them as passing.
+- `scripts/sweep-bidders.mjs` — returns the ephemeral bidders' unspent gas to the maker.
+  `run-live-fill.ts` had always called those keys "sweepable if this run dies", but nothing
+  could sweep them, so the word was an assertion rather than a capability. It matters on a
+  successful run too: the bidders are deliberately over-funded so neither can run dry between
+  commit and reveal, and 0.000296 ETH was left behind after the first live fill — more than
+  the maker had remaining.
+
 ### Fixed
+- **The live fill checked one leg of the depth it declares.** `ship` declares
+  `[WETH, USDC] = [0.0008, 2.0]` to Aqua, and only the USDC side was checked for balance or
+  approved. The maker held 0.0005 WETH, so the run would have funded two ephemeral bidders and
+  only then reverted inside `ship` — the exact waste the order-virginity check twenty lines
+  above exists to prevent, reached from the side it does not cover, and the same omission as
+  the keeper's USDC-only approval fixed earlier. Both legs are now checked before anything is
+  spent; the refusal prints the command that fixes it, so `wrap-weth.ts` gained a
+  `WRAP_TARGET_WETH` override rather than a second hard-coded copy of a number that lives in
+  `run-live-fill.ts`.
 - **The deployed `/evidence` page was rate limited within an hour of mainnet having a round.**
   `newestOpenedRound` in `web/lib/chain.js` memoises the newest opened round so a poll costs
   one or two `eth_call`s instead of binary-searching all 300 — but the memo was guarded by
@@ -55,11 +86,12 @@ each one is in [`run.md`](./docs/archive/run.md).
 - `site/index.html` as a real route rather than a hand-written file synced into `public/`.
   It is the last thing keeping two palettes, two font strategies and two provenance
   conventions alive at once.
-- A second reveal on mainnet. The fork rehearsal exercises the second-price arm
-  (`secondBps > reserveBps`) and a real fill, but no mainnet auction has ever had two
-  bidders reveal — so `PRICE_SET_BY` in `scripts/verify-run.mjs` now FAILS rather than
-  reading n/a, reporting that the one settled round cleared at its reserve. Needs a second
-  funded wallet, not a code change.
+- A bonded round. Every auction so far opens with `bond = 0`, so `claimBond`,
+  `claimForfeit` and `claimUnrevealed` have never run on any chain and `BONDS` in
+  `scripts/verify-run.mjs` is n/a rather than passing. It is the last contract surface with
+  no live evidence.
+- The keeper running continuously, so a visitor always finds a round accepting bids. It has
+  run one round and stopped.
 - The reserve panel reading the index rather than re-deriving. `web/lib/reserve-window.ts`
   is still a transliteration of `subgraph/src/helpers.ts`; the subgraph is published now, so
   the condition its header made deletion conditional on has arrived.

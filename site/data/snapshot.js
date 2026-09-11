@@ -5,11 +5,91 @@
 // data. A .js file rather than .json on purpose -- fetch() of a sibling file fails
 // under file://, and a judge opening index.html directly is a case that has to work.
 window.GLASSHOUSE_SNAPSHOT = {
-  "producedAt": "2026-09-11T16:01:53.591Z",
+  "producedAt": "2026-09-11T22:23:13.014Z",
   "producedBy": "scripts/make-snapshot.mjs, from GlasshouseBook logs on Base",
-  "head": 51176568,
+  "head": 51188004,
   "book": "0xc4ea91Fe700918220423ac307C6B1c59650FFbfe",
   "auctions": [
+    {
+      "id": "0xeebf737f92c8f0d9070f35a7d9baf416923becdf-0x58296d32e575d28f4213301b4a113ab8f92ab46afc48dcb8147ea7667e3efdf9",
+      "round": null,
+      "maker": "0xeebf737f92c8f0d9070f35a7d9baf416923becdf",
+      "orderHash": "0x58296d32e575d28f4213301b4a113ab8f92ab46afc48dcb8147ea7667e3efdf9",
+      "openedAtBlock": 51187720,
+      "commitEnd": 51187750,
+      "revealEnd": 51187780,
+      "exclusiveEnd": 51187795,
+      "reserveBps": 50,
+      "maxBps": 500,
+      "bond": "0",
+      "committedCount": 2,
+      "revealedCount": 2,
+      "bestBidder": "0x1d59a25a36dcc04b5081f8b9c8be96accd1332a8",
+      "bestBps": 400,
+      "secondBps": 250,
+      "clearingBps": 250,
+      "filled": true,
+      "filledBy": "0x1d59a25a36dcc04b5081f8b9c8be96accd1332a8",
+      "amountIn": "10000000000000",
+      "amountOut": "24096",
+      "settled": true,
+      "settledAtBlock": 51187798,
+      "winnerForfeited": false,
+      "settlementMatchesDerivation": true,
+      "settledWinner": "0x1d59a25a36dcc04b5081f8b9c8be96accd1332a8",
+      "settledClearingBps": 250,
+      "bids": [
+        {
+          "bidder": "0x1d59a25a36dcc04b5081f8b9c8be96accd1332a8",
+          "commitIdx": 0,
+          "committedAtBlock": 51187722,
+          "bps": 400
+        },
+        {
+          "bidder": "0x3b699d49cd21426ff2ce2f7acbfcc700cab028fa",
+          "commitIdx": 1,
+          "committedAtBlock": 51187726,
+          "bps": 250
+        }
+      ]
+    },
+    {
+      "id": "0xeebf737f92c8f0d9070f35a7d9baf416923becdf-0x50d52b0284a83ed0d6c9b266b362c81ce94288c2454de49d3e321599eecf5ef0",
+      "round": 0,
+      "maker": "0xeebf737f92c8f0d9070f35a7d9baf416923becdf",
+      "orderHash": "0x50d52b0284a83ed0d6c9b266b362c81ce94288c2454de49d3e321599eecf5ef0",
+      "openedAtBlock": 51184707,
+      "commitEnd": 51184767,
+      "revealEnd": 51184827,
+      "exclusiveEnd": 51184842,
+      "reserveBps": 50,
+      "maxBps": 500,
+      "bond": "0",
+      "committedCount": 1,
+      "revealedCount": 1,
+      "bestBidder": "0xeebf737f92c8f0d9070f35a7d9baf416923becdf",
+      "bestBps": 168,
+      "secondBps": null,
+      "clearingBps": 50,
+      "filled": false,
+      "filledBy": null,
+      "amountIn": null,
+      "amountOut": null,
+      "settled": true,
+      "settledAtBlock": 51184846,
+      "winnerForfeited": false,
+      "settlementMatchesDerivation": true,
+      "settledWinner": "0xeebf737f92c8f0d9070f35a7d9baf416923becdf",
+      "settledClearingBps": 50,
+      "bids": [
+        {
+          "bidder": "0xeebf737f92c8f0d9070f35a7d9baf416923becdf",
+          "commitIdx": 0,
+          "committedAtBlock": 51184709,
+          "bps": 168
+        }
+      ]
+    },
     {
       "id": "0xeebf737f92c8f0d9070f35a7d9baf416923becdf-0x000000000000000000000000000000000000000000000000000001a07d2dfab2",
       "round": null,

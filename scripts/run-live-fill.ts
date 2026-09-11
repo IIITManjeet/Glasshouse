@@ -42,9 +42,13 @@ import { randomBytes } from "node:crypto";
  *
  * ONE SHOT. `Aqua.ship` requires `balance.tokensCount == 0` (StrategiesMustBeImmutable)
  * and `Book.open` requires `commitEnd == 0` (AlreadyOpened), and this order's hash is
- * deterministic. So this exact order can be run once, ever. If it burns, change MAX_BPS
- * in the preflight, re-run it, and paste the new ORDER_DATA/ORDER_HASH here -- that is
- * the retry lever, and it is deliberate rather than a nonce nobody would notice.
+ * deterministic. So this exact order can be run once, ever. If it burns, bump LIVE_ROUND
+ * in the preflight, re-run it, and paste the new ORDER_DATA/ORDER_HASH here -- that is the
+ * retry lever, and it is deliberate rather than a nonce nobody would notice.
+ *
+ * The lever used to be MAX_BPS. That works, but MAX_BPS is the ceiling on a real bid, and
+ * reaching for a semantic parameter to dodge a hash collision is how a demo quietly stops
+ * demonstrating what it says it does. LIVE_ROUND rides in hook data the Book ignores.
  */
 
 // --- the real deployment -------------------------------------------------------------
@@ -56,12 +60,22 @@ const WETH = "0x4200000000000000000000000000000000000006" as const;
 const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as const;
 
 // --- from LiveFillPreflight, printed by `forge test --match-contract LiveFillPreflight -vv`
+//
+// THESE ARE LIVE_ROUND = 1_000_000, and the round counter is the retry lever. The previous
+// order (no counter, 0x58296d32) was shipped, opened, settled and FILLED on Base mainnet on
+// 2026-09-12, which spends it forever -- Aqua.ship and Book.open are each one-time for a
+// hash. The preflight went red an hour after that run succeeded, which is the intended
+// signal and not a regression.
+//
+// The counter must stay ABOVE config/rounds.json, because the preflight and the keeper's
+// manifest come out of the same generator: counter 1 is byte-for-byte the keeper's round 1.
+// test/js/live-order-not-a-keeper-round.test.js holds that line.
 const ORDER_TRAITS =
-  32792681522311496102057670744360050598098787305545420834952732519728813178880n;
+  32792681522313141631723782015834145094839091935637856812523692562228845740032n;
 const ORDER_DATA =
-  "0x4200000000000000000000000000000000000006833589fcd6edb6e08f4c7c32d4f71b54bda02913c4ea91fe700918220423ac307c6b1c59650ffbfe2e17c4ea91fe700918220423ac307c6b1c59650ffbfe0001f45000" as const;
+  "0x4200000000000000000000000000000000000006833589fcd6edb6e08f4c7c32d4f71b54bda02913c4ea91fe700918220423ac307c6b1c59650ffbfe000f42402e17c4ea91fe700918220423ac307c6b1c59650ffbfe0001f45000" as const;
 const EXPECTED_ORDER_HASH =
-  "0x58296d32e575d28f4213301b4a113ab8f92ab46afc48dcb8147ea7667e3efdf9" as const;
+  "0x434ebe8ede084386b4f5fd2ec67bd7cd37f468a5f6401e619568212399ce9096" as const;
 // Taker data is 42 bytes and differs between recipients ONLY in the trailing 20, which
 // test_Preflight_TakerDataDiffersOnlyInTheRecipient pins. So the recipient is spliced in
 // rather than the whole structure being rebuilt here.

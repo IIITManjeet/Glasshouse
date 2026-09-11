@@ -67,6 +67,46 @@ contract LiveFillPreflightTest is Test {
     uint40 internal constant EXCLUSIVE_BLOCKS = 15;
     uint24 internal constant RESERVE_BPS = 50;
     uint24 internal constant MAX_BPS = 500;
+
+    /// @dev THE RETRY LEVER. Bump this to get a fresh order, and nothing else changes.
+    ///
+    /// The live order is ONE SHOT: `Aqua.ship` requires `balance.tokensCount == 0` and
+    /// `Book.open` requires `commitEnd == 0`, and the hash is deterministic. So the moment
+    /// `scripts/run-live-fill.ts` succeeds against mainnet, THIS TEST STOPS PASSING -- it
+    /// forks at the head, where the strategy it is about to ship has already been shipped,
+    /// and Aqua reverts with 0x879f237b(router, orderHash). That is what happened on
+    /// 2026-09-12, an hour after the first successful live fill: the suite went red because
+    /// the run worked.
+    ///
+    /// The counter rides in `postTransferInData`, which the Book ignores, so a bump changes
+    /// the hash and nothing about what the order MEANS.
+    /// `test_Preflight_ARoundCounterGivesAFreshOrderHash` pins that the program survives it
+    /// unchanged. The header of run-live-fill.ts used to nominate MAX_BPS for this job;
+    /// that works, but MAX_BPS is the ceiling on a real bid and this is not, so bumping a
+    /// semantic parameter to dodge a hash collision was the wrong lever to reach for.
+    ///
+    /// IT MUST STAY OUTSIDE config/rounds.json, AND THAT IS NOT A STYLE POINT.
+    ///
+    /// `_orderForRound` is the SAME generator `GenerateRounds.t.sol` uses to write
+    /// config/rounds.json, so `_orderForRound(1)` is not merely similar to the keeper's
+    /// round 1 -- it IS the keeper's round 1, byte for byte. The first bump of this lever
+    /// was to 1, and it produced 0xb26ff03a..., which is the manifest's round 1 with the
+    /// keeper's cursor sitting at exactly nextRound 1. The live fill would have consumed
+    /// the round the keeper was about to open, and the keeper would then have reverted with
+    /// 0x879f237b -- the duplicate-strategy error that reads like something else entirely
+    /// and has already cost this project an afternoon on a fork.
+    ///
+    /// So the live order lives above the manifest, where the keeper cannot reach it.
+    /// `test/js/live-order-not-a-keeper-round.test.js` enforces that against the real
+    /// files rather than against this comment -- in JS, because the invariant holds
+    /// between config/rounds.json and a constant in run-live-fill.ts, and neither of
+    /// those is something the EVM should be re-parsing to find out.
+    ///
+    /// After bumping: re-run this suite and paste the printed ORDER_DATA and orderHash into
+    /// scripts/run-live-fill.ts.
+    ///
+    ///   round 0 (no counter) -- 0x58296d32..., spent on mainnet 2026-09-12, FILLED
+    uint32 internal constant LIVE_ROUND = 1_000_000;
     uint24 internal constant WINNING_BID = 400;
     uint24 internal constant RIVAL_BID = 250;
 
@@ -121,31 +161,12 @@ contract LiveFillPreflightTest is Test {
 
     /// @dev Aqua mode: no balances instruction, Aqua supplies them. Gate first, curve
     ///      second -- 0x2e must decide who may fill before the price is computed.
+    /// @dev The order the live run ships, which is just `_orderForRound` at LIVE_ROUND.
+    ///      Kept as one definition rather than two near-identical ones, because the bug
+    ///      that costs real money here is a live order that differs from the tested order
+    ///      in a byte nobody noticed.
     function _order() internal pure returns (ISwapVM.Order memory) {
-        return MakerTraitsLib.build(
-            MakerTraitsLib.Args({
-                maker: MAKER,
-                tokenA: WETH,
-                tokenB: USDC,
-                shouldUnwrapWeth: false,
-                useAquaInsteadOfSignature: true,
-                allowZeroAmountIn: false,
-                receiver: address(0),
-                hasPreTransferInHook: false,
-                hasPostTransferInHook: true,
-                hasPreTransferOutHook: false,
-                hasPostTransferOutHook: false,
-                preTransferInTarget: address(0),
-                preTransferInData: "",
-                postTransferInTarget: BOOK,
-                postTransferInData: "",
-                preTransferOutTarget: address(0),
-                preTransferOutData: "",
-                postTransferOutTarget: address(0),
-                postTransferOutData: "",
-                program: bytes.concat(GlasshouseAuction.build(BOOK, MAX_BPS), XYCSwap.build())
-            })
-        );
+        return _orderForRound(LIVE_ROUND);
     }
 
     function _takerData(address to) internal pure returns (bytes memory) {
