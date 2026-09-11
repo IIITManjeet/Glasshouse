@@ -201,7 +201,7 @@ The keeper is a script you run. It is not a hosted service, and it is not runnin
 
 ## What is proven, and what is not
 
-**Verified by `forge test` — 97 tests, 9 suites, 0 failures.** Plus `npm run test:js`, 31
+**Verified by `forge test` — 97 tests, 9 suites, 0 failures.** Plus `npm run test:js`, 45
 tests, 0 failures, over the shared ESM (`phase`, the reserve rule, the advisor).
 
 - **A real fill through the official Aqua, on a fork of Base.**
@@ -299,7 +299,7 @@ Requires **Node ≥ 22.13.0** (Hardhat 3) and [Foundry](https://getfoundry.sh).
 ```bash
 npm install
 forge test                    # 97 tests; the fork suites need internet
-npm run test:js               # 31 tests
+npm run test:js               # 45 tests
 node scripts/size-check.mjs   # EIP-170 guard, runs on every build
 ```
 
