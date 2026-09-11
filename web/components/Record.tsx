@@ -5,6 +5,7 @@ import {
   fetchAccount,
   subgraphConfigured,
   type IndexedAt,
+  type Provenance,
   type SubgraphAccount,
   type SubgraphResult,
 } from "@/lib/subgraph";
@@ -32,11 +33,13 @@ import {
 
 const num = (n: number) => n.toLocaleString("en-US");
 
-const PROVENANCE: Record<string, string> = {
+// The three the mapping emits, and only those. subgraph/src/provenance.ts is explicit that
+// UNKNOWN means "not on our list" and NOT "external" -- it is the value nearly every real
+// visitor gets, so it is the one whose wording has to be right.
+const PROVENANCE: Record<Provenance, string> = {
   TEAM: "on our own list of wallets",
   INVITED: "invited to test by us",
-  UNLISTED: "not on our list — which does not mean external, and we do not know who it is",
-  OTHER: "not classified",
+  UNKNOWN: "not on our list — which does not mean external, and we do not know who it is",
 };
 
 export function Record({ address }: { address: string }) {

@@ -119,35 +119,86 @@ the platform.
 
 ## Deploy and publish
 
-**Deployed to Studio 2026-09-07** (F-157). **Not published to The Graph Network**, which
-is the step the Subgraph MCP actually needs — see below.
+Three consumers, and they do **not** all need the same thing. Getting this wrong is how a
+billable key ends up in a public bundle, so the split is stated before the steps.
+
+| Consumer | Endpoint | Secret | Needs publishing? |
+|---|---|---|---|
+| `/account` in the browser | Studio query URL, via `NEXT_PUBLIC_SUBGRAPH_URL` | none | **no** |
+| `scripts/reserve-advisor.mjs` | Gateway, via `GRAPH_API_KEY` | yes, server-side | **yes** |
+| The `glasshouse-auction` skill (Subgraph MCP) | Gateway | yes, server-side | **yes** |
+
+The site is a static export (`web/next.config.mjs`, `output: "export"`). There is no server,
+so anything in a `NEXT_PUBLIC_*` variable is inlined into JavaScript every visitor can read.
+A Gateway URL carries the API key in its path, so it **must never** be the value of
+`NEXT_PUBLIC_SUBGRAPH_URL`. The Studio URL carries only the Studio account id, which is not
+a secret. That is why the page reads Studio and the two server-side tools read the Gateway,
+rather than all three sharing one URL.
+
+### Step 1 — deploy to Studio (done; repeat only if the mappings change)
 
 ```sh
 npx graph auth <deploy-key>
+npx graph codegen && npx graph build
 npx graph deploy glasshouse-base --version-label v0.5.1
 ```
 
-Then **publish to The Graph Network** from Studio (an Arbitrum One transaction). The
-Subgraph MCP queries only subgraphs available on the network through the Gateway, so
-without publishing the composition claim does not hold. Finally create a Gateway API key
-in Studio, restricted to this subgraph and with a monthly spend cap; it is used only
-server-side, from `GRAPH_API_KEY`, by `scripts/reserve-advisor.mjs` and the Claude skill
-— never in `site/`.
+`schema.graphql`, `src/` and `subgraph.yaml` have not changed since `40120fd` (2026-09-07),
+which is the commit the current Studio deployment was built from. **A redeploy is therefore
+not required before publishing** — verified by rebuilding at `571ae53` and getting a clean
+compile from the same sources.
 
-Status, as of 2026-09-08:
+### Step 2 — wire the page (no publishing, no funding, no wallet)
+
+Set `NEXT_PUBLIC_SUBGRAPH_URL` in the Vercel project to the Studio query URL:
+
+```
+https://api.studio.thegraph.com/query/<studio-account-id>/glasshouse-base/v0.5.1
+```
+
+Unset, `web/lib/subgraph.ts` reports `state: "off"` and `Record.tsx` renders nothing at all
+rather than an empty shape. Set, the account record goes live on the next deploy. Studio is
+a development endpoint and is rate-limited; that is the accepted cost of not shipping a key.
+
+### Step 3 — publish to The Graph Network (an Arbitrum One transaction)
+
+Publish from Studio with the wallet that owns the subgraph. It needs ETH on **Arbitrum
+One** — a few dollars is enough, and as of 2026-09-11 the Base deployer
+`0xeebf737f92c8f0d9070f35a7d9baf416923becdf` holds `0`, so check the balance before
+opening Studio rather than after connecting a wallet.
+
+Publishing is what the Gateway serves from, and the Subgraph MCP queries only the Gateway.
+Until this step lands, the composition claim does not hold and the skill stays off.
+
+### Step 4 — the Gateway key, server-side only
+
+Create a Gateway API key in Studio, restricted to this subgraph and with a monthly spend
+cap. Export it as `GRAPH_API_KEY`, alongside the deployment id the advisor also wants:
+
+```sh
+export GRAPH_API_KEY=<gateway-key>
+export GLASSHOUSE_DEPLOYMENT_ID=Qmc9Ah4ow5mXD7599hi3ewze7Fg77x1GivAqaCSAmmpK7E
+```
+
+Never in `web/`, never in a `NEXT_PUBLIC_*` name, never in `site/`. `reserve-advisor.mjs`
+checks both and names each missing one rather than falling back to a cached number
+(`checkPrerequisites`, `scripts/reserve-advisor.mjs:64`).
+
+### Status, as of 2026-09-11
 
 | | |
 |---|---|
 | Deployment id (`Qm…`) | `Qmc9Ah4ow5mXD7599hi3ewze7Fg77x1GivAqaCSAmmpK7E` ✅ |
 | Version label | `v0.5.1` ✅ |
-| Studio query URL | deployed, URL not recorded here — it carries the Studio account id |
+| Mappings match the repo | ✅ unchanged since `40120fd`; rebuilt clean at `571ae53` |
+| Studio query URL | deployed; not recorded here, it carries the Studio account id |
+| `NEXT_PUBLIC_SUBGRAPH_URL` | ❌ not set — step 2, and nothing blocks it |
 | Subgraph id (network) | ❌ not published — needs ETH on Arbitrum One |
 | Gateway query URL | ❌ not published |
 | `GRAPH_API_KEY` | ❌ not created |
 
-`@modelcontextprotocol/sdk` is installed as of 2026-09-08, so the two remaining blockers
-for `scripts/reserve-advisor.mjs` are the published subgraph and the Gateway key. Run it
-with neither and it names both and stops, rather than falling back to a cached number.
+`@modelcontextprotocol/sdk` is installed as of 2026-09-08, so the two remaining blockers for
+`scripts/reserve-advisor.mjs` are the published subgraph and the Gateway key.
 
 ⚠️ **The Book had emitted no events at all until 2026-09-08**, so a healthy, fully synced
 subgraph over an empty contract is the expected state, not a fault. The first live auction

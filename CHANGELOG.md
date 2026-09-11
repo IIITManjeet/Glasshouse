@@ -12,15 +12,28 @@ each one is in [`run.md`](./docs/archive/run.md).
 
 ### Planned
 - Publish the subgraph to The Graph Network. It is deployed to Studio, which the Subgraph
-  MCP cannot see, so the page reads the Book directly over `eth_call` and job 3 -- the UI
-  as the Graph consumer -- is still unmet. Needs ETH on Arbitrum One.
+  MCP cannot see, so `scripts/reserve-advisor.mjs` and the `glasshouse-auction` skill stay
+  off. Needs ETH on Arbitrum One. The page is a separate question and is not blocked on it:
+  it reads the Studio endpoint the moment `NEXT_PUBLIC_SUBGRAPH_URL` is set. The runbook,
+  and why those two consumers must not share a URL, is in `subgraph/README.md`.
 - `web/lib/bid.js` and `web/lib/chain.js` to TypeScript. `bid.js` is 1,400 lines of wallet
   and signing code with no test coverage and deserves its own pass.
 - `site/index.html` as a real route rather than a hand-written file synced into `public/`.
   It is the last thing keeping two palettes, two font strategies and two provenance
   conventions alive at once.
-- Per-event timeline and transaction links on the receipt. Both blocked on one line:
-  `bidsFor()` in `chain.js` reads the logs and discards `transactionHash`.
+- Per-event timeline on the receipt. The transaction links themselves shipped in
+  `1ef507d`; `bidsFor()` in `chain.js` now keeps `transactionHash` as `commitTx` and
+  `revealTx`, so what is left is the ordered per-event timeline, not the plumbing.
+
+### Fixed
+- The account record labelled almost every visitor wrong. `web/lib/subgraph.ts` declared
+  `Provenance` as `TEAM | INVITED | UNLISTED | OTHER`, but the mapping emits
+  `TEAM | INVITED | UNKNOWN` (`subgraph/src/provenance.ts`). `UNKNOWN` is what an address
+  not on our list gets -- which is nearly everyone, including every judge -- and with no
+  entry for it the caption fell through to "unclassified", dropping the one sentence that
+  makes the label honest: that it does not mean external and we do not know who it is. The
+  union and the label table now match the only file that produces these values. Caught
+  before the endpoint was wired, so it was never visible on the live site.
 
 ---
 

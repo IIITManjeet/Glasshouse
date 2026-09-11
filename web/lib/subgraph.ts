@@ -28,7 +28,10 @@ const URL_ = process.env.NEXT_PUBLIC_SUBGRAPH_URL ?? "";
 
 export const subgraphConfigured = () => URL_.length > 0;
 
-export type Provenance = "TEAM" | "INVITED" | "UNLISTED" | "OTHER";
+/** The three values `provenanceOf()` can return -- see subgraph/src/provenance.ts, which
+ *  is the only place they are produced. UNKNOWN is "not on our list"; it does NOT mean
+ *  external, and no consumer may present it as such. */
+export type Provenance = "TEAM" | "INVITED" | "UNKNOWN";
 
 /** `Account` from subgraph/schema.graphql. Counts only -- never a ratio, per the refusals
  *  list in subgraph/README.md. The page prints numerator and denominator itself. */
