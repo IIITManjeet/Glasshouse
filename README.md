@@ -257,11 +257,15 @@ with real money, on a public chain.
   block 50,965,408; an indexer has allocated to it, so it is served rather than merely listed
   (`subgraph/README.md` step 3 verifies this from the GNS logs on Arbitrum rather than from the
   Studio UI). The MCP composition path is operational — `scripts/reserve-advisor.mjs` runs
-  against it end to end. What the index *holds* is the honest part: as of block 51,188,030,
-  **three auctions, five commits, three reveals, two settlements and one fill**. Everything
-  but the first of those landed on 2026-09-12, when the keeper ran its first mainnet round
-  and the live fill followed it. The index is still nearly empty, and every figure drawn
-  from it says so.
+  against it end to end. What the index *holds* is the honest part: as of block 51,208,917,
+  **nine auctions, eleven commits, nine reveals, eight settlements and one fill**.
+  Everything but the first of those landed on 2026-09-12. The index is still small, and
+  every figure drawn from it says so.
+
+  **`scripts/verify-run.mjs` reports 8 passed, 0 failed, 0 not applicable.** Every check it
+  knows how to make now has something real to make it against — including `BONDS`, which
+  read "n/a" for the life of the project until a round was opened with a bond on
+  2026-09-12 and the bond was committed, revealed against and reclaimed.
 
   Those rounds are where three independent implementations of the clearing rule met real
   data and agreed. The subgraph's own replay reports `settlementMatchesDerivation: true` on

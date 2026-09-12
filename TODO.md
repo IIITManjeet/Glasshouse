@@ -177,11 +177,21 @@ Findings referenced as F-n live in `DESIGN.md`.
       judge and a real chance of breaking the one flow that must work live. It is the right
       thing to do the week after, not the day before.
 
-- [ ] **Bonds have never been exercised, on any chain.** Every round the keeper and the live
-  fill open uses `bond = 0`, so `claimBond`, `claimForfeit` and `claimUnrevealed` have never
-  run and `verify-run`'s `BONDS` check is permanently n/a rather than passing. It is the last
-  contract surface with no live evidence behind it. One bonded round would close it; saying so
-  plainly is the alternative.
+- [x] **A bonded round ran on Base mainnet, and BONDS is no longer n/a.** Round 6,
+  2026-09-12, opened with a 0.00001 WETH bond: committed, revealed against, settled and
+  reclaimed. `verify-run` now reports **8 passed / 0 failed / 0 n/a** — every check it can
+  make has something real to make it against.
+
+  The bond's spender is the BOOK, not Aqua, which needed its own allowance; and the claim
+  path is `claimBond` rather than `claimForfeit`, because `settle()` only sets
+  `winnerForfeited` when someone ELSE filled and a keeper round never fills. Both were
+  established by reading the contract and proved on a fork before mainnet — the maker's
+  WETH was byte-identical before and after, and it is again on mainnet.
+
+  `bond = 0` remains the default for ordinary rounds: the Book pulls a bond from the
+  BIDDER at commit, and a demo that charges strangers to look at it is a demo nobody
+  enters. `KEEPER_BOND_WEI` opens a bonded round deliberately.
+
 - [~] **Run the keeper so a visitor finds a round accepting bids.** Six mainnet rounds so
   far (0-5). Measured cost is 0.0000022/round, and the balance after the ephemeral-bidder
   sweep is 0.000534 ETH -- about 240 rounds, or 18 hours back to back.

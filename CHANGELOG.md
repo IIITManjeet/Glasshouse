@@ -36,6 +36,18 @@ each one is in [`run.md`](./docs/archive/run.md).
   allowed to cost, not just what it returns. First coverage of `web/lib/chain.js` beyond
   `decodeAuction`.
 
+- **A bonded round, and the last n/a becomes a pass.** Round 6 on Base, 2026-09-12,
+  opened with a 0.00001 WETH bond and carried through commit, reveal, settle and
+  `claimBond`. `scripts/verify-run.mjs` now reports **8 passed, 0 failed, 0 not
+  applicable** — every check it knows how to make has something real to make it against.
+  `BONDS` had read "n/a" for the life of the project, because `claimBond`, `claimForfeit`
+  and `claimUnrevealed` had never executed on any chain.
+
+  The bond returns. It is pulled from the bidder at commit and reclaimed after settle, so
+  the round costs gas only and the maker's WETH is unchanged to the wei — checked on a
+  fork first and again on mainnet. `bond = 0` stays the default for ordinary rounds,
+  because the cost falls on BIDDERS and a demo that charges strangers to look at it is a
+  demo nobody enters.
 - **The second-price claim, on Base mainnet.** Order `0x58296d32…`, 2026-09-12, via
   `scripts/run-live-fill.ts`. Two bidders committed sealed; the winner revealed 400 bps and
   the rival 250; the auction cleared at **250 — the rival's bid, not the winner's** — and the
@@ -96,10 +108,6 @@ each one is in [`run.md`](./docs/archive/run.md).
 - `site/index.html` as a real route rather than a hand-written file synced into `public/`.
   It is the last thing keeping two palettes, two font strategies and two provenance
   conventions alive at once.
-- A bonded round. Every auction so far opens with `bond = 0`, so `claimBond`,
-  `claimForfeit` and `claimUnrevealed` have never run on any chain and `BONDS` in
-  `scripts/verify-run.mjs` is n/a rather than passing. It is the last contract surface with
-  no live evidence.
 - The keeper running continuously, so a visitor always finds a round accepting bids. It has
   run one round and stopped.
 - The reserve panel reading the index rather than re-deriving. `web/lib/reserve-window.ts`

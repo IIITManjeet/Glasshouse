@@ -5,11 +5,48 @@
 // data. A .js file rather than .json on purpose -- fetch() of a sibling file fails
 // under file://, and a judge opening index.html directly is a case that has to work.
 window.GLASSHOUSE_SNAPSHOT = {
-  "producedAt": "2026-09-11T23:48:36.307Z",
+  "producedAt": "2026-09-12T10:00:27.431Z",
   "producedBy": "scripts/make-snapshot.mjs, from GlasshouseBook logs on Base",
-  "head": 51190550,
+  "head": 51208917,
   "book": "0xc4ea91Fe700918220423ac307C6B1c59650FFbfe",
   "auctions": [
+    {
+      "id": "0xeebf737f92c8f0d9070f35a7d9baf416923becdf-0xa6887719298f6dd279dc786a2390d802dd7112374399e53b2676257439c6bf54",
+      "round": 6,
+      "maker": "0xeebf737f92c8f0d9070f35a7d9baf416923becdf",
+      "orderHash": "0xa6887719298f6dd279dc786a2390d802dd7112374399e53b2676257439c6bf54",
+      "openedAtBlock": 51208635,
+      "commitEnd": 51208695,
+      "revealEnd": 51208755,
+      "exclusiveEnd": 51208770,
+      "reserveBps": 50,
+      "maxBps": 500,
+      "bond": "10000000000000",
+      "committedCount": 1,
+      "revealedCount": 1,
+      "bestBidder": "0xeebf737f92c8f0d9070f35a7d9baf416923becdf",
+      "bestBps": 69,
+      "secondBps": null,
+      "clearingBps": 50,
+      "filled": false,
+      "filledBy": null,
+      "amountIn": null,
+      "amountOut": null,
+      "settled": true,
+      "settledAtBlock": 51208773,
+      "winnerForfeited": false,
+      "settlementMatchesDerivation": true,
+      "settledWinner": "0xeebf737f92c8f0d9070f35a7d9baf416923becdf",
+      "settledClearingBps": 50,
+      "bids": [
+        {
+          "bidder": "0xeebf737f92c8f0d9070f35a7d9baf416923becdf",
+          "commitIdx": 0,
+          "committedAtBlock": 51208637,
+          "bps": 69
+        }
+      ]
+    },
     {
       "id": "0xeebf737f92c8f0d9070f35a7d9baf416923becdf-0xfccf8b6f7a3ecdb749b5e004ad47fddfbd7d46c10f3b2bfb6e157269fbbcf26e",
       "round": 5,
