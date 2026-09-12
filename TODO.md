@@ -53,7 +53,7 @@ prizes page; organiser email treated as authoritative where the two differ.
 
 - [ ] **The video script narrates fork numbers.** `DECISIONS.md:224` beat 3 says "0.01 WETH in,
       38.986354 USDC out" — that is the anvil fork. The mainnet fill is order `0x58296d32…`,
-      **0.00001 WETH in, 24,096 USDC out**, cleared at the runner-up's 250 bps
+      **0.00001 WETH in, 24,096 USDC base units out (0.024096 USDC)**, cleared at the runner-up's 250 bps
       (`README.md:245-250`). The script predates the mainnet run. The 1inch track explicitly
       wants on-chain token execution shown in the demo, so this beat has to be re-cut to the
       real order — and it is a stronger beat, not a weaker one.
@@ -291,7 +291,7 @@ agreeing**. Static export clean. All five deployed routes 200. Repo public. `mai
 - [x] **A second bidder revealed above the reserve on mainnet, and the winner filled.**
   2026-09-12, order `0x58296d32…` via `scripts/run-live-fill.ts`. Winner 400 bps, rival 250,
   cleared at **250 — the rival's bid**. Filled inside the exclusive window: 0.00001 WETH in,
-  24,096 USDC out, exactly what the preflight predicted. `fillPhase: EXCLUSIVE`,
+  24,096 USDC base units out (0.024096 USDC), exactly what the preflight predicted. `fillPhase: EXCLUSIVE`,
   `fillByWinner: true`.
 
   `verify-run` is now **7 passed / 0 failed / 1 n/a**. `PRICE_SET_BY` passes and names both

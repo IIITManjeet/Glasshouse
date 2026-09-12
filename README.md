@@ -252,7 +252,8 @@ before anything was spent.
 
 **Order `0x58296d32…`, on Base mainnet.** Two bidders committed sealed. The winner revealed
 400 bps, the rival 250, and the auction cleared at **250 — the rival's bid, not the winner's**.
-The winner then filled inside the exclusive window: 0.00001 WETH in, 24,096 USDC out, the exact
+The winner then filled inside the exclusive window: 0.00001 WETH in, **24,096 USDC base units
+out — that is 0.024096 USDC**, because USDC has six decimals. The exact
 amounts the preflight predicted. `fillPhase` is `EXCLUSIVE` and `fillByWinner` is true, so the
 window did the thing it exists to do. That is the whole claim of this project happening once,
 with real money, on a public chain.
@@ -495,7 +496,7 @@ Deployment to mainnet is [`DEPLOY.md`](./DEPLOY.md).
 
 | Track | What we submit |
 |---|---|
-| **1inch** | Opcode `0x2e` on a redeployed `AquaSwapVMRouter` against the official Aqua, with a fill demonstrated **on Base mainnet** — order `0x58296d32…`, two sealed bidders, cleared at the runner-up's 250 bps, filled inside the exclusive window for 0.00001 WETH in / 24,096 USDC out (and on a fork besides, `test/fork/AquaBaseFork.t.sol`). Real token transfers on a public chain, not a simulation. No 1inch source vendored. |
+| **1inch** | Opcode `0x2e` on a redeployed `AquaSwapVMRouter` against the official Aqua, with a fill demonstrated **on Base mainnet** — order `0x58296d32…`, two sealed bidders, cleared at the runner-up's 250 bps, filled inside the exclusive window for 0.00001 WETH in / 24,096 USDC base units out (0.024096 USDC — six decimals) (and on a fork besides, `test/fork/AquaBaseFork.t.sol`). Real token transfers on a public chain, not a simulation. No 1inch source vendored. |
 | **The Graph** | `subgraph/` over `GlasshouseBook`: all eight events, plus the independent settlement replay. **Published to The Graph Network** (`FPQdiZTAnR8ac6grgAF2x49bWqwDh87RzqUgQxAvoY2y`) and served by an allocated indexer, so the Subgraph MCP composition path is live: `scripts/reserve-advisor.mjs` and `.claude/skills/glasshouse-auction` are two consumers of it. The index is nearly empty (see above).<br><br>**Query it yourself:** `https://api.studio.thegraph.com/query/1758826/glasshouse/version/latest` (open, rate-limited) or the Gateway at `https://gateway.thegraph.com/api/<key>/subgraphs/id/FPQdiZTAnR8ac6grgAF2x49bWqwDh87RzqUgQxAvoY2y`. Deployment id `Qmc9Ah4ow5mXD7599hi3ewze7Fg77x1GivAqaCSAmmpK7E`. |
 | **Uniswap** | `scripts/uniswap-benchmark.mjs` quotes the deployed v3 `QuoterV2` on Base as an *external* anchor for the price-improvement claim, which is otherwise measured only against SwapVM's own instructions. `scripts/get-usdc.ts` buys the maker's fill inventory through `SwapRouter02`. [`FEEDBACK.md`](./FEEDBACK.md) is the developer feedback, including a real struct-incompatibility bug we hit between `SwapRouter` and `SwapRouter02`. |
 

@@ -62,3 +62,7 @@ art-prompts/
 # what is not working -- which belongs in an organiser's form and in TODO.md, not in the
 # history of a public repo.
 CHECKIN.txt
+# Working aids for the submission, same reasoning as CHECKIN.txt: they are notes to
+# ourselves about a deadline, not part of the project a reader clones.
+VIDEO.md
+SUBMISSION.md

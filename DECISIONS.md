@@ -214,7 +214,8 @@ including a real fill through the official Aqua.
 
 ## What the video has to carry
 
-Four minutes, human-narrated. AI voiceover is an automatic reject.
+Between two and four minutes, human-narrated. Anything outside that window is an automatic
+reject, and so is a synthetic voice. Target 3:30 so a slow sentence does not push it over.
 
 1. **The problem, from source.** Two shipped opcodes. One gates by identity and reverts on
    outsiders. One gates by clock, and its price is a pure function of `block.timestamp`, so
@@ -223,8 +224,19 @@ Four minutes, human-narrated. AI voiceover is an automatic reject.
 2. **The measurement.** One order, three ways. Identity 10 000, clock 10 618, bid 9 756 basis
    points of base — and the bid gate is the only one where the participant who valued it most
    actually got it.
-3. **It runs.** A real fill through the official Aqua on Base: 0.01 WETH in, 38.986354 USDC
-   out, gated by opcode `0x2e`, priced at the second bid.
+3. **It runs, on mainnet.** Order `0x58296d32…` on Base: two bidders sealed, the winner
+   revealed 400 bps and the rival 250, and it cleared at **250 — the rival's bid, not the
+   winner's**. The winner filled inside the exclusive window through the official Aqua:
+   0.00001 WETH in, 24,096 USDC **base units** out — 0.024096 USDC — the exact amounts the
+   preflight predicted. Say "base units" or "about two and a half cents" out loud; never
+   "24,096 USDC".
+
+   > **These numbers were wrong here until 2026-09-13, and the correction matters.** This
+   > beat used to read "0.01 WETH in, 38.986354 USDC out", which is the ANVIL FORK run. It
+   > was written before the mainnet fill existed and never updated, so the script would have
+   > had someone narrate fork figures over a mainnet demo. The 1inch track asks specifically
+   > for on-chain execution of token transfers to be shown, so the real order is not only
+   > more honest, it is the stronger beat.
 4. **The honest part.** It is slower than what it replaces. The window is still a free option
    worth a few basis points. Forfeiture needs evidence, so a no-show nobody else fills behind
    keeps its bond. Say all of it — the limits are more convincing than the claims.
