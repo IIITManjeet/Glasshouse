@@ -308,6 +308,75 @@ with real money, on a public chain.
   bond is the fix, and it is v2: the Book has no upgrade path by design, so it means a new
   deployment.
 
+## Where this goes next: invite-only playgrounds
+
+**Not built. Nothing below is deployed, and the site does not mention it.** It is here because
+it is the direction the architecture actually points, and because the shape of it is decided by
+constraints this repo already has rather than by preference.
+
+**The constraint that settles the design.** `GlasshouseBook` has no owner, no admin and no
+upgrade path, and its parameters are immutable after `open` (`GlasshouseBook.sol:17`). So a
+"room" cannot be a feature added to the deployed Book. Any private group is a **new
+deployment**, not a flag — the same conclusion the maker-side bond reaches above, for the same
+reason.
+
+Three ways to get rooms, and the choice is not close:
+
+1. **One Book per room, from a factory.** `create()` deploys a fresh Book and makes the caller
+   its maker. The Book is 6,149 bytes — 25% of the EIP-170 limit (`npm run size`) — so on Base
+   a room costs cents to open. Rooms are genuinely isolated: separate storage, separate bonds,
+   independent reserve and window parameters, and a bug in one room cannot reach another.
+2. **A `roomId` mapping in a v2 Book.** One address to index, but it is a new deployment
+   anyway, and it puts every room on one storage layout and one bug surface. Cheaper to index,
+   worse to trust.
+3. **Rooms as a UI filter over the public Book.** Cheapest and dishonest: nothing would be
+   private, and "playground" would be a label rather than a mechanism.
+
+**(1).** It needs no new trust in the auction itself, and the cost it imposes — many contracts
+to index — is the exact problem subgraph templates exist to solve.
+
+**Membership is a merkle root, not a list.** The creator posts one `bytes32` root of invited
+addresses at `create()`; `commit` takes a proof. One storage slot regardless of how many
+friends, and the invite you send someone is their proof. Adding a friend is a new root.
+
+There is a pleasing symmetry in the stack here, and it is worth stating because it sharpens
+what this project is arguing. SwapVM already ships an identity gate — opcode `0x2d`,
+`WhitelistSequential`, the top row of the comparison table above. Glasshouse's whole claim is
+that `0x2d` asks *who you are* and `0x2e` asks *what it is worth*, and that the second is the
+right question for **price**. A playground deliberately uses both, each for the thing it is
+good at: **`0x2d` decides who may enter the room; `0x2e` decides who wins inside it.** The
+identity gate was never the enemy — using it to set a price was.
+
+**What "private" can and cannot mean, stated before anyone is tempted to overstate it.**
+
+- **Bid values are already private until reveal.** Commit-reveal does that today. No new work.
+- **Membership can be genuinely gated.** Only invited addresses could commit.
+- **Room activity is public, and cannot be otherwise.** Anyone can read the Book's logs on
+  Basescan. Hiding that needs encryption or a different chain, neither of which is on the table.
+
+So the honest word is **invite-only**, not private. A product whose entire argument is that you
+can check it yourself does not get to sell secrecy it cannot deliver.
+
+**Why this is the strongest Graph story available to us**, and the reason it is written down
+rather than filed. `subgraph/subgraph.yaml` has one `dataSources` entry and no `templates`
+block. Rooms change that: the factory's room-created event calls `dataSource.create()`, and one
+subgraph indexes every room ever opened, including rooms that did not exist when the subgraph
+was deployed. That is the thing an indexer does which no direct `eth_call` reader can do at
+all — the board's own fallback path (`web/lib/chain.js`) could never follow a contract it was
+not compiled knowing about.
+
+It also makes the most interesting entity in the schema a cross-room one: a bidder whose
+record — **sealed versus opened**, the question `/account` already asks of a single Book —
+aggregates over every room they have entered. Reliability becomes portable between groups
+without anyone asserting it, because it is derived from logs. Room discovery ("which public
+rooms are active") becomes a query rather than a contract feature.
+
+**The smallest honest first step**, if this is picked up: the factory and the template subgraph
+with **bond 0 and no merkle gate** — public rooms only. That proves the indexing architecture,
+which is the hard part and the novel part, without touching the bond path or claiming a privacy
+property. Membership gating comes after, and a factory holding other people's bonds is new
+unaudited code that should not be rushed.
+
 ## Why not an AVS / restaking?
 
 Because there is nothing here to secure. An off-chain auction committed by a signed operator
