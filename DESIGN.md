@@ -796,3 +796,46 @@ by someone adding a retry or a fallback to a component that had no bug.
 before it is fixed. `shoot-screens.mjs` prints a measurement beside every image for this
 reason, and any capture of a route that reads the chain needs a settle longer than the read
 it is waiting on.
+
+## F-12 🟡 `/r/<hash>` looked empty for two different reasons, and only one was a bug
+
+Reported from the live site as "I am not able to find anything on the particular round page".
+Measured in headless Chrome against production rather than reasoned about, which is the only
+reason the two causes were separated instead of one fix being written for both.
+
+**The bug.** The page rendered *"No round in the URL"* for every round link on the site.
+`/r/<hash>` is a Vercel **rewrite** onto `/round/?h=<hash>`: a rewrite decides which file the
+edge serves and does **not** change the browser's location, so the client saw `/r/<hash>/`
+with an empty search string and `params.get("h")` correctly returned null. Nothing was
+misconfigured — the query string genuinely does not exist on the client.
+
+This is **F-10 exactly**, which `/profile/<addr>` was fixed for by reading the address out of
+`usePathname()` as a fallback (`app/account/page.tsx:90`). `app/round/page.tsx` was written
+before that fix and never received it, so the same defect survived in the one file nobody
+re-checked. Every round link in the table, and every URL anyone had shared, was dead. Fixed
+the same way, and the two are now the only rewrite-backed routes, both covered.
+
+**The thing that was NOT a bug, and nearly got "fixed".** With the path fallback in place the
+page still looked empty at a 7-second settle — 159 rendered characters, stuck on "Reading
+this round from the Book…". At 25 seconds it renders in full: chart, receipt, ladder,
+provenance caption, 3,462 characters. The page was correct the whole time. Base's public
+endpoint was rate limiting (HTTP 429) and the read was simply slow.
+
+Both pool members in `web/lib/chain.js` were tested directly at that moment — `eth_call` and
+a 140-block `eth_getLogs` — and both answered. So no component was changed on suspicion. This
+is the fourth time a capture taken before a chain read returned has looked like a broken
+component (F-11 was the third), and the first time the wait needed was **ten times** the
+rig's default settle.
+
+**What did change, because a demo should not depend on a shared endpoint.** `rpcUrl()` in
+`web/lib/useAuctions.ts` now reads `NEXT_PUBLIC_RPC_URL` after `?rpc=` and before the default,
+so the deployed site can be pointed at a dedicated endpoint. Two consequences recorded in
+`DEPLOY.md`: the value is public, because a static export inlines every `NEXT_PUBLIC_*` into a
+downloadable chunk; and setting it disables the fallback pool, because `chain.js` honours a
+caller-chosen endpoint exactly rather than substituting a pool member — which is the behaviour
+that stops the source chip claiming a number came from somewhere it did not.
+
+**And one thing that WAS missing.** `app/round/page.tsx` destructured everything from
+`useBoard()` except `error`, so a refused read left it on the loading state indefinitely
+rather than saying so. Every other surface on the site keeps "we could not read it" distinct
+from "there is nothing there"; this was the one place that collapsed them into a spinner.
