@@ -24,7 +24,7 @@ function PhaseChip({ a, head }: { a: Auction; head: number }) {
   return (
     <span
       className={[
-        "inline-block border px-1.5 py-0.5 font-mono text-[0.66rem] uppercase tracking-[0.12em]",
+        "inline-block whitespace-nowrap border px-1.5 py-0.5 font-mono text-[0.66rem] uppercase tracking-[0.12em]",
         live ? "border-glass bg-glass-soft text-glass" : "border-rule text-ink-faint",
       ].join(" ")}
     >
@@ -59,14 +59,14 @@ export function RoundsTable({ auctions, head }: { auctions: Auction[]; head: num
 
   return (
     <div className="overflow-x-auto border border-rule">
-      <table className="w-full min-w-[54rem] border-collapse text-left text-sm">
+      <table className="w-full min-w-[62rem] border-collapse text-left text-sm">
         <thead>
           <tr className="border-b border-rule bg-sunk">
             {["round", "opened", "phase", "reveals", "clearing", "winner", "filled"].map((h) => (
               <th
                 key={h}
                 scope="col"
-                className="px-3 py-2 font-mono text-[0.66rem] font-normal uppercase tracking-[0.12em] text-ink-faint"
+                className="whitespace-nowrap px-3 py-2 font-mono text-[0.66rem] font-normal uppercase tracking-[0.12em] text-ink-faint"
               >
                 {h}
               </th>
@@ -101,7 +101,7 @@ export function RoundsTable({ auctions, head }: { auctions: Auction[]; head: num
             return (
               <tr key={a.orderHash} className="border-b border-rule last:border-b-0 hover:bg-raised">
                 <td className="tnum px-3 py-2 text-ink">{a.round}</td>
-                <td className="tnum px-3 py-2 text-ink-soft">{num(a.openedAtBlock)}</td>
+                <td className="tnum whitespace-nowrap px-3 py-2 text-ink-soft">{num(a.openedAtBlock)}</td>
                 <td className="px-3 py-2">
                   <PhaseChip a={a} head={head} />
                 </td>

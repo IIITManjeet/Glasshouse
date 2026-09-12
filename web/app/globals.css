@@ -112,6 +112,33 @@ html {
   overflow-wrap: anywhere;
 }
 
+/* ...BUT NOT INSIDE THINGS THAT ARE ONE TOKEN.
+
+   The rule above is the right default and the wrong one for a table. `anywhere` breaks a
+   word whenever it "would otherwise overflow", and inside a column squeezed by six other
+   columns that is nearly every word -- so the rounds table shipped with its ROUND header
+   set as "ROUN / D", every phase chip reading "OPE / N", block numbers split as
+   "51,189,8 / 06" and addresses as "0xeebf... / ecdf". Reported from the live site as
+   "broken components inside a table", and correctly: a header broken mid-word does not
+   look like tight spacing, it looks like the page failed.
+
+   Worth recording how it got here. The global was added DEFENSIVELY while chasing F-8, an
+   apparent 390px overflow that was measured and withdrawn -- it was a headless-Chrome
+   cropping artefact and never existed. So a guard against a bug that was not real is what
+   produced one that is. It is kept rather than deleted because its OTHER reason is sound:
+   this app prints 42-character hex addresses, and an unbreakable 42-character token has a
+   min-content width wider than a phone.
+
+   The exemption is by kind, not by page: a column heading, a monospace figure, a chip and
+   a phase label are each a single unit whose meaning depends on staying whole. Long prose
+   and full addresses still break, which is the case the global was for. */
+th,
+.tnum,
+.chip,
+.nowrap-token {
+  overflow-wrap: normal;
+}
+
 /* Every number that came from a chain, a test or a computation is monospace with tabular
    figures, so columns of them line up and a changing digit does not shift the ones beside
    it. That rule is from ui-spec section 2.1 and it is why this is global rather than a
