@@ -106,7 +106,9 @@ export function RoundsTable({ auctions, head }: { auctions: Auction[]; head: num
                   <PhaseChip a={a} head={head} />
                 </td>
                 <td className="tnum px-3 py-2 text-ink-soft">
-                  {revealsRead ? `${a.revealedCount} of ${a.committedCount}` : `not read, ${a.committedCount} committed`}
+                  <span className="whitespace-nowrap">
+                    {revealsRead ? `${a.revealedCount} of ${a.committedCount}` : `not read, ${a.committedCount} committed`}
+                  </span>
                   {missingReveals > 0 && revealWindowClosed ? (
                     <span className="ml-1.5 whitespace-nowrap text-[0.72rem] text-brick">
                       {missingReveals} unrevealed · bond forfeitable

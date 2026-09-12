@@ -54,7 +54,7 @@ export function AddressLink({
       <a
         href={recordHref(addr)}
         title={`${addr} — their record on this site`}
-        className={`tnum text-glass underline decoration-rule underline-offset-2 hover:decoration-glass ${className}`}
+        className={`tnum whitespace-nowrap text-glass underline decoration-rule underline-offset-2 hover:decoration-glass ${className}`}
       >
         {label ?? short(addr)}
       </a>
