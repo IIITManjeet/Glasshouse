@@ -85,25 +85,53 @@ link. Architecture decided by Fable, recorded in this session.
       declared before `.btn` so its own size never applied, and `--color-lifted` is `#ffffff`
       on the light theme — identical to `--color-raised` — so any hover or header painted with
       it was invisible in the theme most judges will see. (6755cd1)
-- [ ] **WS-A — chrome, routes, FAQ.** Nav becomes `Live · Rounds · Evidence · FAQ`; a real
+- [x] **WS-A — chrome, routes, FAQ.** Nav becomes `Live · Rounds · Evidence · FAQ`; a real
       four-column footer carrying every link; `/faq` with 20 questions whose answers are LIFTED
       from existing prose rather than rewritten; one type register everywhere; `/evidence` and
       `/round` trimmed; `/board` → `/` redirect.
-- [ ] **WS-B — the instrument at `/`.** The live round becomes the front door, keeping exactly
+- [x] **WS-B — the instrument at `/`.** The live round becomes the front door, keeping exactly
       one sentence of what-this-is above it. All five `BTN_*` constants deleted; one primary per
       view, changing label through the round's states.
-- [ ] **WS-C — rounds as a market.** A promoted tile whose countdown is the biggest thing on
+- [x] **WS-C — rounds as a market.** A promoted tile whose countdown is the biggest thing on
       the page, a visible bid strip, a row-link contract that no longer lies, and an honest
       "last settled" tile when nothing is open — which is what every exchange shows when the
       market is quiet.
-- [ ] **WS-D — personification without invention.** A deterministic two-hue mark, real ENS when
+- [x] **WS-D — personification without invention.** A deterministic two-hue mark, real ENS when
       it resolves, and roles read from chain fields (`house`, `you`, `winner`, `leading`,
       `filled`, `maker`). `Identity.tsx`'s refusal of identicons STANDS: no generated names, no
       faces, full hex always visible and copyable. A colour derived from the bytes is a
       rendering of the address, not a claim about anyone.
-- [ ] **Integration:** build, `lint:page`, `npm test`, walk every route at 390px and 1280px in
-      both themes measuring `scrollWidth` vs `innerWidth`, count `.btn-primary` per view, then
-      delete `HowToBid.tsx` once nothing imports it.
+- [x] **Integration done** (07066a3, b90a5e4). Build, `lint:page` PASS, 59 JS tests green,
+      `HowToBid.tsx` and `.tape .panel-id` deleted with zero call sites. Five defects found
+      while integrating, none of them in the plan:
+
+      - `/r/<hash>` had NEVER worked. A Vercel rewrite changes which file the edge serves and
+        does not change the browser's location, so the client saw an empty query string and
+        every round link on the site rendered "No round in the URL". This is F-10 exactly, the
+        fix `/profile/<addr>` already had; `round/page.tsx` predated it. Measured in headless
+        Chrome against production, not inferred.
+      - The round page could not say a read had FAILED — `error` was the one `useBoard()` field
+        it did not destructure, so a rate-limited RPC left it loading forever.
+      - The profile look-up box was a no-op on every profile: seeded with the address already
+        on screen, so "Look up" reloaded the page you were on.
+      - The connected address appeared TWICE, and only the lower one reached a profile.
+        WalletChip's own comment had warned this would happen. The menu moved to the masthead
+        and gained the profile link; the old chip called `disconnect()` on click.
+      - Deleting `.tape h1` broke `/evidence`'s heading — it was the one h1 with no size
+        utility, so Tailwind's `font-size: inherit` rendered it at 14px. Fixed in the markup,
+        which is where it should always have lived.
+
+- [ ] **Still worth doing if there is time** (from the spacing review; none are defects):
+      collapse vertical rhythm to `2/3/4/6/8/12/16` — sixteen distinct steps are in use and
+      section→section is a different value on every route; move `/rounds`'s one primary out of
+      `.card-foot`, where a 44px filled button sits inside a 13px caption strip; and move the
+      wallet bar on `/` into the bid-panel column so "who am I" sits above "place a bid"
+      instead of reading as masthead furniture between the headline and the countdown.
+
+- [ ] **Optional, and it removes the last demo risk:** set `NEXT_PUBLIC_RPC_URL` on Vercel to a
+      dedicated Base endpoint. Unset, every visitor reads the public endpoint from their own IP
+      and can be rate limited. Note it is public (static export) and that setting it disables
+      the fallback pool — see DEPLOY.md.
 
 Revert target if tonight goes wrong: tag **`pre-frontend-restructure`**.
 
