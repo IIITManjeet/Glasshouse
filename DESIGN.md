@@ -633,6 +633,7 @@ fold from these images requires scrolling the page first, which `shoot-screens.m
 currently do.
 
 **The tally for the session: three findings recorded from screenshots, three withdrawn.**
+(F-11, below, made it four for four across the next session.)
 Every one was the tool or the environment rather than the product — a cropped window, a dev
 overlay, a transition caught early. The findings that survived were the ones found by reading
 code or by measuring inside the page. That is the lesson worth carrying forward, and it is
@@ -770,3 +771,28 @@ shown listed only the light value.
 The landing hero could be this same chart rendered from the most recently settled round, with
 the same provenance line. That is the one remaining place a generated image would otherwise
 have gone.
+
+## F-11 ⚪ WITHDRAWN — the rounds table looked broken; the capture beat a 2.3 s chain read
+
+**The fourth capture artefact, and the first one recorded here rather than only in a
+check-in.** It was written up in `CHECKIN.txt`, which is untracked by design, so the one
+withdrawal that completes the pattern was living in the only file that does not survive a
+clone. That is exactly the quiet deletion this section exists to prevent, so it is here now.
+
+**Symptom.** The first screenshots of `/rounds` showed an empty table under a populated
+header — indistinguishable from a `RoundsTable` that renders its shell and never receives
+rows.
+
+**Cause.** The capture was taken before a 2.3-second chain read had returned. The component
+was correct; the rig was early. Same class as F-8 (a cropped headless window), F-9 (the
+Next.js dev indicator) and F-7 (a `<Swap>` caught mid-transition).
+
+**Why it matters more than the three before it.** Those three were cosmetic. This one looked
+like a data-layer failure on the page whose entire job is to show that the Book has history,
+which is the single most damaging thing a judge could see — and it would have been "fixed"
+by someone adding a retry or a fallback to a component that had no bug.
+
+**The rule this makes non-negotiable:** a suspected visual defect is measured inside the page
+before it is fixed. `shoot-screens.mjs` prints a measurement beside every image for this
+reason, and any capture of a route that reads the chain needs a settle longer than the read
+it is waiting on.
