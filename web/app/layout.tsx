@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import Link from "next/link";
 import { NavLink } from "@/components/NavLink";
+import { WalletChip } from "@/components/WalletChip";
 import { IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
@@ -123,6 +124,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     where the subgraph's own fields live -- provenance, and bids sealed
                     versus opened -- behind a URL you had to already know. */}
                 <NavLink href="/account">Bidders</NavLink>
+                {/* AFTER the nav and visually quieter than it, because connecting is
+                    optional here and the placement should say so. Reading this site needs
+                    no wallet; only bidding does, and that rule is one of the better
+                    decisions in the product -- a page arguing you do not have to trust it
+                    should not ask you to sign something before it will show you why. The
+                    control was previously on /board alone, so on four of five pages there
+                    was no sign that bidding existed at all. */}
+                <span className="ml-1 border-l border-rule pl-5">
+                  <WalletChip />
+                </span>
               </nav>
             </header>
             {/* The provenance line, on every page, so any screenshot carries it. The

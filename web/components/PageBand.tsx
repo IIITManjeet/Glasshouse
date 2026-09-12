@@ -34,7 +34,11 @@ import type { CSSProperties } from "react";
 export function pageBand(src: string): CSSProperties {
   return {
     backgroundImage:
-      "linear-gradient(to right, var(--color-ground) 0%, transparent 16%, transparent 84%, var(--color-ground) 100%), " +
+      // The right side fades EARLIER and HARDER than the left. These bands are lit from
+      // the right, so their brightest pixels sit exactly where the content column ends --
+      // a symmetric fade left a visible vertical cut down the page. Asymmetry here is the
+      // image being accounted for rather than a value picked for tidiness.
+      "linear-gradient(to right, var(--color-ground) 0%, transparent 15%, transparent 62%, var(--color-ground) 94%), " +
       "linear-gradient(to bottom, color-mix(in srgb, var(--color-ground) 55%, transparent) 0%, color-mix(in srgb, var(--color-ground) 84%, transparent) 62%, var(--color-ground) 100%), " +
       `url(${src})`,
     backgroundSize: "100% 13rem, 100% 13rem, 100% 13rem",

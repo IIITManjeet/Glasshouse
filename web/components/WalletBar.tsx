@@ -46,45 +46,34 @@ const BTN_OFF = "";
  * wallet that resolves `wallet_switchEthereumChain` before the switch has actually taken
  * effect -- several do -- cannot cause a transaction to land on the wrong chain.
  */
-export function WalletBar({ className = "" }: { className?: string }) {
-  const [mounted, setMounted] = useState(false);
+/**
+ * WHICH CONNECTORS CAN ACTUALLY CONNECT, asked of the connectors rather than of
+ * `window.ethereum`.
+ *
+ * Lifted out of WalletBar so the header control can ask the same question and get the same
+ * answer. It is the one piece of this file that must not be reimplemented: a second,
+ * simpler copy would reintroduce both bugs described below, and it would do so only for
+ * people whose wallet setup differs from the developer's -- which is the worst possible
+ * distribution for a bug.
+ *
+ * This used to be a single synchronous read of `window.ethereum` in a mount effect, wrong
+ * in two ways that both present as "the button says no wallet found and cannot be clicked"
+ * while a wallet sits right there in the toolbar.
+ *
+ *   1. EXTENSIONS INJECT LATE. A one-shot read at mount can run before the extension has
+ *      written to `window`, and nothing ever re-read it, so the answer stayed false for
+ *      the life of the page.
+ *   2. EIP-6963 WALLETS NEED NOT SET `window.ethereum` AT ALL. That is the point of the
+ *      standard -- it replaced the single global wallets used to fight over. Rabby, and
+ *      MetaMask with "use as default wallet" off, announce by event and may leave the
+ *      global undefined. wagmi already discovers these and puts them in `connectors`.
+ *
+ * So: ask each connector for its provider, and re-ask whenever a wallet announces itself.
+ */
+export function useAvailableConnectors(): readonly Connector[] {
+  const { connectors } = useConnect();
   const [available, setAvailable] = useState<readonly Connector[]>([]);
-  const [copied, setCopied] = useState(false);
-  const [note, setNote] = useState<string | null>(null);
 
-  const { address, isConnected, chainId: walletChainId } = useAccount();
-  const { connect, connectors, status: connectStatus, error: connectError, reset: resetConnect } = useConnect();
-  const { disconnect } = useDisconnect();
-  const { switchChain, status: switchStatus, error: switchError, reset: resetSwitch } = useSwitchChain();
-  // The config's chain, used only as a fallback when the connector has not reported one
-  // yet. `useAccount().chainId` is the wallet's actual chain and is the one that matters.
-  const configChainId = useChainId();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // WHICH CONNECTORS CAN ACTUALLY CONNECT, asked of the connectors rather than of
-  // `window.ethereum`.
-  //
-  // This used to be a single synchronous read of `window.ethereum` in a mount effect, and
-  // it was wrong in two ways that both present as "the button says no wallet found and
-  // cannot be clicked" while a wallet sits right there in the toolbar.
-  //
-  //   1. EXTENSIONS INJECT LATE. A one-shot read at mount can run before the extension has
-  //      written to `window`, and nothing ever re-read it, so the answer stayed `false` for
-  //      the life of the page.
-  //   2. EIP-6963 WALLETS NEED NOT SET `window.ethereum` AT ALL. That is the whole point of
-  //      the standard -- it replaced the single global that wallets used to fight over.
-  //      Rabby, and MetaMask with "use as default wallet" turned off, announce themselves
-  //      by event and may leave the global undefined. wagmi already discovers these
-  //      (`multiInjectedProviderDiscovery` is on by default) and puts them in `connectors`;
-  //      this component was ignoring that and asking the obsolete question instead.
-  //
-  // So: ask each connector for its provider, which is the question actually being answered,
-  // and re-ask whenever a wallet announces itself. `connectors[0]` is gone with it -- with
-  // discovery on, index 0 is whichever wallet happened to announce first, not necessarily
-  // one that works.
   useEffect(() => {
     let cancelled = false;
 
@@ -105,7 +94,7 @@ export function WalletBar({ className = "" }: { className?: string }) {
     try {
       window.dispatchEvent(new Event("eip6963:requestProvider"));
     } catch {
-      /* pre-6963 browser; the probe below still finds a legacy injected provider */
+      /* pre-6963 browser; the probe still finds a legacy injected provider */
     }
     void probe();
 
@@ -121,6 +110,28 @@ export function WalletBar({ className = "" }: { className?: string }) {
       clearTimeout(t);
     };
   }, [connectors]);
+
+  return available;
+}
+
+export function WalletBar({ className = "" }: { className?: string }) {
+  const [mounted, setMounted] = useState(false);
+  const available = useAvailableConnectors();
+  const [copied, setCopied] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+
+  const { address, isConnected, chainId: walletChainId } = useAccount();
+  const { connect, connectors, status: connectStatus, error: connectError, reset: resetConnect } = useConnect();
+  const { disconnect } = useDisconnect();
+  const { switchChain, status: switchStatus, error: switchError, reset: resetSwitch } = useSwitchChain();
+  // The config's chain, used only as a fallback when the connector has not reported one
+  // yet. `useAccount().chainId` is the wallet's actual chain and is the one that matters.
+  const configChainId = useChainId();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
 
   // Errors become a sentence and then clear themselves; a wallet error that stays on screen
   // after the visitor has fixed it is noise. The wagmi hook's own error is reset with it so
