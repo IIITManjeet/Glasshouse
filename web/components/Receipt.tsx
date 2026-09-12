@@ -4,6 +4,7 @@ import { AddressLink } from "./Address";
 
 import { useState } from "react";
 import type { Auction, Source } from "@/lib/useAuctions";
+import { roundLabel } from "@/lib/useAuctions";
 
 /**
  * The receipt. ui-spec.md section S4 -- "the thing a judge screenshots".
@@ -53,8 +54,8 @@ function castCommands(a: Auction): string {
  *  invitation to bid against someone, not a boast about a result. */
 function inviteText(a: Auction, clearing: number | null): string {
   return a.bestBidder
-    ? `Round ${a.round} on Glasshouse settled at ${clearing} bps — the winner bid higher and paid the runner-up's price. Sealed-bid, second-price, on Base.`
-    : `Round ${a.round} on Glasshouse is open. Sealed bids, second price — the winner pays what the runner-up offered.`;
+    ? `The ${roundLabel(a)} on Glasshouse settled at ${clearing} bps — the winner bid higher and paid the runner-up's price. Sealed-bid, second-price, on Base.`
+    : `The ${roundLabel(a)} on Glasshouse is open. Sealed bids, second price — the winner pays what the runner-up offered.`;
 }
 
 function Copy({ text, label }: { text: string; label: string }) {
@@ -118,7 +119,7 @@ export function Receipt({ a, source }: { a: Auction; source: Source }) {
     <figure data-src={simulated ? "sim" : "chain"} className="border border-rule bg-raised rounded-card shadow-card">
       <figcaption className="flex flex-wrap items-center justify-between gap-2 border-b border-rule px-4 py-2.5">
         <span className="font-mono text-[0.72rem] uppercase tracking-[0.14em] text-ink">
-          Receipt · round {num(a.round)}
+          Receipt · {roundLabel(a)}
         </span>
         <span
           className={`border px-2 py-0.5 font-mono text-[0.6875rem] uppercase tracking-[0.12em] ${
@@ -362,7 +363,7 @@ function ShareRound({
   const url =
     typeof window === "undefined"
       ? ""
-      : `${window.location.origin}/evidence?round=${a.round}`;
+      : `${window.location.origin}/r/${a.orderHash}`;
   const text = inviteText(a, clearing);
 
   if (simulated) return null;

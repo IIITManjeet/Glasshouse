@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { type Auction, livePhase } from "@/lib/useAuctions";
 // The local copy of this used to point at Basescan and nowhere else. It now comes from
 // components/Address.tsx, which sends the address text to the bidder's own record here and
@@ -100,7 +101,21 @@ export function RoundsTable({ auctions, head }: { auctions: Auction[]; head: num
 
             return (
               <tr key={a.orderHash} className="border-b border-rule last:border-b-0 hover:bg-raised">
-                <td className="tnum px-3 py-2 text-ink">{a.round}</td>
+                {/* THE ROW OPENS. Every auction has a page at /r/<hash> and the table is
+                    where anyone would look for it -- a list of rounds none of which can be
+                    opened is a list, not an index. The hash is the key rather than the
+                    round number because the most interesting auction on this Book, the one
+                    that cleared at the runner-up's price, has no round number: it is the
+                    live-fill order, built above the manifest so it can never collide with
+                    a keeper round. */}
+                <td className="tnum px-3 py-2 text-ink">
+                  <Link
+                    href={`/r/${a.orderHash}`}
+                    className="text-glass underline decoration-rule underline-offset-2 hover:decoration-glass"
+                  >
+                    {a.round ?? "open"}
+                  </Link>
+                </td>
                 <td className="tnum whitespace-nowrap px-3 py-2 text-ink-soft">{num(a.openedAtBlock)}</td>
                 <td className="px-3 py-2">
                   <PhaseChip a={a} head={head} />

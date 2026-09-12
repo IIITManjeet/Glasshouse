@@ -33,6 +33,8 @@ const nextConfig = {
     return [
       { source: "/profile/:address", destination: "/account/?a=:address" },
       { source: "/profile/:address/", destination: "/account/?a=:address" },
+      { source: "/r/:hash", destination: "/round/?h=:hash" },
+      { source: "/r/:hash/", destination: "/round/?h=:hash" },
     ];
   },
 };

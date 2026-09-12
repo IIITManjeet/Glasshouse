@@ -117,6 +117,28 @@ function useDemoFlag(): [boolean, (on: boolean) => void] {
   return [on, setDemoGlobal];
 }
 
+/**
+ * WHAT TO CALL AN AUCTION THAT HAS NO ROUND NUMBER.
+ *
+ * `round` is an index into config/rounds.json and most auctions have one. The live-fill
+ * order does not: it is built at a counter deliberately above the manifest so it can never
+ * collide with a round the keeper will open. That makes the single most interesting
+ * auction on this Book -- the one that cleared at the runner-up's 250 rather than the
+ * winner's 400 -- also the one with no index.
+ *
+ * Printed unguarded it rendered "Round null" in the settlement chart, "Receipt · round —"
+ * on the receipt, and a share link ending `?round=null`. Three copies of one assumption,
+ * so it lives here once, next to the type it describes.
+ *
+ * The hash is not a fallback in the apologetic sense: it is what the chain calls this
+ * auction, and it is the key /r/<hash> is addressed by.
+ */
+export function roundLabel(a: { round?: number | null; orderHash?: string }): string {
+  return a.round === null || a.round === undefined
+    ? `order ${String(a.orderHash ?? "").slice(0, 10)}\u2026`
+    : `round ${a.round}`;
+}
+
 const BOOK = "0xc4ea91Fe700918220423ac307C6B1c59650FFbfe";
 
 function rpcUrl() {

@@ -1,6 +1,6 @@
 "use client";
 
-import { type Auction, type Source, livePhase } from "@/lib/useAuctions";
+import { type Auction, type Source, livePhase, roundLabel } from "@/lib/useAuctions";
 
 /**
  * THE MECHANISM, AS ONE PICTURE.
@@ -44,23 +44,6 @@ const H = 320;
 
 const num = (n: number) => n.toLocaleString("en-US");
 const short = (a?: string | null) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "—");
-
-/**
- * What to call this round in prose.
- *
- * NOT EVERY AUCTION HAS A ROUND NUMBER. `round` is an index into config/rounds.json, and
- * the live-fill order is deliberately not in that table -- it is built at a counter above
- * the manifest precisely so it can never collide with a round the keeper will open. So the
- * one auction on Base that actually demonstrates second price, the 250 bps fill, is also
- * the one with no index, and printing it unguarded rendered "Round null" in the chart
- * header and "From round —" beneath it. An auction identified by nothing is worse than one
- * identified by its hash, which is what the chain calls it anyway.
- */
-function roundName(a: Auction): string {
-  return a.round === null || a.round === undefined
-    ? `order ${String(a.orderHash).slice(0, 10)}…`
-    : `round ${a.round}`;
-}
 
 export function Settlement({ a, head, source }: { a: Auction; head: number; source: Source }) {
   // THE SOURCE IS A PROP BECAUSE THIS FIGURE CANNOT KNOW IT OTHERWISE, and getting that
@@ -131,7 +114,7 @@ export function Settlement({ a, head, source }: { a: Auction; head: number; sour
           Where the price came from
         </span>
         <span className={simulated ? "chip chip-warn" : "chip"}>
-          {simulated ? "Simulated · not a chain read" : `${roundName(a)} · block ${num(head)}`}
+          {simulated ? "Simulated · not a chain read" : `${roundLabel(a)} · block ${num(head)}`}
         </span>
       </figcaption>
 
@@ -382,7 +365,7 @@ export function Settlement({ a, head, source }: { a: Auction; head: number; sour
           </>
         ) : (
           <>
-            the bids of {roundName(a)} as the Book recorded them, in commit order, read at
+            the bids of {roundLabel(a)} as the Book recorded them, in commit order, read at
             block {num(head)}.
           </>
         )}{" "}
