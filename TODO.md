@@ -10,13 +10,27 @@ Findings referenced as F-n live in `DESIGN.md`.
 
 ## In progress
 
-- [~] **Fork round generation is partly stuck.** Four rounds exist (0-3: three settled, one
-  live in reveal), which is enough to exercise the filters. Further rounds fail at `ship`
-  with custom error `0x879f237b(router, orderHash)` -- Aqua rejecting an already-shipped
-  strategy. The keeper's `nextRound` cursor and Aqua's ledger of shipped strategies have
-  drifted apart across restarts, so it retries hashes Aqua has already seen. The keeper is
-  not wrong and neither is Aqua; nothing reconciles them after a crashed run. Either restart
-  anvil for a clean fork, or have the keeper skip a round whose strategy Aqua already holds.
+- [x] **The keeper survives an interruption, and skips a round it cannot ship.**
+  Was: `nextRound` only advances after settle AND dock, so any interruption left the cursor
+  on a partly-done round and the next run restarted it from `ship` -- which Aqua rejects for
+  a strategy it already holds, permanently stranding the keeper on that round. Harmless on a
+  fork; not harmless now that the mainnet balance is good for ~240 rounds and the run is
+  meant to be left alone.
+
+  Progress is recorded in the state file (`shipped`, written between ship and open) and
+  confirmed against the Book, never inferred from the revert -- `0x879f237b` reads like a
+  duplicate-strategy error but also fires for a missing allowance, so the selector cannot
+  tell you which. Each step now asks what is already true: open skipped when `commitEnd` is
+  set, commit when the Book holds ours, reveal when already revealed, settle when settled.
+  A ship that fails for any reason SKIPS the round and advances, because retrying is what
+  turned one bad round into a dead keeper.
+
+  Verified on a fork both ways, after a regression the first version introduced: a round
+  killed between commit and reveal resumes and reveals at the bps its state file recorded;
+  a fresh round still seals, reveals and settles with a real winner. That regression --
+  `hasCommitted` read into a const before the commit was sent, so every FRESH round settled
+  at 0 bps with no winner -- was caught only by testing the path that looked least likely
+  to break.
 
 ## Frontend — open
 
@@ -159,9 +173,15 @@ Findings referenced as F-n live in `DESIGN.md`.
   run and `verify-run`'s `BONDS` check is permanently n/a rather than passing. It is the last
   contract surface with no live evidence behind it. One bonded round would close it; saying so
   plainly is the alternative.
-- [ ] **Run the keeper continuously**, so a visitor arriving at the board finds a round
-  accepting bids. It has run exactly one round and stopped, which is the one thing the
-  keeper's own header says it exists to prevent. ~0.0000028 ETH/round.
+- [~] **Run the keeper so a visitor finds a round accepting bids.** Six mainnet rounds so
+  far (0-5). Measured cost is 0.0000022/round, and the balance after the ephemeral-bidder
+  sweep is 0.000534 ETH -- about 240 rounds, or 18 hours back to back.
+
+  Deliberately NOT left running unattended before the demo. The board only needs a live
+  round while someone is watching, and 2 rounds of demo cost ~1% of the balance, so the
+  risk worth managing is arriving at judging with the money already spent -- not running
+  out mid-round, which the gas floor now handles by stopping cleanly between rounds.
+  Run a capped batch (`KEEPER_MAX_ROUNDS=5`) shortly before showing it.
 
 ## Backend — done
 
