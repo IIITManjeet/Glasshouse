@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { livePhase, type Auction } from "@/lib/useAuctions";
 import { useBoard } from "@/components/BoardProvider";
+import { pageBand } from "@/components/PageBand";
 import { PhaseTrack, BidCards, Stats, ReplayCheck, Countdown } from "@/components/Auction";
 import { WalletBar } from "@/components/WalletBar";
 import { BidPanel, RevealStrip } from "@/components/BidPanel";
@@ -34,7 +35,7 @@ export default function BoardPage() {
   const featured: Auction | undefined = live ?? auctions[0];
 
   return (
-    <main>
+    <main className="relative" style={pageBand("/art/header-board.webp")}>
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="panel-id">GH 01 · Book 0xc4ea…FFbf · Base 8453</p>

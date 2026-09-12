@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useBoard } from "@/components/BoardProvider";
+import { pageBand } from "@/components/PageBand";
 import { SourceChip } from "@/components/Auction";
 import { Settlement } from "@/components/Settlement";
 import { Receipt } from "@/components/Receipt";
@@ -104,10 +105,6 @@ function RoundView() {
   }
 
   const phase = livePhase(a, head);
-  const name =
-    a.round === null || a.round === undefined
-      ? `Order ${String(a.orderHash).slice(0, 10)}…`
-      : `Round ${a.round}`;
 
   return (
     <>
@@ -158,7 +155,7 @@ function RoundView() {
 
 export default function RoundPage() {
   return (
-    <main className="mx-auto max-w-[62rem] px-4 py-10 sm:px-6">
+    <main className="relative mx-auto max-w-[62rem] px-4 py-10 sm:px-6" style={pageBand("/art/header-round.webp")}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
         <div>
           <h1 className="font-display text-3xl font-semibold text-ink">One round</h1>

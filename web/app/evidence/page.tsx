@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useBoard } from "@/components/BoardProvider";
+import { pageBand } from "@/components/PageBand";
 import { Receipt } from "@/components/Receipt";
 import { Timeline } from "@/components/Timeline";
 import { Settlement } from "@/components/Settlement";
@@ -150,7 +151,7 @@ export default function EvidencePage() {
   const { auctions, source, head, error } = useBoard();
 
   return (
-    <main>
+    <main className="relative" style={pageBand("/art/header-evidence.webp")}>
       <section className="mb-8 max-w-3xl">
         <p className="panel-id">GH 03 · Evidence · 5 panels</p>
         <h1 className="mt-2">

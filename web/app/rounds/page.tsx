@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useBoard } from "@/components/BoardProvider";
+import { pageBand } from "@/components/PageBand";
 import { SourceChip } from "@/components/Auction";
 import { RoundsTable } from "@/components/RoundsTable";
 import {
@@ -60,7 +61,7 @@ export default function RoundsPage() {
           : "Nothing has loaded yet: no chain read has returned and this build carries no fallback snapshot.";
 
   return (
-    <main className="mx-auto max-w-[62rem] px-4 py-10 sm:px-6">
+    <main className="relative mx-auto max-w-[62rem] px-4 py-10 sm:px-6" style={pageBand("/art/header-rounds.webp")}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
         <div>
           <h1 className="font-display text-3xl text-ink">Rounds</h1>
