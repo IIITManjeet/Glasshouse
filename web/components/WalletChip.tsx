@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAccount, useConnect, useDisconnect } from "wagmi";
 import { useAvailableConnectors } from "./WalletBar";
+import { AddressMark, recordHref } from "./Address";
 
 /**
  * CONNECT A WALLET, FROM ANYWHERE, WITHOUT BEING ASKED TO.
@@ -29,12 +30,29 @@ import { useAvailableConnectors } from "./WalletBar";
  * and React discards the tree. `mounted` is the standard fix and is the same one WalletBar
  * uses; the gap is invisible because this is chrome rather than content.
  *
- * IT OFFERS NO CHAIN SWITCHING, no address copy, no balance. Those live in WalletBar on
- * the board, next to the bidding it serves. A second, subtly different wallet UI is how
- * two of them drift apart.
+ * IT IS NOW THE ONLY PLACE THE ADDRESS APPEARS, and that is a correction.
+ *
+ * This file used to say: "IT OFFERS NO CHAIN SWITCHING, no address copy, no balance. Those
+ * live in WalletBar on the board, next to the bidding it serves. A second, subtly different
+ * wallet UI is how two of them drift apart." The reasoning was right and the outcome was
+ * the thing it warned about: WalletBar grew its own address disclosure with a copy control
+ * and a disconnect, so a connected visitor saw their address TWICE on one screen -- once in
+ * the masthead and once above the bid panel -- and only the lower one could reach their
+ * profile. Two wallet UIs, drifted apart, exactly as predicted.
+ *
+ * So the menu moved up here rather than being deleted: identity belongs in the chrome,
+ * where it is the same in every route. WalletBar keeps only what is contextual to bidding
+ * -- the connect path and "Switch to Base" -- and renders nothing at all once you are
+ * connected on the right chain.
+ *
+ * THE OLD CONNECTED STATE WAS ALSO A HAZARD. It was a bare button whose onClick called
+ * `disconnect()` with `title="Disconnect"` as the only warning, so clicking your own
+ * address -- the obvious thing to click to see your account -- silently dropped the wallet.
+ * It is a menu now: your record, copy, disconnect.
  */
 export function WalletChip() {
   const [mounted, setMounted] = useState(false);
+  const [copied, setCopied] = useState(false);
   useEffect(() => setMounted(true), []);
 
   const { address, isConnected } = useAccount();
@@ -46,14 +64,51 @@ export function WalletChip() {
 
   if (isConnected && address) {
     return (
-      <button
-        type="button"
-        onClick={() => disconnect()}
-        title="Disconnect"
-        className="tnum whitespace-nowrap text-[0.8125rem] text-ink-soft hover:text-glass"
-      >
-        {address.slice(0, 6)}…{address.slice(-4)}
-      </button>
+      <details className="relative">
+        <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 whitespace-nowrap text-[0.8125rem] text-ink-soft hover:text-glass [&::-webkit-details-marker]:hidden">
+          <AddressMark addr={address} />
+          <span className="tnum">
+            {address.slice(0, 6)}…{address.slice(-4)}
+          </span>
+          <span aria-hidden="true" className="text-[0.6rem] text-ink-faint">
+            ▾
+          </span>
+        </summary>
+        <div className="card absolute right-0 z-30 mt-2 w-[17rem] p-2 text-left">
+          <p className="tnum px-2 pt-1 pb-2 text-[0.7rem] leading-snug break-all text-ink-faint">
+            {address}
+          </p>
+          <a
+            href={recordHref(address)}
+            className="block rounded-control px-2 py-1.5 text-[0.8125rem] text-ink hover:bg-glass-soft hover:text-glass"
+          >
+            Your record on this site →
+          </a>
+          <button
+            type="button"
+            className="block w-full rounded-control px-2 py-1.5 text-left text-[0.8125rem] text-ink hover:bg-glass-soft"
+            onClick={() => {
+              void navigator.clipboard?.writeText(address).then(() => setCopied(true));
+            }}
+          >
+            {copied ? "Copied ✓" : "Copy address"}
+          </button>
+          <button
+            type="button"
+            className="block w-full rounded-control px-2 py-1.5 text-left text-[0.8125rem] text-brick hover:bg-brick-soft"
+            onClick={() => disconnect()}
+          >
+            Disconnect
+          </button>
+          {/* EIP-1193 HAS NO DISCONNECT, and saying so is the difference between a control
+              that works and one the visitor thinks has failed because their wallet still
+              lists the site as connected. Carried over verbatim from WalletBar, which used
+              to own this menu. */}
+          <p className="mt-1 border-t border-rule px-2 pt-1.5 text-[0.7rem] leading-snug text-ink-faint">
+            This forgets the account here; your wallet stays connected on its side.
+          </p>
+        </div>
+      </details>
     );
   }
 

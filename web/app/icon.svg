@@ -7,13 +7,35 @@
     set one below it. At 16px it reads as a small chart; at any size it is the only thing
     this project actually claims.
 
-    Teal is --glass, the token that means "ours / won / surplus to the maker" everywhere
-    else in the palette. No fill behind it, so it sits on light and dark tabs alike.
+    REDRAWN TO SURVIVE 16px, which the first version did not. It was three 3.4px unfilled
+    strokes and a 1.6px DASHED line on a transparent ground: at tab size the dashes
+    collapsed into a faint grey smudge, the hairline disappeared entirely, and a
+    transparent ground meant the teal sat on whatever colour the browser's tab strip
+    happened to be -- which on a dark strip is teal-on-near-black at about 2:1. The mark
+    was correct in its geometry and invisible in its actual use, which is the same class
+    of mistake as a font named in a stack and never fetched.
+
+    What changed, and only these: a filled ground so contrast is ours rather than the
+    browser's, bars at 5px instead of 3.4, and the clearing line solid instead of dashed.
+    The geometry -- three ascending bars, the rule at the second one's height -- is
+    untouched, because that is the part that carries the meaning.
+
+    Teal is --color-glass, the token that means "ours / won / surplus to the maker"
+    everywhere else in the palette. The bars are the light ground colour rather than pure
+    white so the mark belongs to the same palette as the site.
   -->
-  <g fill="none" stroke="#1F6F66" stroke-width="3.4" stroke-linecap="square">
-    <line x1="6"  y1="26" x2="6"  y2="20" />
-    <line x1="16" y1="26" x2="16" y2="14" />
-    <line x1="26" y1="26" x2="26" y2="6" />
+  <rect width="32" height="32" rx="7" fill="#0c7a68" />
+
+  <!-- The three bids, ascending. Squared caps: these are columns, not lines. -->
+  <g fill="#f4f5f7">
+    <rect x="5.5"  y="19" width="5" height="8.5" rx="0.5" />
+    <rect x="13.5" y="13" width="5" height="14.5" rx="0.5" />
+    <rect x="21.5" y="7"  width="5" height="20.5" rx="0.5" />
   </g>
-  <line x1="2" y1="14" x2="30" y2="14" stroke="#8A5A14" stroke-width="1.6" stroke-dasharray="3 2.5" />
+
+  <!-- The clearing price, at the SECOND bar's height. Amber is the palette's colour for
+       the surplus that goes to the maker, and it is the one thing on this mark that is not
+       a bid. It crosses the tallest bar without touching its top, which is the whole
+       second-price rule in one line. -->
+  <rect x="2.5" y="12" width="27" height="2" rx="1" fill="#e6b345" />
 </svg>

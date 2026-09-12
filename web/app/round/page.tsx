@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useBoard } from "@/components/BoardProvider";
 import { pageBand } from "@/components/PageBand";
 import { SourceChip } from "@/components/Auction";
@@ -53,10 +53,29 @@ function findRound(auctions: Auction[], h: string | null, n: string | null): Auc
 }
 
 function RoundView() {
-  const { auctions, head, source, loading, isFork } = useBoard();
+  const { auctions, head, source, loading, isFork, error } = useBoard();
   const params = useSearchParams();
 
-  const h = params.get("h");
+  // THE SAME BUG AS F-10, IN THE FILE THAT DID NOT GET THE FIX.
+  //
+  // `/r/<hash>` is a Vercel REWRITE onto `/round/?h=<hash>` (vercel.json). A rewrite
+  // changes which file the edge serves; it does NOT change the browser's location. So the
+  // client still sees `/r/<hash>/` with an EMPTY query string, `params.get("h")` returns
+  // null, and the page renders its "No round in the URL" state -- for every round link on
+  // the site, including the one in the rounds table and any URL anyone shared.
+  //
+  // `/profile/<addr>` had exactly this defect, it was in production the whole time, and
+  // DESIGN.md F-10 records it. `app/account/page.tsx:90` fixed it by reading the address
+  // out of the PATH as a fallback. This file was written before that fix and never got it,
+  // so the bug survived in the one place nobody re-checked -- found by opening a round link
+  // and seeing an empty page.
+  //
+  // Query parameter first, path second: `?h=` is what `/round/?h=` itself uses and what
+  // `/evidence`'s old back door used, so it stays authoritative.
+  const pathname = usePathname() ?? "";
+  const fromPath = /^\/r\/(0x[0-9a-fA-F]{64})\/?$/.exec(pathname)?.[1] ?? null;
+
+  const h = params.get("h") ?? fromPath;
   const n = params.get("n");
   const asked = h ?? n;
   const a = findRound(auctions, h, n);
@@ -70,6 +89,39 @@ function RoundView() {
         </Link>
         .
       </p>
+    );
+  }
+
+  // A FAILED READ IS NOT A SLOW READ, and this page used to have no way to say so.
+  //
+  // `error` was the one field of `useBoard()` this file did not destructure, so when the
+  // chain read failed the guard below stayed true forever and the page sat on "Reading this
+  // round from the Book..." indefinitely. Every other surface on the site distinguishes
+  // "we could not read it" from "there is nothing there" -- it is the rule the rounds
+  // filters and the account page are both built on -- and this was the one place that
+  // silently collapsed the two into a spinner.
+  //
+  // It matters most on exactly the RPC condition that produced it: Base's public endpoint
+  // rate limits (-32016 / HTTP 429), which this project has already been bitten by once
+  // when a poll cost ten calls instead of three. A visitor who arrives mid-limit should be
+  // told, and told that the number is not wrong -- only unread.
+  if (error && auctions.length === 0) {
+    return (
+      <div className="card mt-6">
+        <p className="text-sm text-ink">Could not read this round from the chain.</p>
+        <p className="mt-2 text-[0.8125rem] text-ink-faint">{error}</p>
+        <p className="mt-2 text-[0.8125rem] text-ink-faint">
+          That is a statement about this read, not about the round: Base&apos;s public endpoint
+          rate limits, and a refused call is not an empty auction. Reload, or open it on
+          Basescan.
+        </p>
+        <Link
+          href="/rounds"
+          className="mt-3 inline-block text-sm text-glass underline underline-offset-2"
+        >
+          Every round so far →
+        </Link>
+      </div>
     );
   }
 
@@ -145,9 +197,9 @@ function RoundView() {
         <Link href="/evidence" className="text-glass underline underline-offset-2">
           The evidence page →
         </Link>
-        <Link href="/board" className="text-glass underline underline-offset-2">
-          The live board →
-        </Link>
+        {/* `/board` is gone -- the instrument moved to `/` and the nav's "Live" entry is
+            the way there now. A third link to it from the bottom of a round page was one
+            of the three places this route pointed at the board. */}
       </div>
     </>
   );
@@ -156,17 +208,16 @@ function RoundView() {
 export default function RoundPage() {
   return (
     <main className="relative mx-auto max-w-[62rem] px-4 py-10 sm:px-6" style={pageBand("/art/header-round.webp")}>
-      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-        <div>
-          <h1 className="font-display text-3xl font-semibold text-ink">One round</h1>
-          <p className="mt-1 text-sm text-ink-soft">
-            Everything this Book recorded about a single auction — the bids in commit order,
-            the price and where it came from, and the transactions that produced them.
-          </p>
-        </div>
-        <Link href="/rounds" className="text-sm text-glass underline underline-offset-2">
-          ← every round
-        </Link>
+      {/* ONE LINE, AND NO BACK-LINK IN THE MASTHEAD. The nav marks the page you are on and
+          carries Live · Rounds · Evidence · FAQ, so a second "← every round" beside the
+          title was a third navigation affordance for a route that already had two. The one
+          at the bottom of the round stays: that is where a reader who has finished actually
+          reaches for it. */}
+      <div>
+        <h1 className="font-display text-3xl font-semibold text-ink">One round</h1>
+        <p className="mt-1 text-sm text-ink-soft">
+          Everything this Book recorded about a single auction.
+        </p>
       </div>
 
       {/* useSearchParams needs a Suspense boundary under static export, the same as

@@ -105,12 +105,12 @@ export default function RoundsPage() {
           : "Nothing has loaded yet: no chain read has returned and this build carries no fallback snapshot.";
 
   return (
-    <main className="relative mx-auto max-w-[62rem] px-4 py-10 sm:px-6" style={pageBand("/art/header-rounds.webp")}>
+    <main className="relative" style={pageBand("/art/header-rounds.webp")}>
       {/* ONE LINE OF INTRO. The old three sentences plus a "← live board" link were doing
           the job the tile below now does properly, and the link is redundant twice over: the
           nav has it, and the tile's own call to action goes to the same place. */}
-      <h1 className="font-display text-3xl text-ink">Rounds</h1>
-      <p className="mt-1 text-sm text-ink-soft">
+      <h1 className="font-display text-3xl font-semibold text-ink">Rounds</h1>
+      <p className="mt-3 text-sm text-ink-soft">
         Every round this Book has opened, newest first.
       </p>
 

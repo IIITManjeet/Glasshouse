@@ -168,7 +168,7 @@ export default function EvidencePage() {
           refers to by number, and they announced a count that went stale the moment a panel
           moved. Nothing on the site linked to "GH 07". */}
       <section className="mb-8 max-w-3xl">
-        <h1>
+        <h1 className="font-display text-3xl font-semibold text-ink">
           Everything here is <em className="text-glass not-italic">checkable</em>, and says how.
         </h1>
         <p className="lede mt-4 text-ink-soft">

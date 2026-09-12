@@ -702,10 +702,20 @@ th,
    ================================================================================
 
    /board and /evidence are instruments; / is an argument. They were rendering in one
-   register, which is why the site read as the same page four times over. This is the
-   second register, and it is deliberately NOT global: the landing page keeps the quiet
-   editorial look, and the tool pages look like a terminal, so moving between them feels
-   like moving between two different kinds of thing -- which is what they are.
+   register, which is why the site read as the same page four times over.
+
+   IT IS GLOBAL NOW, AND THE SECOND REGISTER IS GONE. The paragraph that stood here argued
+   the opposite -- that the landing page should keep a quiet editorial look while the tool
+   pages looked like a terminal, "so moving between them feels like moving between two
+   different kinds of thing". That was true of a site whose front door was an essay. The
+   front door is the instrument now, there is no landing page to keep editorial, and two
+   registers was the single clearest signal of the essay-with-an-appendix problem the whole
+   restructure exists to remove. `docs/design-direction-2026-09.md` reached the same end
+   state by asking for TAPE_ROUTES to be extended to every route; deleting the list gets
+   there in one move instead of five.
+
+   What survives is what F-5 already narrowed this class to: DENSITY ONLY. Radii, size,
+   leading. No colour, no font-family.
 
    DARK-FIRST, inverting the rest of the site. A terminal's default is dark, so the base
    block here is the dark one and the LIGHT variant lives in the media query -- the
@@ -732,18 +742,34 @@ th,
   line-height: 1.55;
 }
 
-.tape .panel-id {
-  color: var(--color-label);
-  font-size: 0.62rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
+/* `.tape .panel-id` WAS HERE AND IS DELETED TOO. It styled the "GH 01 - Book 0xc4ea..."
+   eyebrows, which were an academic paper's figure numbers on a product, and the restructure
+   removed the last of them -- a grep for `panel-id` across web/ now returns nothing. It was
+   also 0.62rem, roughly 10px, under the 11px floor this project set for the labels that
+   carry provenance (commit fb89ee0). Dead code that was also a standing violation. */
 
-/* The display face survives, but only at the top of a tool page. Everything below the
-   heading is machine output and is set in mono. */
-.tape h1 {
-  font-family: var(--font-display);
-  font-size: clamp(1.9rem, 4vw, 2.6rem);
-  font-weight: 300;
-  line-height: 1.12;
-}
+/* `.tape h1` WAS HERE AND IS DELETED. Recorded rather than quietly removed, because it is
+   the third finding in this file caused by the same thing and the pattern is worth naming.
+
+   It set `font-family: var(--font-display)`, `font-size: clamp(1.9rem, 4vw, 2.6rem)` and
+   `font-weight: 300` on every `h1` inside `.tape`. Three separate problems, only the first
+   of which was visible before `.tape` went global:
+
+   1. IT CONTRADICTED F-5, which this file's own history says resolved the two-register
+      question by making `.tape` density only -- "no colour and no font-family". This rule
+      set a font-family. It survived the F-5 pass because it was scoped to two routes and
+      those two routes' h1s carried no size utilities of their own, so nothing looked wrong.
+
+   2. IT WAS UNLAYERED, so it beat the utilities regardless of specificity. Line 1 of this
+      file is `@import "tailwindcss"`, which puts every utility inside `@layer utilities`,
+      and an unlayered declaration outranks any layered one. With `.tape` on every route,
+      `text-3xl font-semibold` in the markup stopped meaning anything on five pages.
+
+   3. `font-weight: 300` IS NOT A WEIGHT THIS SITE LOADS. `layout.tsx` fetches IBM Plex Sans
+      at 400, 500 and 600 only, and names them explicitly because it is not a variable font.
+      So 300 was synthesised by the browser -- a faux-light smear of the 400 face -- on the
+      largest text on the page. That is the same class of defect as the fonts that were
+      named in a stack and never fetched, which this file already records above.
+
+   Headings now take their size and weight from the utilities on the element, which is where
+   a reader of the markup would look for them. */

@@ -223,7 +223,17 @@ export function BidCards({ a }: { a: Auction }) {
   if (!a.bids.length) {
     return <p className="mt-4 text-sm text-ink-faint">No bids committed yet.</p>;
   }
+
+  // ONE LINK FOR THE WHOLE ROW, not one per card. The disclosure a bidder needs at the
+  // moment of bidding is the tag itself -- one of your rivals is the maker -- and that is on
+  // the card. WHY that is defensible is an argument, it is the same argument for every card,
+  // and four copies of it in a row of four cards is four times the noise for one fact.
+  const hasHouse = a.bids.some(
+    (b) => a.maker && b.bidder?.toLowerCase() === a.maker.toLowerCase(),
+  );
+
   return (
+    <>
     <div className="mt-4 flex flex-wrap gap-2">
       {a.bids.map((b) => {
         const who = b.bidder?.toLowerCase() ?? null;
@@ -238,7 +248,8 @@ export function BidCards({ a }: { a: Auction }) {
         // card head already says "house · the maker" in the louder register the disclosure
         // deserves, and a second, quieter "house" beside the address would be the same fact
         // twice at two weights.
-        const role: AddressRole | null = (who && me && who === me
+        const isYou = Boolean(who && me && who === me);
+        const role: AddressRole | null = isYou
           ? "you"
           : leading
             ? a.settled
@@ -246,7 +257,7 @@ export function BidCards({ a }: { a: Auction }) {
               : "leading"
             : isFilled
               ? "filled"
-              : null) as AddressRole | null;
+              : null;
         const tx = b.revealTx ?? b.commitTx ?? null;
         return (
           <div
@@ -315,6 +326,14 @@ export function BidCards({ a }: { a: Auction }) {
         );
       })}
     </div>
+    {hasHouse ? (
+      <div className="mt-1">
+        <Link href="/faq#house" className="btn btn-tertiary">
+          why the house bids
+        </Link>
+      </div>
+    ) : null}
+    </>
   );
 }
 

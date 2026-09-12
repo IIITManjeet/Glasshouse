@@ -135,6 +135,7 @@ function LastPrintTile({ a, head, lastOpened }: { a: Auction; head: number; last
       : "set by the contract's clearing rule";
 
   return (
+    <>
     <div className="card">
       <div className="card-head">
         <span>
@@ -206,11 +207,16 @@ function LastPrintTile({ a, head, lastOpened }: { a: Auction; head: number; last
         </a>
       </div>
 
-      <p className="mt-3 text-[0.8125rem] text-ink-faint">
-        No round is open. Rounds open when the keeper runs; the last opened at block{" "}
-        <span className="tnum">{num(lastOpened)}</span>.
-      </p>
     </div>
+    {/* OUTSIDE the card, not inside it. `.card-foot` ends with `margin-bottom: -16px` so it
+        can sit flush against the card's edge; anything placed after it inside the card is
+        pulled up underneath it. This sentence is also genuinely ABOUT the tile rather than
+        part of it -- the tile is a print, this is why there is no live round above it. */}
+    <p className="mt-3 text-[0.8125rem] text-ink-faint">
+      No round is open. Rounds open when the keeper runs; the last opened at block{" "}
+      <span className="tnum">{num(lastOpened)}</span>.
+    </p>
+    </>
   );
 }
 

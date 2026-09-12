@@ -103,13 +103,34 @@ export default function Home() {
         </p>
       )}
 
+      {/* TWO EMPTY STATES, AND THE DIFFERENCE BETWEEN THEM IS THE WHOLE RULE.
+          This used to be one card reading "No round has been opened on this Book yet",
+          rendered whenever `featured` was missing -- INCLUDING when the chain read had
+          failed, which is the error branch above firing at the same time. So a rate-limited
+          RPC printed a claim about the Book's history on the strength of a network error.
+          "We could not read it" is not "nothing happened", and a page whose argument is
+          checkability cannot be the one that confuses them. */}
       {!loading && !featured && (
         <div className="card">
-          <p className="text-ink-soft">No round has been opened on this Book yet.</p>
-          <p className="mt-2 text-sm text-ink-faint">
-            Rounds are opened by a keeper, and this page has no way to tell whether one is
-            running right now. It says so rather than showing a spinner.
-          </p>
+          {error ? (
+            <>
+              <p className="text-ink-soft">
+                This page could not read the Book, so it does not know whether a round is open.
+              </p>
+              <p className="mt-2 text-sm text-ink-faint">
+                That is not the same as no round being open — the error above is the RPC going
+                quiet, not the Book being empty.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-ink-soft">No round has been opened on this Book yet.</p>
+              <p className="mt-2 text-sm text-ink-faint">
+                Rounds are opened by a keeper, and this page has no way to tell whether one is
+                running right now. It says so rather than showing a spinner.
+              </p>
+            </>
+          )}
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button type="button" onClick={() => setDemo(true)} className="btn btn-secondary">
               Watch a simulated round

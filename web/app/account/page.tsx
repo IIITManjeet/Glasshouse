@@ -18,26 +18,63 @@ import { Record } from "@/components/Record";
 // web/app/providers.tsx.
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
-function AddressForm({ initial }: { initial: string }) {
+/**
+ * LOOK UP AN ADDRESS -- and, when one is already on screen, look up a DIFFERENT one.
+ *
+ * The bug this fixes was reported from the live site: "the same look up on the profile page
+ * redirects me on the same page". It did, and it had to. The field was seeded with
+ * `initial={raw}` -- the address the page is already showing -- so on any populated profile
+ * the input arrived pre-filled with the answer, and pressing `Look up` navigated to the URL
+ * you were already on. A full page reload, back to exactly the same place, which reads as a
+ * broken control rather than as the no-op it was.
+ *
+ * Seeding made sense on the EMPTY branches, where there is nothing else to put in the field
+ * and a malformed address is worth handing back for correction. It is wrong on a profile,
+ * where the only reason to reach for this control is to go somewhere else. So `current` says
+ * what is already on screen: the field starts empty, the placeholder says what it is for,
+ * and re-submitting the address you are already reading does nothing instead of reloading.
+ *
+ * VALIDATION MOVED IN FRONT OF THE NAVIGATION for the same reason. A typo used to cost a
+ * round trip to reach the "Not an address" page; it is now answered in place, and only a
+ * well-formed address is worth a reload.
+ */
+function AddressForm({ initial, current }: { initial: string; current?: string | null }) {
   const router = useRouter();
   const [value, setValue] = useState(initial);
+  const [hint, setHint] = useState<string | null>(null);
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
         const next = value.trim();
+        if (!next) {
+          setHint("Paste an address to look up.");
+          return;
+        }
+        if (!ADDRESS_RE.test(next)) {
+          setHint("That is not a 42-character 0x address.");
+          return;
+        }
+        if (current && next.toLowerCase() === current.toLowerCase()) {
+          setHint("That is the address you are already looking at.");
+          return;
+        }
         // A full navigation, not router.push. /profile/<addr> is a Vercel edge rewrite
         // rather than an exported route, and the client router cannot resolve it -- it
         // would 404 without making a request. The reload is the cost of the pretty URL,
         // and this is a deliberate lookup action rather than idle navigation.
-        if (next) window.location.assign(`/profile/${encodeURIComponent(next)}`);
+        window.location.assign(`/profile/${encodeURIComponent(next)}`);
       }}
-      className="mt-4 flex flex-wrap gap-2"
+      className="mt-4 flex flex-wrap items-start gap-2"
     >
       <input
         value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder="0x…"
+        onChange={(e) => {
+          setValue(e.target.value);
+          if (hint) setHint(null);
+        }}
+        aria-invalid={hint ? true : undefined}
+        placeholder={current ? "Look up another address — 0x…" : "0x…"}
         spellCheck={false}
         className="tnum min-w-[16rem] flex-1 rounded-control border border-rule bg-raised px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-glass focus:outline-none"
       />
@@ -48,6 +85,11 @@ function AddressForm({ initial }: { initial: string }) {
       <button type="submit" className="btn btn-secondary">
         Look up
       </button>
+      {hint ? (
+        <p role="status" className="w-full text-[0.8125rem] text-amber">
+          {hint}
+        </p>
+      ) : null}
     </form>
   );
 }
@@ -119,7 +161,7 @@ function AccountView() {
           rather than silently coerced into some other address, or dropped and rendered as if nothing had been
           typed at all.
         </p>
-        <AddressForm initial={raw} />
+        <AddressForm initial="" current={raw} />
       </div>
     );
   }
@@ -155,7 +197,7 @@ function AccountView() {
 
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         {head > 0 && <SourceChip source={source} head={head} isFork={isFork} />}
-        <AddressForm initial={raw} />
+        <AddressForm initial="" current={raw} />
       </div>
 
       {loading && auctions.length === 0 ? (

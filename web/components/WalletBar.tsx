@@ -231,39 +231,21 @@ export function WalletBar({ className = "" }: { className?: string }) {
       );
     }
 
-    return (
-      <details className="relative">
-        <summary
-          className={`${BTN} ${BTN_IDLE} inline-block cursor-pointer list-none [&::-webkit-details-marker]:hidden`}
-        >
-          <span className="tnum">{short(address)}</span> · Base
-        </summary>
-        <div className="absolute right-0 z-30 mt-1 w-72 border border-rule bg-raised rounded-card shadow-card p-2 text-[0.75rem] shadow-sm">
-          <button
-            type="button"
-            className="block w-full px-2 py-1 text-left font-mono text-ink hover:bg-glass-soft"
-            onClick={() => {
-              if (address) void navigator.clipboard?.writeText(address).then(() => setCopied(true));
-            }}
-          >
-            {copied ? "Copied ✓" : "Copy address"}
-          </button>
-          <button
-            type="button"
-            className="block w-full px-2 py-1 text-left font-mono text-brick hover:bg-brick-soft"
-            onClick={() => disconnect()}
-          >
-            Disconnect
-          </button>
-          {/* EIP-1193 has no disconnect. Saying so is the difference between a control that
-              works and one the visitor thinks has failed when the wallet still shows the
-              site as connected. */}
-          <p className="mt-1 border-t border-rule px-2 pt-1 text-[0.7rem] leading-snug text-ink-faint">
-            This forgets the account here; your wallet stays connected on its side.
-          </p>
-        </div>
-      </details>
-    );
+    // CONNECTED, ON THE RIGHT CHAIN, AND THEREFORE NOTHING TO SAY HERE.
+    //
+    // This used to render a `<details>` disclosure with the short address, a copy control
+    // and a disconnect. The masthead's WalletChip already showed the address on every
+    // route, so a connected visitor on this page saw it TWICE -- and only this lower one
+    // could reach their profile, which is the confusing half. WalletChip's own header
+    // comment had warned that "a second, subtly different wallet UI is how two of them
+    // drift apart", and then this was it.
+    //
+    // The menu moved to WalletChip, which gained the profile link it was missing. Identity
+    // is chrome: it belongs in the one place that is the same on every page. What stays in
+    // this file is only what is contextual to BIDDING -- the connect path above, and
+    // "Switch to Base" when the wallet is on the wrong chain -- and once neither applies,
+    // this component correctly has nothing to contribute.
+    return null;
   }
 
   return (

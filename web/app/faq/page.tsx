@@ -123,7 +123,7 @@ function P({ children }: { children: React.ReactNode }) {
 
 export default function FaqPage() {
   return (
-    <main className="mx-auto max-w-[62rem] py-8">
+    <main>
       <h1 className="font-display text-3xl font-semibold text-ink">
         Questions, answered in full
       </h1>

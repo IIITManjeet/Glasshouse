@@ -31,10 +31,19 @@ prizes page; organiser email treated as authoritative where the two differ.
       and do not speed footage up to fit), minimum 720p, real spoken human narration, **no
       music**, no text-to-speech or AI voiceover, not recorded on a phone, intro under ~20 s,
       and if slides appear, max 4 bullets each. Two Graph tracks require a video of their own.
-- [ ] **Export `GRAPH_API_KEY` in whichever shell you record from.** It is NOT in `.env.local`
-      (that file holds only `VERCEL_OIDC_TOKEN`); the crosscheck passed today only because the
-      key was in the ambient environment. `npm run crosscheck` dies without it, and running it
-      on camera is one of the strongest things we can show.
+- [ ] **Export `GRAPH_API_KEY` in whichever shell you record from.** `npm run crosscheck` dies
+      without it, and running it on camera is one of the strongest things we can show.
+
+      **It cannot go in a dotenv file.** Nothing in this repo loads one for the scripts -- no
+      `dotenv`, no `loadEnv` anywhere -- so `cross-check-subgraph.mjs:91` and
+      `reserve-advisor.mjs` read `process.env.GRAPH_API_KEY` raw and `.mcp.json` interpolates
+      `${GRAPH_API_KEY}` from the environment. A key written into `.env.local` would sit there
+      inert while the scripts kept failing. `export` it, or `setx` it to persist to new shells.
+
+      **And it must never reach Vercel.** The site is `output: "export"`, so any env var it
+      reads is inlined into a public chunk, and a Gateway URL carries its key in the path
+      (`web/lib/subgraph.ts:21`). The frontend reads the keyless Studio endpoint on purpose.
+      `web/.env.local` correctly holds `NEXT_PUBLIC_SUBGRAPH_URL` and nothing else.
 - [ ] **Run a capped keeper batch shortly before recording** so a visitor finds a round taking
       bids: `KEEPER_MAX_ROUNDS=5`. Measured cost ~0.0000022 ETH/round against a balance good
       for ~240 rounds. Deliberately not left running unattended — the risk to manage is
