@@ -8,22 +8,30 @@
    Exposed as Tailwind v4 theme variables so `text-ink-faint` and `bg-raised` work directly
    and nothing has to remember a hex. */
 @theme {
-  --color-ground: #f1f4f3;
-  --color-raised: #fafcfb;
-  --color-sunk: #e7ecea;
-  --color-ink: #0f1a18;
-  --color-ink-soft: #4a5c58;
-  --color-ink-faint: #5a6b67;
-  --color-rule: #d2dcd9;
-  --color-glass: #1f6f66;
-  --color-glass-soft: #e0edea;
-  --color-brick: #9c3b2c;
-  --color-brick-soft: #f6e5e1;
-  --color-amber: #8a5a14;
-  --color-amber-soft: #f7eedc;
-  /* Labels only: column heads, panel ids, eyebrows. NEVER a value. Distinct from amber,
-     which ui-spec 2.2 reserves for "pending / provisional / stale" and nothing else. */
-  --color-label: #6b5300;
+  --color-ground: #f4f5f7;
+  --color-raised: #ffffff;
+  --color-sunk: #e9ecf0;
+  /* A THIRD SURFACE, which the old two could not express. Panel header strips, table
+     header rows and the active state of a control all sit ON a raised card, and with only
+     ground/raised they had to borrow one of those and rely on a border to separate them.
+     Depth in a venue comes from stacked surfaces, not from blur. */
+  --color-lifted: #ffffff;
+  --color-ink: #0f1216;
+  --color-ink-soft: #454c57;
+  --color-ink-faint: #5b6470;
+  --color-rule: #d5dae0;
+  --color-glass: #0c7a68;
+  --color-glass-soft: #e3f4ef;
+  --color-brick: #b42318;
+  --color-brick-soft: #fbe4e1;
+  --color-amber: #8a5a00;
+  --color-amber-soft: #f7edd6;
+  /* NEUTRAL NOW, and that is the point. This was its own gold, which made three
+     amber-ish things on screen -- label, amber and the old teal-gold pairing -- and a
+     colour that means three things means nothing. Amber is reserved for
+     pending/provisional/stale (ui-spec 2.2); a column heading is not pending, it is just
+     a heading, so it is quiet text. */
+  --color-label: #5b6470;
 
   /* The `--font-*-loaded` variables are declared by next/font in app/layout.tsx and
      land on <html>. Naming the family after them as well keeps the stack working if the
@@ -41,17 +49,17 @@
      when it sits ON another surface -- a card over the page, a control over a card. It
      never lifts to look nice. Two shadows only, so "raised" and "lifted" stay
      distinguishable; a third would just be mush. */
-  --radius-card: 10px;
-  --radius-control: 7px;
-  --radius-chip: 5px;
+  --radius-card: 8px;
+  --radius-control: 6px;
+  --radius-chip: 4px;
 
   /* Layered rather than one blur: a tight contact shadow for the edge and a wide soft
      one for the lift, which is how a real object sits on a surface. Tuned low-opacity
      because the ground is off-white and a heavy shadow on paper looks like a sticker. */
-  --shadow-card: 0 1px 2px rgb(15 26 24 / 0.05), 0 4px 16px -4px rgb(15 26 24 / 0.08);
-  --shadow-lift: 0 2px 4px rgb(15 26 24 / 0.06), 0 12px 32px -8px rgb(15 26 24 / 0.14);
+  --shadow-card: 0 0 0 1px rgb(15 18 22 / 0.06), 0 1px 2px rgb(15 18 22 / 0.06);
+  --shadow-lift: 0 0 0 1px rgb(15 18 22 / 0.06), 0 12px 32px -12px rgb(15 18 22 / 0.18);
 
-  --font-display: var(--font-newsreader), Newsreader, Georgia, "Times New Roman", serif;
+  --font-display: var(--font-plex-sans), "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   --font-sans: var(--font-plex-sans), "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   --font-mono: var(--font-plex-mono), "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
@@ -60,20 +68,21 @@
    block first so nothing can be defined ONLY inside a media query and vanish. */
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-ground: #0b1513;
-    --color-raised: #121f1d;
-    --color-sunk: #081110;
-    --color-ink: #e5eeeb;
-    --color-ink-soft: #92a6a1;
-    --color-ink-faint: #7b8f8a;
-    --color-rule: #21332f;
-    --color-glass: #5cc0b1;
-    --color-glass-soft: #14302b;
-    --color-brick: #db7660;
-    --color-brick-soft: #2c1714;
-    --color-amber: #d6a94a;
-    --color-amber-soft: #33280f;
-    --color-label: #e9b036;
+    --color-ground: #0a0c10;
+    --color-raised: #12161c;
+    --color-sunk: #06080b;
+    --color-lifted: #1a2029;
+    --color-ink: #e8ecf1;
+    --color-ink-soft: #a3adb8;
+    --color-ink-faint: #7f8896;
+    --color-rule: #262d37;
+    --color-glass: #3ecfb2;
+    --color-glass-soft: #0e2a26;
+    --color-brick: #ff6b5b;
+    --color-brick-soft: #2c1512;
+    --color-amber: #e6b345;
+    --color-amber-soft: #2b2210;
+    --color-label: #7f8896;
 
     /* On a dark ground a black shadow does nothing. Depth comes from a hairline of
        light along the top edge -- the way an object catches ambient light -- plus a
@@ -430,59 +439,15 @@ th,
    reads this block by name.
 */
 .tape {
-  --color-ground: #0a0c10;
-  --color-raised: #11151b;
-  --color-sunk: #06080b;
-  --color-ink: #e6ebf0;
-  --color-ink-soft: #9aa5b1;
-  --color-ink-faint: #778390;
-  --color-rule: #232a33;
-  --color-glass: #3fd18f;
-  --color-glass-soft: #0d2b1f;
-  --color-brick: #ff6b5b;
-  --color-brick-soft: #2b1310;
-  --color-amber: #e9b036;
-  --color-amber-soft: #2b2210;
-  --color-label: #e9b036;
-
-  /* Deliberately tighter than the editorial register. A terminal earns depth from a
-     1px grid and a panel id, not from blur -- soft shadows here would read as a
-     terminal skin painted over a consumer app. */
-  --radius-card: 3px;
-  --radius-control: 3px;
-  --radius-chip: 2px;
+  --radius-card: 4px;
+  --radius-control: 4px;
+  --radius-chip: 3px;
   --shadow-card: inset 0 1px 0 rgb(255 255 255 / 0.03);
-  --shadow-lift: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 8px 24px -8px rgb(0 0 0 / 0.55);
 
-  background: var(--color-ground);
-  color: var(--color-ink);
-  font-family: var(--font-mono);
   font-size: 0.875rem;
   line-height: 1.55;
 }
 
-@media (prefers-color-scheme: light) {
-  .tape {
-    --color-ground: #f5f5f0;
-    --color-raised: #ffffff;
-    --color-sunk: #ecece6;
-    --color-ink: #15181d;
-    --color-ink-soft: #454c55;
-    --color-ink-faint: #5e6670;
-    --color-rule: #d3d6d2;
-    --color-glass: #0e6e46;
-    --color-glass-soft: #dbeee5;
-    --color-brick: #b3261e;
-    --color-brick-soft: #f7e2e0;
-    --color-amber: #7a5000;
-    --color-amber-soft: #f4ecd9;
-    --color-label: #7a5000;
-  }
-}
-
-/* A panel id, top-left of every panel: "GH 04 - RECEIPT". Wayfinding, and it makes any
-   screenshot of a single panel say which panel it is -- the same job the source tag does
-   for data, applied to structure. */
 .tape .panel-id {
   color: var(--color-label);
   font-size: 0.62rem;

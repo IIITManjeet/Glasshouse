@@ -264,7 +264,10 @@ for (const [theme, block] of PALETTES) {
     // `label` is the token The Tape added for column heads and panel ids. It is text, so it
     // is measured like any other text colour rather than trusted because it looks bright.
     for (const fg of ["ink", "ink-soft", "ink-faint", "glass", "amber", "brick", "label"]) {
-      for (const bg of ["ground", "raised"]) {
+      // `lifted` is the third surface added with the venue palette -- panel header
+      // strips and table header rows. Text sits on it, so it is measured like the
+      // other two rather than assumed safe for being close to `raised`.
+      for (const bg of ["ground", "raised", "lifted"]) {
         if (!t[fg] || !t[bg]) continue;
         const r = contrast(t[fg], t[bg]);
         if (r < AA) {
