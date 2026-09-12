@@ -186,7 +186,12 @@ th,
   display: inline-block;
   padding: 2px 8px;
   border-radius: var(--radius-chip);
-  background: color-mix(in srgb, var(--color-glass) 14%, transparent);
+  /* NEUTRAL, and this is the other half of making the primary visible. A 14% accent tint
+     made every inert label a faded copy of the one filled accent control, so teal stopped
+     meaning "this is the act". Teal is now spent in exactly two places: the primary button
+     and `.chip-live`. A column heading is not pending and not primary; it is quiet text on
+     a quiet fill. */
+  background: var(--color-sunk);
   color: var(--color-ink-soft);
   font-family: var(--font-mono);
   font-size: 0.64rem;
@@ -218,7 +223,168 @@ th,
    The pressed state is driven by `aria-pressed`, which means the accessible state and the
    visible state cannot drift apart -- there is no second boolean in a className to forget
    to update. The unpressed form is deliberately quiet: an off switch should recede. */
+/* The shared control shape.
+
+   THE RULE THIS REVERSES, and it is worth saying why rather than quietly editing it. The
+   old comment here read: "Size is deliberately constant across every variant: hierarchy
+   here is carried by FILL, never by scale." That was borrowed from Primer, and the
+   borrowing dropped the half that made it work -- Primer's primary is 32px SANS at weight
+   500 and its labels are not monospace, so fill alone is enough to separate them. Here
+   every control was 12px mono and every label was 10px mono on a 14% accent tint, which
+   made a filled primary and an inert chip the same object at two opacities. No amount of
+   design rationale survives that arithmetic, and the report was blunt: the CTAs were not
+   visible.
+
+   So: hierarchy is carried by fill AND scale AND face. A button is a sentence you act on,
+   so it is sans; the value inside it stays mono (see `.btn .tnum`). Size is owned by the
+   variant, not by this block, because a 44px primary beside a 32px tertiary is the point. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  font-family: var(--font-sans);
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+/* A NUMBER INSIDE A LABEL STAYS MONO. "Place sealed bid - 250 bps" is a sentence carrying a
+   chain value, and the value has to line up with the same figure rendered in the table
+   above it. Without this the button was the one place a bps figure changed face. */
+.btn .tnum {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* One per view. The only filled thing on the page, and now also the largest -- 44px is the
+   touch target the accessibility guidelines ask for and the size a venue gives to the act it
+   exists for. This is the button a bidder has to find in four seconds. */
+.btn-primary {
+  min-height: 44px;
+  padding: 0 20px;
+  font-size: 15px;
+  font-weight: 600;
+  background: var(--color-glass);
+  border-color: var(--color-glass);
+  /* The ground, not white: on the light theme the accent is dark enough for pale text, and
+     on the dark theme the accent is light enough that it needs dark text. `--color-ground`
+     flips with the theme and is correct in both without a second rule. */
+  color: var(--color-ground);
+  font-weight: 500;
+}
+.btn-primary:hover {
+  background: color-mix(in srgb, var(--color-glass) 88%, var(--color-ink));
+}
+
+/* The workhorse. A bordered surface that inverts on hover, which is the moment it proves
+   it was a control all along. */
+.btn-secondary {
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 14px;
+  background: transparent;
+  border-color: var(--color-glass);
+  color: var(--color-glass);
+}
+.btn-secondary:hover {
+  background: var(--color-glass);
+  color: var(--color-ground);
+}
+
+/* Primer's "invisible": for the many small actions that should disappear until reached for.
+   Bare text, with a wash appearing on hover so it is still discoverably a control. */
+.btn-tertiary {
+  min-height: 32px;
+  padding: 0 8px;
+  font-size: 13px;
+  background: transparent;
+  border-color: transparent;
+  color: var(--color-ink-soft);
+  /* A HAIRLINE UNDERLINE AT REST. Tertiary was "invisible until reached for", and on a page
+     where it is the ONLY control that made it invisible full stop -- the over-correction
+     recorded in TODO.md against /rounds's `refresh`. A rule-coloured underline stays
+     discoverable without competing with anything. */
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--color-rule);
+}
+.btn-tertiary:hover {
+  background: var(--color-glass-soft);
+  color: var(--color-glass);
+  text-decoration-color: var(--color-glass);
+}
+
+.btn-danger {
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 14px;
+  background: transparent;
+  border-color: var(--color-brick);
+  color: var(--color-brick);
+}
+.btn-danger:hover {
+  background: var(--color-brick);
+  color: var(--color-ground);
+}
+
+/* THE ONE FILLED RED. A reveal with one block left is not "an action available"; it is the
+   last moment a bid that has already been paid for can still be saved, and it is the only
+   case on the site where urgency outranks one-primary-per-view -- it REPLACES the primary
+   rather than joining it. Same geometry as `.btn-primary`, so the swap does not move the
+   target out from under a cursor already travelling towards it. */
+.btn-danger-solid {
+  min-height: 44px;
+  padding: 0 20px;
+  font-size: 15px;
+  font-weight: 600;
+  background: var(--color-brick);
+  border-color: var(--color-brick);
+  color: var(--color-ground);
+}
+.btn-danger-solid:hover {
+  background: color-mix(in srgb, var(--color-brick) 88%, var(--color-ink));
+}
+
+/* Identical on every variant, on purpose. Primer and Radix are both strict that a focus
+   ring must never depend on which variant it is attached to -- a keyboard user should not
+   have to learn four indicators. :focus-visible so a mouse click does not draw it. */
+.btn:focus-visible {
+  outline: 2px solid var(--color-glass);
+  outline-offset: 2px;
+}
+
+/* Disabled says "not now", which is different from "not a control". It keeps the shape and
+   loses the affordance. */
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  background: var(--color-sunk);
+  border-color: var(--color-rule);
+  color: var(--color-ink-faint);
+  cursor: not-allowed;
+  /* Weight falls back to 500 so a disabled primary stops shouting while it waits. */
+  font-weight: 500;
+}
+.btn:disabled:hover,
+.btn[aria-disabled="true"]:hover {
+  background: var(--color-sunk);
+  color: var(--color-ink-faint);
+}
+
+/* MOVED BELOW `.btn` DELIBERATELY, and this fixes a latent bug rather than tidying one.
+   Both selectors are a single class, so source order decided every shared property -- and
+   `.btn` came second. Its `padding: 6px 14px` and `font-size: 0.75rem` were silently
+   overriding the `3px 8px` / `0.7rem` declared here, so the toggle has never been the size
+   this block asks for. Now that `.btn` is sans, that same override would also have dragged
+   the status bar's one control out of the mono register it shares with HEAD and ACCOUNTS.
+   Order fixed, and the face pinned explicitly rather than inherited. */
 .btn-toggle {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  min-height: 0;
   background: transparent;
   border-color: var(--color-rule);
   color: var(--color-ink-faint);
@@ -245,92 +411,159 @@ th,
   color: var(--color-ground);
 }
 
-/* The shared control shape. Size is deliberately constant across every variant: hierarchy
-   here is carried by FILL, never by scale. A bigger button reads as clumsy against a
-   monospace grid, and every system studied varies fill and keeps size fixed. */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 6px 14px;
-  border: 1px solid transparent;
+
+/* ---- A CONTAINER IS NOT A CONTROL ------------------------------------------------
+   The complaint this answers, verbatim: "even I am not able to understand whether cards
+   are ctas or what."
+
+   THE CAUSE. There was no card primitive. The recipe `border border-rule bg-raised
+   rounded-card shadow-card` was hand-composed at fifteen-odd call sites, on clickable
+   navigation tiles and on inert data figures alike, so the two kinds were byte-identical.
+   Worse, the two clickable cards on the old landing page carried LESS visual weight than
+   the data cards around them -- no border at all, just a hover tint -- so the only boxes
+   on the site that did something were the quietest boxes on the site.
+
+   THE RULE, and it is a rule about kinds of object rather than about pixels:
+
+     A CARD IS A CONTAINER, NEVER A CONTROL. It has a default cursor, no hover state, no
+     transition and no arrow. Every action inside it lives on a real button. Whole-card
+     clickability is FORBIDDEN -- mixing "the card is the link" with "the card holds a
+     button" is exactly the ambiguity above, and the old landing page proved the cost: a
+     button nested in a Link needed `e.preventDefault()` to stop the card swallowing it.
+
+     A ROW IS THE ONE EXCEPTION, because a table of rows has an established contract a
+     card does not: a chevron in the last cell, a hover surface step, and one real anchor
+     inside that carries the focus ring.
+
+   Data cards outnumber navigation cards here by an order of magnitude, so the default
+   reading of "a box" has to be "information". Navigation earns an arrow and a verb. */
+.card {
+  background: var(--color-raised);
+  border: 1px solid var(--color-rule);
   border-radius: var(--radius-control);
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  line-height: 1.2;
-  cursor: pointer;
-  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+  box-shadow: var(--shadow-card);
+  padding: 16px;
+  cursor: default;
 }
 
-/* One per view. The only filled thing on the page. */
-.btn-primary {
-  background: var(--color-glass);
-  border-color: var(--color-glass);
-  /* The ground, not white: on the light theme the accent is dark enough for pale text, and
-     on the dark theme the accent is light enough that it needs dark text. `--color-ground`
-     flips with the theme and is correct in both without a second rule. */
-  color: var(--color-ground);
+/* The header strip and the caption foot are the anatomy every figure on this site already
+   had by hand: a title with a source chip on top, a "what produced this" line underneath.
+   Naming it once means the provenance caption cannot be forgotten by whoever writes the
+   next figure -- it is part of the shape rather than an extra someone remembers.
+
+   NOT `--color-lifted`. On the light theme `--color-lifted` is #ffffff, the same value as
+   `--color-raised`, so a header strip painted with it is invisible and the whole band
+   depends on its bottom border. Mixing 4% ink into the card surface darkens it on light
+   and LIGHTENS it on dark, because `--color-ink` flips with the theme -- one declaration
+   that is correct in both, which is the property `--color-ground` was chosen for on
+   `.btn-primary` for the same reason. */
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: -16px -16px 12px;
+  padding: 8px 16px;
+  background: color-mix(in srgb, var(--color-ink) 4%, var(--color-raised));
+  border-bottom: 1px solid var(--color-rule);
+  border-radius: var(--radius-control) var(--radius-control) 0 0;
+  font-family: var(--font-sans);
+  font-size: 13px;
   font-weight: 500;
-}
-.btn-primary:hover {
-  background: color-mix(in srgb, var(--color-glass) 88%, var(--color-ink));
-}
-
-/* The workhorse. A bordered surface that inverts on hover, which is the moment it proves
-   it was a control all along. */
-.btn-secondary {
-  background: transparent;
-  border-color: var(--color-glass);
-  color: var(--color-glass);
-}
-.btn-secondary:hover {
-  background: var(--color-glass);
-  color: var(--color-ground);
-}
-
-/* Primer's "invisible": for the many small actions that should disappear until reached for.
-   Bare text, with a wash appearing on hover so it is still discoverably a control. */
-.btn-tertiary {
-  background: transparent;
-  border-color: transparent;
-  color: var(--color-ink-soft);
-}
-.btn-tertiary:hover {
-  background: var(--color-glass-soft);
+  line-height: 1.3;
   color: var(--color-ink);
 }
 
-.btn-danger {
-  background: transparent;
-  border-color: var(--color-brick);
-  color: var(--color-brick);
-}
-.btn-danger:hover {
-  background: var(--color-brick);
-  color: var(--color-ground);
+.card-foot {
+  margin: 12px -16px -16px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--color-rule);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--color-ink-faint);
 }
 
-/* Identical on every variant, on purpose. Primer and Radix are both strict that a focus
-   ring must never depend on which variant it is attached to -- a keyboard user should not
-   have to learn four indicators. :focus-visible so a mouse click does not draw it. */
-.btn:focus-visible {
-  outline: 2px solid var(--color-glass);
-  outline-offset: 2px;
+/* A ROW THAT GOES SOMEWHERE, and the fix for a hover that was lying.
+
+   `RoundsTable` put `hover:bg-raised` on the whole `<tr>` while only the round cell was a
+   link, so the entire row lit up under the cursor and then swallowed the click. That is the
+   same confusion as the cards, pointing the other way: it looked clickable and was not.
+
+   NOT `--color-lifted`, for the reason given on `.card-head` -- it equals `--color-raised`
+   on the light theme, so the hover would have been invisible in exactly the theme most
+   judges will see. `--color-glass-soft` is the wash `.btn-tertiary:hover` already uses for
+   "you have reached for this", and it is a real step in both themes. */
+.row-link {
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.row-link:hover,
+.row-link:focus-within {
+  background: var(--color-glass-soft);
+}
+.row-link > td:last-child::after,
+.row-link > .row-go::after {
+  content: "\203a";
+  margin-left: 6px;
+  color: var(--color-ink-faint);
+  font-size: 18px;
+  line-height: 1;
+}
+.row-link:hover > td:last-child::after,
+.row-link:hover > .row-go::after {
+  color: var(--color-glass);
 }
 
-/* Disabled says "not now", which is different from "not a control". It keeps the shape and
-   loses the affordance. */
-.btn:disabled,
-.btn[aria-disabled="true"] {
-  background: var(--color-sunk);
-  border-color: var(--color-rule);
-  color: var(--color-ink-faint);
-  cursor: not-allowed;
+/* ---- AN ADDRESS BECOMES SOMETHING YOU CAN RECOGNISE -----------------------------
+   The ask was "personification of accounts". The constraint is that this site never
+   invents a fact, and `components/Identity.tsx` had already refused identicons in as many
+   words: "A generated picture is a face this address never chose, and on a page about
+   provenance an invented identity is the wrong kind of decoration." That refusal stands.
+
+   WHAT IS AND IS NOT INVENTED. A generated word-name ("Brave Falcon") is a name nobody
+   chose and reads as a person, so it stays refused. A blockie is a face by another route,
+   so it stays refused. But a colour derived from the bytes invents nothing: it is a
+   RENDERING of the address, the same way `0xeEbf...cDf` is a rendering of it, and it is
+   what turns six rows of hex into six recognisable participants. The handle is therefore
+   the mark plus the short hex plus the role -- and the hex is the handle, visibly derived
+   because it IS the address.
+
+   Saturation and lightness are fixed per theme so every mark clears the same contrast
+   against `raised`; only the two hues vary, passed in as custom properties so the
+   component computes no colour and the theme swap stays one media query. */
+.addr-mark {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  vertical-align: -1px;
+  flex: none;
+  background: linear-gradient(135deg, hsl(var(--h1) 58% 42%) 0 50%, hsl(var(--h2) 58% 42%) 50% 100%);
+  outline: 1px solid color-mix(in srgb, var(--color-ink) 14%, transparent);
+  outline-offset: -1px;
 }
-.btn:disabled:hover,
-.btn[aria-disabled="true"]:hover {
-  background: var(--color-sunk);
-  color: var(--color-ink-faint);
+.addr-mark-lg {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  vertical-align: middle;
+}
+@media (prefers-color-scheme: dark) {
+  .addr-mark {
+    background: linear-gradient(135deg, hsl(var(--h1) 62% 60%) 0 50%, hsl(var(--h2) 62% 60%) 50% 100%);
+  }
+}
+
+/* The reading measure for the FAQ and any other page whose job is prose rather than
+   instrumentation. 44rem is roughly 70 characters at 16px, which is the span every
+   readability study lands on; the instrument routes keep `.tape` density instead. */
+.prose-measure {
+  max-width: 44rem;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.6;
 }
 
 /* PROSE LEAVES THE MONOSPACE REGISTER. DESIGN.md F-5.
