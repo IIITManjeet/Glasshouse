@@ -141,9 +141,35 @@ export function roundLabel(a: { round?: number | null; orderHash?: string }): st
 
 const BOOK = "0xc4ea91Fe700918220423ac307C6B1c59650FFbfe";
 
+/**
+ * WHICH ENDPOINT THIS PAGE READS, in order of who asked.
+ *
+ * `?rpc=` first, because a visitor pointing this page at their own node is being explicit
+ * and must be obeyed exactly -- `chain.js` honours a caller-chosen endpoint and never
+ * substitutes a pool member for it, precisely so the source chip cannot lie about where a
+ * number came from.
+ *
+ * THEN `NEXT_PUBLIC_RPC_URL`, WHICH IS NEW AND EXISTS FOR ONE REASON. Until now the only
+ * way to move off Base's public endpoint was to append a query parameter by hand, so the
+ * deployed site had no way to be configured at all: every visitor read
+ * `https://mainnet.base.org` from their own IP, and that endpoint rate limits (-32016 /
+ * HTTP 429). `chain.js` already rotates through a two-member pool and backs off, and both
+ * members were answering when this was written -- but they are free endpoints whose terms
+ * move, that file says so itself, and "the demo was rate limited" is not a sentence worth
+ * risking when the fix is one environment variable.
+ *
+ * IT IS PUBLIC, AND THAT IS THE TRADE. A static export inlines every `NEXT_PUBLIC_*` value
+ * into a downloadable chunk, exactly as `lib/subgraph.ts` documents for the subgraph URL. So
+ * a provider URL with an API key in its path is a published key. Only set this to an
+ * endpoint whose key is either domain-allowlisted by the provider or expendable. Unset, the
+ * behaviour is unchanged.
+ */
 function rpcUrl() {
-  if (typeof window === "undefined") return "https://mainnet.base.org";
-  return new URLSearchParams(window.location.search).get("rpc") ?? "https://mainnet.base.org";
+  const configured =
+    typeof process !== "undefined" ? process.env.NEXT_PUBLIC_RPC_URL || null : null;
+  const fallback = configured ?? "https://mainnet.base.org";
+  if (typeof window === "undefined") return fallback;
+  return new URLSearchParams(window.location.search).get("rpc") ?? fallback;
 }
 
 /** A phase that is not "open" means something is still happening and worth watching. */

@@ -21,6 +21,19 @@ Aqua activity, so it is a fallback and not the plan.
 
 Both contracts are on Base mainnet (8453) from block 50,965,408.
 
+**Two environment variables on the Vercel project**, both optional and both public by
+construction -- the site is a static export, so every `NEXT_PUBLIC_*` value is inlined into a
+chunk anyone can download:
+
+| | |
+|---|---|
+| `NEXT_PUBLIC_SUBGRAPH_URL` | The **Studio** query URL. Never the Gateway one: a Gateway URL carries its API key in the path, and this value ships to the browser (`web/lib/subgraph.ts`). Currently set. |
+| `NEXT_PUBLIC_RPC_URL` | A dedicated Base endpoint, to move off the public one before a demo. Unset, every visitor reads `https://mainnet.base.org` from their own IP and can be rate limited (-32016 / 429). Setting it also disables the two-member fallback pool in `web/lib/chain.js`, because a caller-chosen endpoint is honoured exactly rather than substituted -- which is what keeps the source chip honest. Only use a key that is domain-allowlisted or expendable. |
+
+`GRAPH_API_KEY` belongs in **neither**. It is a Gateway key for `scripts/cross-check-subgraph.mjs`,
+`scripts/reserve-advisor.mjs` and the MCP server in `.mcp.json`, and nothing in this repo loads a
+dotenv file for those -- they read `process.env` directly, so it has to be exported in the shell.
+
 ## 0. Before anything
 
 Hardhat 3 does **not** auto-load `.env`. Provide configuration variables as environment
