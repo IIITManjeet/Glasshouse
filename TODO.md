@@ -34,11 +34,14 @@ Findings referenced as F-n live in `DESIGN.md`.
 
 ## Frontend — open
 
-- [!] **F-5 the type rule — NEEDS YOUR DECISION, not a patch.** Mono on /board and /evidence
-  is deliberate: `Theme.tsx` routes them into `.tape`, which sets the mono family on purpose
-  ("a landing page persuades, a terminal reports"). The readability research says mono is
-  wrong at paragraph length. Narrow option: keep the register, set only the explanatory
-  paragraphs under each heading in the prose face. Left open rather than reversed silently.
+- [x] **F-5 the type rule — RESOLVED BY DELETING THE RULE.** `.tape` set the mono family as
+      the BODY face on /board and /evidence, which is what the readability research objects
+      to at paragraph length, and the open question was how much of it to reverse. The
+      answer turned out to be all of it: `.tape` is density only now — radii, size, leading
+      — with no colour and no font-family, so there is one register across the site and the
+      question stops existing rather than getting a narrower answer. Newsreader went with
+      it; two faces was the clearest signal of the two-register problem. (c46eeca)
+
 - [x] **F-9 withdrawn** — the floating circle is the Next.js dev indicator, injected by
   `next dev` and absent from production. Verified against the deployed site and the built
   chunks. Second finding withdrawn for the same reason as F-8.
@@ -51,7 +54,13 @@ Findings referenced as F-n live in `DESIGN.md`.
       Two over-corrections caught by looking at the result: `refresh` was too quiet as
       tertiary when it is the only control on the page, and the rehearsal toggle lost the
       status bar's uppercase. Both fixed.
-- [ ] Art overlays, at most three, per the art direction in `DESIGN.md`. Last, and safe to cut.
+- [x] **Imagery: two atmospheric backgrounds, and no illustration.** The art direction was
+      wrong twice (the NAME, then the WORD) and `art-prompts/README.md` records both. Round
+      three is abstract only: light through glass, nameless, carrying no information —
+      `web/public/art/hero-field.webp` behind the landing headline, fading out before the
+      settlement chart, and `social-card.jpg` behind the Open Graph card. Both were cropped
+      to remove Gemini's sparkle watermark, and both went from ~6.4 MB to under 12 KB.
+      `Atmosphere.tsx` and its drifting envelopes were deleted in the same pass (1582c52).
 
 ## Frontend — done
 
