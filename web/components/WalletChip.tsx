@@ -75,7 +75,7 @@ export function WalletChip() {
           </span>
         </summary>
         <div className="card absolute right-0 z-30 mt-2 w-[17rem] p-2 text-left">
-          <p className="tnum px-2 pt-1 pb-2 text-[0.7rem] leading-snug break-all text-ink-faint">
+          <p className="tnum px-2 pt-2 pb-2 text-[0.7rem] leading-snug break-all text-ink-faint">
             {address}
           </p>
           <a
@@ -104,7 +104,7 @@ export function WalletChip() {
               that works and one the visitor thinks has failed because their wallet still
               lists the site as connected. Carried over verbatim from WalletBar, which used
               to own this menu. */}
-          <p className="mt-1 border-t border-rule px-2 pt-1.5 text-[0.7rem] leading-snug text-ink-faint">
+          <p className="mt-2 border-t border-rule px-2 pt-2 text-[0.7rem] leading-snug text-ink-faint">
             This forgets the account here; your wallet stays connected on its side.
           </p>
         </div>

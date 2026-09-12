@@ -164,7 +164,7 @@ export function LatencyLens() {
         </span>
       </figcaption>
 
-      <div className="overflow-x-auto px-4 py-5">
+      <div className="overflow-x-auto px-4 py-4">
         <svg
           viewBox="0 0 700 292"
           role="img"

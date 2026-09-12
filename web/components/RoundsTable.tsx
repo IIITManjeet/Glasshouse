@@ -105,7 +105,7 @@ export function RoundsTable({ auctions, head }: { auctions: Auction[]; head: num
 
   if (rows.length === 0) {
     return (
-      <p className="border border-rule bg-raised rounded-card shadow-card p-4 text-sm text-ink-soft">
+      <p className="card text-sm text-ink-soft">
         No rounds to show. Nothing has been read from the chain or the fallback snapshot yet
         -- that is a statement about this page&rsquo;s data, not a claim that zero rounds have
         happened, so the table says so in prose instead of drawing an empty grid of zeroes.
@@ -132,8 +132,16 @@ export function RoundsTable({ auctions, head }: { auctions: Auction[]; head: num
                 // The background goes on the CELLS, not the row: a sticky <thead> paints
                 // nothing of its own, so a row-level background scrolls away and the rows
                 // slide under bare text.
+                // `.table-head` now, not seven utilities improvising one. It also fixes
+                // a bug that was invisible in the theme it was broken in: this painted
+                // `bg-lifted`, and on LIGHT `--color-lifted` is #ffffff -- identical to
+                // `--color-raised` -- so the sticky header of the ledger had no fill at
+                // all and was held up by its bottom border. `.card-head`'s own comment
+                // warns about exactly this substitution two blocks above it in
+                // globals.css. The primitive mixes 4% ink into the card surface instead,
+                // which darkens on light and lightens on dark from one declaration.
                 className={[
-                  "whitespace-nowrap border-b border-rule bg-lifted px-3 py-2.5 font-mono text-[0.6875rem] font-normal uppercase tracking-[0.12em] text-ink-faint",
+                  "table-head px-3 py-2.5",
                   numeric ? "text-right" : "text-left",
                 ].join(" ")}
               >
@@ -143,7 +151,7 @@ export function RoundsTable({ auctions, head }: { auctions: Auction[]; head: num
             {/* The chevron column. `.row-link` injects the `›` into the last cell, so the
                 header needs a matching one -- with a real name for a screen reader, which
                 gets no chevron and would otherwise meet an unlabelled column. */}
-            <th scope="col" className="w-8 border-b border-rule bg-lifted px-3 py-2.5">
+            <th scope="col" className="table-head w-8 px-3 py-2.5">
               <span className="sr-only">open the round</span>
             </th>
           </tr>

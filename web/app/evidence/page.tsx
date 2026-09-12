@@ -141,7 +141,7 @@ function PinnedReceipt() {
           )}
         </>
       ) : (
-        <div className="border border-rule bg-raised rounded-card shadow-card p-6">
+        <div className="card">
           <p className="text-ink-soft">No round on this Book has settled yet.</p>
           <p className="mt-2 max-w-2xl text-sm text-ink-faint">
             A receipt needs a reveal window that has closed with at least one envelope opened.
@@ -171,13 +171,13 @@ export default function EvidencePage() {
         <h1 className="font-display text-3xl font-semibold text-ink">
           Everything here is <em className="text-glass not-italic">checkable</em>, and says how.
         </h1>
-        <p className="lede mt-4 text-ink-soft">
+        <p className="lede mt-3 text-ink-soft">
           Every figure says whether it came from Base or from a unit test — including where the
           number is less flattering.
         </p>
       </section>
 
-      <nav className="mb-12 flex flex-wrap gap-x-4 gap-y-1 border-y border-rule py-2 font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">
+      <nav className="mb-12 flex flex-wrap gap-x-4 gap-y-2 border-y border-rule py-2 font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">
         {SECTIONS.map(([id, label]) => (
           <a key={id} href={`#${id}`} className="hover:text-glass">
             {label}
@@ -192,9 +192,9 @@ export default function EvidencePage() {
       )}
 
       <div>
-        <section id="receipt" className="mb-14 scroll-mt-6">
-          <h2 className="mb-1 font-display text-2xl font-semibold">Did it work</h2>
-          <p className="mb-5 max-w-2xl text-sm text-ink-soft">
+        <section id="receipt" className="mb-12 scroll-mt-6">
+          <h2 className="mb-3 font-display text-2xl font-semibold">Did it work</h2>
+          <p className="mb-6 max-w-2xl text-sm text-ink-soft">
             What the winner bid, what the winner paid, and the gap that went to the maker.
           </p>
           <Suspense
@@ -211,9 +211,9 @@ export default function EvidencePage() {
       </div>
 
       <div>
-        <section id="bidders" className="mb-14 scroll-mt-6">
-          <h2 className="mb-1 font-display text-2xl font-semibold">Who is bidding</h2>
-          <p className="mb-5 max-w-2xl text-sm text-ink-soft">
+        <section id="bidders" className="mb-12 scroll-mt-6">
+          <h2 className="mb-3 font-display text-2xl font-semibold">Who is bidding</h2>
+          <p className="mb-6 max-w-2xl text-sm text-ink-soft">
             Counts, never shares — and a round counts as won only once it has settled.
           </p>
           <Leaderboard auctions={auctions} source={source} />
@@ -221,9 +221,9 @@ export default function EvidencePage() {
       </div>
 
       <div>
-        <section id="comparison" className="mb-14 scroll-mt-6">
-          <h2 className="mb-1 font-display text-2xl font-semibold">Is it actually better</h2>
-          <p className="mb-5 max-w-2xl text-sm text-ink-soft">
+        <section id="comparison" className="mb-12 scroll-mt-6">
+          <h2 className="mb-3 font-display text-2xl font-semibold">Is it actually better</h2>
+          <p className="mb-6 max-w-2xl text-sm text-ink-soft">
             The same order, three ways — every number from a unit test, not from a network.
           </p>
           <Comparison />
@@ -231,9 +231,9 @@ export default function EvidencePage() {
       </div>
 
       <div>
-        <section id="reserve" className="mb-14 scroll-mt-6">
-          <h2 className="mb-1 font-display text-2xl font-semibold">What happens next</h2>
-          <p className="mb-5 max-w-2xl text-sm text-ink-soft">
+        <section id="reserve" className="mb-12 scroll-mt-6">
+          <h2 className="mb-3 font-display text-2xl font-semibold">What happens next</h2>
+          <p className="mb-6 max-w-2xl text-sm text-ink-soft">
             The advisor reads the rounds that already happened and prints the command.
           </p>
           <ReservePanel auctions={auctions} source={source} head={head} />
@@ -243,7 +243,7 @@ export default function EvidencePage() {
       {/* "The long version" LEFT THIS ROW for the footer, where it sits on every route
           instead of only on the page a reader has already finished. /board became / when
           the instrument moved, so the first link is the live board at its new address. */}
-      <nav className="border-t border-rule pt-5 text-sm">
+      <nav className="mt-12 border-t border-rule pt-6 text-sm">
         <Link href="/" className="text-glass underline underline-offset-2">
           Watch a round →
         </Link>

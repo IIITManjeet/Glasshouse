@@ -28,7 +28,7 @@ export default function Error({
   }, [error]);
 
   return (
-    <main className="mx-auto max-w-2xl py-16">
+    <main className="mx-auto max-w-2xl">
       <h1 className="font-display text-2xl font-semibold">Something on this page failed to render.</h1>
       <p className="mt-4 text-ink-soft">
         The contracts are unaffected — this is a fault in the page, not on chain. Every auction
@@ -44,7 +44,7 @@ export default function Error({
         whatever this page does.
       </p>
 
-      <pre className="tnum mt-5 overflow-x-auto border border-rule bg-sunk p-3 text-[0.78rem] text-ink-soft">
+      <pre className="tnum mt-6 overflow-x-auto border border-rule bg-sunk p-3 text-[0.78rem] text-ink-soft">
         {error.message}
         {error.digest ? `\n\ndigest: ${error.digest}` : ""}
       </pre>

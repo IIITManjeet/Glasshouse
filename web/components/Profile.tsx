@@ -247,7 +247,7 @@ function StatTiles({ account }: { account: Account }) {
           <div key={k}>
             <div className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">{k}</div>
             <div
-              className={`tnum mt-0.5 text-sm ${tone === "brick" ? "text-brick" : tone === "amber" ? "text-amber" : "text-ink"}`}
+              className={`tnum mt-2 text-sm ${tone === "brick" ? "text-brick" : tone === "amber" ? "text-amber" : "text-ink"}`}
             >
               {v}
             </div>
@@ -387,7 +387,7 @@ export function Profile({ address, auctions, head }: { address: string; auctions
           and the same 42 characters twice reads as a rendering bug. This names the SECTION
           -- the board's recent window -- and keeps the address beside it as a link, marked,
           so a reader can see it is the same participant. */}
-      <header className="mb-5 flex flex-wrap items-baseline gap-x-3 gap-y-2">
+      <header className="mb-6 flex flex-wrap items-baseline gap-x-3 gap-y-2">
         <h2 className="font-display text-xl font-normal">On the board</h2>
         <AddressLink addr={address} role={roles[0]} />
         {roles.slice(1).map((r) => (

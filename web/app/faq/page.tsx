@@ -108,7 +108,15 @@ const linkClass = "text-glass underline underline-offset-2";
  */
 function Q({ id, children }: { id: string; children: React.ReactNode }) {
   return (
-    <div id={id} className="mt-9 scroll-mt-8">
+    // 32px between questions, 24px for the first question under a group heading. A group
+    // heading was the SAME distance from its first question as the questions were from each
+    // other, so the headings floated between two blocks instead of owning the one below
+    // them. (`[h2+&]` is the adjacent-sibling selector: this div directly after the h2.)
+    //
+    // 24 rather than the 20 the review suggested: globals.css's vertical scale is
+    // 2/3/4/6/8/12/16 with one meaning each, and 6 IS "heading to its content". A 5 here
+    // would have reintroduced the off-scale step this pass exists to delete.
+    <div id={id} className="mt-8 scroll-mt-8 [h2+&]:mt-6">
       <h3 className="text-[1.0625rem] font-semibold text-ink">{TITLES.get(id)}</h3>
       <div className="mt-2 text-ink-soft">{children}</div>
     </div>
@@ -137,14 +145,14 @@ export default function FaqPage() {
           arrived from a deep link needs in order to know what else is here. */}
       <nav
         aria-label="Questions on this page"
-        className="mt-8 grid grid-cols-1 gap-x-8 gap-y-6 border-y border-rule py-5 sm:grid-cols-2"
+        className="mt-8 grid grid-cols-1 gap-x-8 gap-y-6 border-y border-rule py-4 sm:grid-cols-2"
       >
         {GROUPS.map((g) => (
           <div key={g.id}>
             <h2 className="text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-ink-faint">
               {g.title}
             </h2>
-            <ul className="mt-2 space-y-1.5">
+            <ul className="mt-2 space-y-2">
               {g.questions.map(([anchor, question]) => (
                 <li key={anchor}>
                   <a
@@ -204,7 +212,7 @@ export default function FaqPage() {
             whole round at once; the steps under it are the same round from the
             bidder&rsquo;s side.
           </P>
-          <div className="mt-5">
+          <div className="mt-6">
             <Mechanism />
           </div>
           {/* Lifted verbatim: components/HowToBid.tsx:46-57, the four steps. */}
@@ -233,7 +241,7 @@ export default function FaqPage() {
                 </span>
                 <div>
                   <div className="font-medium text-ink">{title}</div>
-                  <p className="mt-0.5">{body}</p>
+                  <p className="mt-2">{body}</p>
                 </div>
               </li>
             ))}
@@ -277,7 +285,7 @@ export default function FaqPage() {
       </section>
 
       {/* ============================================================== 2 =============== */}
-      <section id="taking-part" className="mt-16 scroll-mt-8">
+      <section id="taking-part" className="mt-12 scroll-mt-8">
         <h2 className="border-b border-rule pb-2 font-display text-xl font-semibold text-ink">
           Taking part
         </h2>
@@ -427,7 +435,7 @@ export default function FaqPage() {
       </section>
 
       {/* ============================================================== 3 =============== */}
-      <section id="checking-it" className="mt-16 scroll-mt-8">
+      <section id="checking-it" className="mt-12 scroll-mt-8">
         <h2 className="border-b border-rule pb-2 font-display text-xl font-semibold text-ink">
           Checking it
         </h2>
@@ -516,7 +524,7 @@ cast logs --address ${BOOK} --from-block <opened> --to-block <exclusiveEnd> --rp
       </section>
 
       {/* ============================================================== 4 =============== */}
-      <section id="why-built-this-way" className="mt-16 scroll-mt-8">
+      <section id="why-built-this-way" className="mt-12 scroll-mt-8">
         <h2 className="border-b border-rule pb-2 font-display text-xl font-semibold text-ink">
           Why it is built this way
         </h2>
@@ -527,7 +535,7 @@ cast logs --address ${BOOK} --from-block <opened> --to-block <exclusiveEnd> --rp
             below is the same three bidders under both rules — only the rule for choosing among
             them differs, and the axis each rule ignores is drawn rather than deleted.
           </P>
-          <div className="mt-5">
+          <div className="mt-6">
             <LatencyLens />
           </div>
           {/* Lifted: README.md "The problem", the two paragraphs -- identity and clock. */}

@@ -8,6 +8,7 @@ import { type Auction, livePhase } from "@/lib/useAuctions";
 import { Countdown } from "./Auction";
 import { AddressLink } from "./Address";
 import { BidStrip } from "./BidStrip";
+import { ArrowRight } from "./Icon";
 
 const num = (n?: number | null) =>
   n === null || n === undefined || Number.isNaN(n) ? "—" : n.toLocaleString("en-US");
@@ -69,13 +70,17 @@ function PhaseChip({ a, head }: { a: Auction; head: number }) {
 function LiveTile({ a, head, primary }: { a: Auction; head: number; primary: boolean }) {
   const p = livePhase(a, head);
   const canStillBid = p === "commit";
+  // NO TRAILING ARROW CHARACTER. It was `"Bid in this round →"` -- the glyph baked into
+  // the label string, so it took the sans face's own metrics: it did not scale with the
+  // 15px primary, and it sat on the text baseline rather than on the optical centre of a
+  // 44px control. `<ArrowRight />` is a 16px path centred by `.btn`'s own flexbox.
   const label = canStillBid
-    ? "Bid in this round →"
+    ? "Bid in this round"
     : p === "reveal"
-      ? "Watch the reveals →"
+      ? "Watch the reveals"
       : // The exclusive window: reveals are over and the winner is filling. "Watch the
         // reveals" would be a small lie about which window this is.
-        "Watch the winner fill →";
+        "Watch the winner fill";
 
   return (
     <div className="card">
@@ -103,18 +108,28 @@ function LiveTile({ a, head, primary }: { a: Auction; head: number; primary: boo
         <BidStrip a={a} mode="full" />
       </div>
 
-      <div className="card-foot flex flex-wrap items-center justify-between gap-3">
-        <span>
-          reserve <span className="tnum text-ink-soft">{a.reserveBps}</span> · max{" "}
-          <span className="tnum text-ink-soft">{a.maxBps}</span> bps
-        </span>
+      {/* THE PRIMARY IS NOT A FOOTNOTE, AND IT USED TO LIVE IN ONE.
+          This anchor sat inside `.card-foot`: a 13px, `--color-ink-faint`, 10px-padded
+          caption strip whose whole job is to be the quietest band on the card. Dropping a
+          44px filled control into it ballooned the strip to ~64px, gave the loudest thing
+          on the page a caption-coloured surround, and put the act BELOW a horizontal rule
+          from the round it acts on. The parameters footnote stays in the foot, which is
+          what a foot is for; the act comes back up into the card body, 16px under the
+          sealed-bid count it follows from. */}
+      <div className="mt-4">
         <a
           href={INSTRUMENT}
           className={primary && canStillBid ? "btn btn-primary" : "btn btn-secondary"}
         >
           {label}
+          <ArrowRight />
         </a>
       </div>
+
+      <p className="card-foot">
+        reserve <span className="tnum text-ink-soft">{a.reserveBps}</span> · max{" "}
+        <span className="tnum text-ink-soft">{a.maxBps}</span> bps
+      </p>
     </div>
   );
 }
@@ -151,8 +166,14 @@ function LastPrintTile({ a, head, lastOpened }: { a: Auction; head: number; last
       </div>
 
       {priced ? (
-        <div className="border border-rule bg-raised rounded-card px-4 py-3.5">
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        // A SURFACE STEP, NOT A SECOND BOX. This was `border border-rule bg-raised
+        // rounded-card`, which drew a full second frame 16px inside the card's own
+        // border -- around the one number on the tile anybody quotes. `bg-raised` is also
+        // the card's own colour, so the border was the only thing separating them: a
+        // rectangle whose sole content was "there is a rectangle here". `--color-sunk` is
+        // a real step down from the card in both themes and needs no outline at all.
+        <div className="bg-sunk rounded-control px-4 py-3">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2">
             {/* AMBER, NOT GLASS. In this palette amber is the provisional and the money --
                 the clearing price is what the maker actually paid away, and it is the one
                 figure on a settled round anybody quotes. */}
@@ -177,7 +198,7 @@ function LastPrintTile({ a, head, lastOpened }: { a: Auction; head: number; last
       ) : (
         // A round with no clearing price is a real outcome, not a missing number, and a
         // 3rem em-dash would be the "grid of zeroes" mistake in one character.
-        <p className="border border-rule bg-raised rounded-card px-4 py-3.5 text-sm text-ink-soft">
+        <p className="bg-sunk rounded-control px-4 py-3 text-sm text-ink-soft">
           The last round closed without a clearing price: no bid was opened in it, so the
           contract has no second price to clear at.
         </p>
@@ -197,16 +218,20 @@ function LastPrintTile({ a, head, lastOpened }: { a: Auction; head: number; last
         </span>
       </div>
 
-      <div className="card-foot flex flex-wrap items-center justify-between gap-3">
-        <span>
-          reserve <span className="tnum text-ink-soft">{a.reserveBps}</span> · max{" "}
-          <span className="tnum text-ink-soft">{a.maxBps}</span> bps
-        </span>
+      {/* Out of the foot, for LiveTile's reason. This one is secondary rather than
+          primary -- there is nothing to bid on -- but a 36px bordered control inside a
+          10px caption strip is the same category error at a smaller size. */}
+      <div className="mt-4">
         <a href={roundHref(a)} className="btn btn-secondary">
-          Open the round →
+          Open the round
+          <ArrowRight />
         </a>
       </div>
 
+      <p className="card-foot">
+        reserve <span className="tnum text-ink-soft">{a.reserveBps}</span> · max{" "}
+        <span className="tnum text-ink-soft">{a.maxBps}</span> bps
+      </p>
     </div>
     {/* OUTSIDE the card, not inside it. `.card-foot` ends with `margin-bottom: -16px` so it
         can sit flush against the card's edge; anything placed after it inside the card is

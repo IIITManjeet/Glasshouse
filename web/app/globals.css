@@ -411,6 +411,62 @@ th,
   color: var(--color-ground);
 }
 
+/* ---- A FIELD IS NOT A CARD ------------------------------------------------------
+   The third kind of interactive thing, and the one that had no primitive. A label is a
+   `.chip`, a control is a `.btn-*`, and an input was... `border border-rule bg-raised
+   rounded-card shadow-card px-2 py-1`, hand-composed at four call sites (the bid bps field
+   and the two `Enter secret` fields in BidPanel, the address lookup on /account).
+
+   THAT RECIPE IS THE CARD RECIPE. Byte for byte it is what `.card` replaced, which means
+   every text field on the site was drawn as a small raised container that happened to have
+   a caret in it -- the same "is this a CTA or a box?" ambiguity the card comment above
+   records, pointing at a third kind of object. A field is not a container and is not a
+   control: it is a SLOT, and a slot reads as recessed rather than raised.
+
+   So: `--color-sunk`, the surface that already means "below the card" (it is what `.chip`
+   and the code blocks sit on), no shadow at all, and the control radius rather than the
+   card radius. The geometry is `.btn-secondary`'s -- 36px tall -- because a field and the
+   button that submits it sit in one flex row on /account and a 34px input beside a 36px
+   button is the misalignment this pass exists to remove.
+
+   The focus ring is `.btn:focus-visible`'s, identically, for the reason given there: a
+   keyboard user should not have to learn a second indicator. `:focus` rather than
+   `:focus-visible` on a field, though -- a click into a text input IS a keyboard context,
+   which is the one place the distinction inverts. */
+.input {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-control);
+  background: var(--color-sunk);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.2;
+}
+.input::placeholder {
+  color: var(--color-ink-faint);
+}
+.input:focus {
+  border-color: var(--color-glass);
+  outline: 2px solid var(--color-glass);
+  outline-offset: 2px;
+}
+/* A field holding a chain value keeps the mono register, same rule as `.btn .tnum`: the bps
+   typed into the bid box has to line up with the bps printed in the table above it. */
+.input.tnum {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+/* The multi-line variant: the bid-secret escape hatch, which is 32 bytes of hex and has to
+   wrap. Same surface, same border, real padding on all four sides because there is more
+   than one line to inset. */
+.input-area {
+  min-height: 0;
+  padding: 8px 10px;
+  line-height: 1.5;
+}
+
 
 /* ---- A CONTAINER IS NOT A CONTROL ------------------------------------------------
    The complaint this answers, verbatim: "even I am not able to understand whether cards
@@ -440,7 +496,15 @@ th,
 .card {
   background: var(--color-raised);
   border: 1px solid var(--color-rule);
-  border-radius: var(--radius-control);
+  /* `--radius-card`, NOT `--radius-control`, and the swap is a consistency fix rather than
+     a taste one. There are two radius tokens and they are named after the two kinds of
+     object: 8px for a container, 6px for a control. `.card` asked for the CONTROL radius,
+     while the nine `<figure>` wrappers on this site -- Settlement, Receipt, Verification,
+     Comparison, Lens, Mechanism, Leaderboard, Reserve, Timeline, Record -- all composed
+     their own box with `rounded-card`. So on `/` a `.card` (6px) sat directly beside a
+     figure (8px), and on /evidence every panel disagreed with every card by two pixels.
+     Containers are 8 now, controls are 6, and nothing on the page has to remember which. */
+  border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
   padding: 16px;
   cursor: default;
@@ -466,7 +530,8 @@ th,
   padding: 8px 16px;
   background: color-mix(in srgb, var(--color-ink) 4%, var(--color-raised));
   border-bottom: 1px solid var(--color-rule);
-  border-radius: var(--radius-control) var(--radius-control) 0 0;
+  /* Matches `.card`'s own radius above, or the strip's corners poke out of the card's. */
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
   font-family: var(--font-sans);
   font-size: 13px;
   font-weight: 500;
@@ -483,6 +548,34 @@ th,
   font-weight: 400;
   line-height: 1.5;
   color: var(--color-ink-faint);
+}
+
+/* THE HEADER STRIP OF A TABLE, which `.card-head` cannot be.
+   `.card-head` is `display: flex` with `margin: -16px -16px 12px`, both of which a `<th>`
+   or a `<tr>` silently discards -- a table cell is not a flex item of the card and has no
+   16px padding to cancel. So `RoundsTable` improvised the strip by hand, and the improvised
+   version carried the exact bug `.card-head`'s own comment warns about two blocks up: it
+   painted `bg-lifted`, and on the LIGHT theme `--color-lifted` is `#ffffff`, the same value
+   as `--color-raised`. The sticky header of the ledger has therefore been invisible in the
+   theme most judges will see, held up only by its bottom border, while the dark theme got a
+   real step. Same declaration as `.card-head` -- 4% ink mixed into the card surface, which
+   darkens on light and LIGHTENS on dark because `--color-ink` flips -- so the two header
+   strips on the site are now one decision rather than two.
+
+   The type is the 11px mono column label this project floors at (nothing goes smaller), in
+   `--color-label`'s neutral rather than an accent: a column heading is not pending and not
+   primary, it is a heading. Density is left to the cell -- `px-3 py-2.5`, the table row
+   unit -- so a header cell and a body cell are the same height. */
+.table-head {
+  background: color-mix(in srgb, var(--color-ink) 4%, var(--color-raised));
+  border-bottom: 1px solid var(--color-rule);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--color-label);
 }
 
 /* A ROW THAT GOES SOMEWHERE, and the fix for a hover that was lying.

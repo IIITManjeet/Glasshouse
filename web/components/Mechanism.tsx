@@ -120,7 +120,7 @@ export function Mechanism() {
         </span>
       </figcaption>
 
-      <div className="overflow-x-auto px-4 py-5">
+      <div className="overflow-x-auto px-4 py-4">
         <svg
           viewBox="0 0 900 250"
           role="img"

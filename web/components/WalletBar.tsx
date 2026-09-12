@@ -7,6 +7,7 @@ import { base } from "wagmi/chains";
 // tests load, and adding a .d.ts would create a second place for the shape to drift.
 // `allowJs` lets TypeScript infer it, so no suppression is needed or wanted here.
 import { explainRevert } from "@/lib/bid.js";
+import { Wallet } from "./Icon";
 
 const short = (a?: string | null) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "—");
 
@@ -25,6 +26,22 @@ const short = (a?: string | null) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : 
 // competing with the button a bidder has to find in four seconds.
 const BTN = "btn";
 const BTN_IDLE = "btn-secondary";
+// A BARE `.btn` HAS NO SIZE, and four controls in this file were wearing one.
+//
+// globals.css puts height, padding and font-size on the VARIANT, never on `.btn` -- its
+// comment says so explicitly: "Size is owned by the variant, not by this block, because a
+// 44px primary beside a 32px tertiary is the point." So `className="btn"` with nothing
+// after it produced a control with `min-height` unset, `padding: 0` and the inherited body
+// font size: measured at 19px tall against the 36px every other state of this bar renders
+// at. Every one of them is a state the visitor is quite likely to see -- pre-mount, no
+// wallet installed, and both "Confirm in wallet..." waits -- so the bar jumped height as
+// the wallet answered.
+//
+// `.btn-secondary` supplies only the geometry here: `.btn:disabled` and
+// `.btn[aria-disabled="true"]` already repaint the fill, border and text as "not now", and
+// they come later in the file, so the colours are the disabled ones either way. What it
+// buys is that the slot does not move.
+const BTN_DISABLED = "btn btn-secondary";
 // Switching chains is a correction, not a danger: nothing is lost by being on the wrong
 // chain, bid.js refuses to write off Base, and the brick outline here read as an error the
 // visitor had caused. The sentence beside it already says which chain is which.
@@ -180,7 +197,7 @@ export function WalletBar({ className = "" }: { className?: string }) {
     // Before mount the answer is genuinely unknown, and a disabled control has to say why
     // it is disabled, so it says that rather than showing a dead `Connect wallet`.
     if (!mounted) {
-      return <span className={`${BTN}`} aria-disabled="true">Reading wallet state…</span>;
+      return <span className={BTN_DISABLED} aria-disabled="true">Reading wallet state…</span>;
     }
 
     if (!hasInjected || !injected) {
@@ -188,7 +205,7 @@ export function WalletBar({ className = "" }: { className?: string }) {
         <button
           type="button"
           disabled
-          className={`${BTN}`}
+          className={BTN_DISABLED}
           title="Bidding needs a browser wallet on Base. Everything else on this page is read from the chain and works without one."
         >
           No wallet found — the board reads fine without one
@@ -199,13 +216,14 @@ export function WalletBar({ className = "" }: { className?: string }) {
     if (!isConnected) {
       if (connectStatus === "pending") {
         return (
-          <button type="button" disabled className={`${BTN}`}>
+          <button type="button" disabled className={BTN_DISABLED}>
             Confirm in wallet…
           </button>
         );
       }
       return (
         <button type="button" className={`${BTN} ${BTN_IDLE}`} onClick={() => connect({ connector: injected })}>
+          <Wallet />
           Connect wallet
         </button>
       );
@@ -214,7 +232,7 @@ export function WalletBar({ className = "" }: { className?: string }) {
     if (wrongChain) {
       if (switchStatus === "pending") {
         return (
-          <button type="button" disabled className={`${BTN}`}>
+          <button type="button" disabled className={BTN_DISABLED}>
             Confirm in wallet…
           </button>
         );
@@ -249,7 +267,7 @@ export function WalletBar({ className = "" }: { className?: string }) {
   }
 
   return (
-    <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 ${className}`}>
+    <div className={`flex flex-wrap items-center gap-x-3 gap-y-2 ${className}`}>
       {body()}
       {note ? (
         <span role="status" className="max-w-prose font-mono text-[0.72rem] leading-snug text-brick">

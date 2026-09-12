@@ -26,6 +26,15 @@
   -->
   <rect width="32" height="32" rx="7" fill="#0c7a68" />
 
+  <!-- The clearing price, at the SECOND bar's height, and drawn BEFORE the bars so it
+       passes behind them. Painted on top it cut a 2px amber band across the tallest white
+       column, and in the rasterised 16px favicon the winner's bar simply looked broken --
+       a rendering fault rather than a price. Behind, the columns stay solid and the line
+       reads as what it is: the winner's bar is taller than the price the winner pays.
+       Amber is the palette's colour for the surplus that goes to the maker, and it is the
+       one thing on this mark that is not a bid. -->
+  <rect x="2.5" y="12" width="27" height="2" rx="1" fill="#e6b345" />
+
   <!-- The three bids, ascending. Squared caps: these are columns, not lines. -->
   <g fill="#f4f5f7">
     <rect x="5.5"  y="19" width="5" height="8.5" rx="0.5" />
@@ -33,9 +42,4 @@
     <rect x="21.5" y="7"  width="5" height="20.5" rx="0.5" />
   </g>
 
-  <!-- The clearing price, at the SECOND bar's height. Amber is the palette's colour for
-       the surplus that goes to the maker, and it is the one thing on this mark that is not
-       a bid. It crosses the tallest bar without touching its top, which is the whole
-       second-price rule in one line. -->
-  <rect x="2.5" y="12" width="27" height="2" rx="1" fill="#e6b345" />
 </svg>

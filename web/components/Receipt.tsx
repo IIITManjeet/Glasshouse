@@ -2,6 +2,7 @@
 
 import { AddressLink, RoleChip } from "./Address";
 import { Copy } from "./Copy";
+import { Copy as CopyIcon, Check } from "./Icon";
 import { rolesOf } from "./Identity";
 
 import { useState } from "react";
@@ -64,7 +65,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return (
     <div className="border-t border-rule py-2.5 first:border-t-0 sm:first:border-t">
       <div className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">{label}</div>
-      <div className="mt-1 text-[0.86rem] text-ink">{children}</div>
+      <div className="mt-2 text-[0.86rem] text-ink">{children}</div>
     </div>
   );
 }
@@ -330,10 +331,11 @@ function CheckYourself({ a }: { a: Auction }) {
           }}
           className="btn btn-tertiary"
         >
-          {copied ? "Copied ✓" : "Copy"}
+          {copied ? <Check /> : <CopyIcon />}
+          {copied ? "Copied" : "Copy"}
         </button>
       </div>
-      <pre className="mt-1 overflow-x-auto bg-sunk p-3 font-mono text-[0.72rem] leading-relaxed text-ink-soft">
+      <pre className="mt-2 overflow-x-auto bg-sunk p-3 font-mono text-[0.72rem] leading-relaxed text-ink-soft">
         {cmd}
       </pre>
     </details>

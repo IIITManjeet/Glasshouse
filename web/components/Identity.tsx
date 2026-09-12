@@ -202,20 +202,20 @@ export function IdentityCard({
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <h1 className="font-sans text-2xl font-semibold text-ink">{name ?? short(address)}</h1>
           {roles.map((r) => (
             <RoleChip key={r} role={r} />
           ))}
         </div>
 
-        <div className="mt-1 flex flex-wrap items-baseline">
+        <div className="mt-2 flex flex-wrap items-baseline">
           <span className="tnum text-sm break-all text-ink-soft">{address}</span>
           <Copy text={address} label="this address" className="shrink-0" />
         </div>
 
         {!name && (
-          <p className="mt-1.5 text-[0.8rem] text-ink-faint">
+          <p className="mt-2 text-[0.8rem] text-ink-faint">
             {loading
               ? "Looking for an ENS name…"
               : "No ENS name. That is not a judgement — most addresses do not have one."}

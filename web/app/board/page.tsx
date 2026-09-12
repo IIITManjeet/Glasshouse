@@ -31,7 +31,7 @@ export default function BoardMoved() {
   }, [router]);
 
   return (
-    <main className="py-10">
+    <main>
       <h1 className="text-[1.5rem] leading-[1.25] font-semibold text-ink">The board moved to the front page.</h1>
       <p className="lede mt-3 max-w-xl text-ink-soft">
         The live round, its phases and the panel to bid in it are now at the site root.

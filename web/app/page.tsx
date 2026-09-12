@@ -10,6 +10,7 @@ import { BidPanel, RevealStrip } from "@/components/BidPanel";
 import { SettlementReel } from "@/components/SettlementReel";
 import { AddressLink } from "@/components/Address";
 import { Loading, Swap } from "@/components/Loading";
+import { ArrowRight } from "@/components/Icon";
 
 const num = (n?: number | null) =>
   n === null || n === undefined || Number.isNaN(n) ? "—" : n.toLocaleString("en-US");
@@ -69,7 +70,7 @@ export default function Home() {
         price.
       </h1>
 
-      <WalletBar className="mt-5 mb-4" />
+      <WalletBar className="mt-8 mb-4" />
 
       {loading && !featured && (
         <Loading
@@ -242,7 +243,7 @@ export default function Home() {
           the last five rounds, then everything. Nothing here explains the mechanism. */}
 
       {lastSettled ? (
-        <section className="mt-10">
+        <section className="mt-12">
           <h2 className="text-base font-semibold text-ink">
             {featured ? "Last settled" : "The last round this Book settled"}
           </h2>
@@ -250,34 +251,33 @@ export default function Home() {
               shows the last print; it does not show an empty frame and hope. The reel is
               playback of reveals that genuinely happened, and it carries its own source
               chip and "what produced this" caption, so it is honest at any width. */}
-          <div className="mt-3 max-w-3xl">
+          <div className="mt-6 max-w-3xl">
             <SettlementReel a={lastSettled} head={head} source={source} />
           </div>
         </section>
       ) : null}
 
       {recent.length > 0 ? (
-        <section className="mt-10">
+        <section className="mt-12">
           <h2 className="text-base font-semibold text-ink">Recent rounds</h2>
           {/* A <table> has to sit inside a <figure data-src> whose body contains the words
               "What produced this" or scripts/lint-provenance.mjs fails the build. */}
-          <figure data-src={source} className="mt-3">
+          <figure data-src={source} className="mt-6 max-w-3xl">
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-left text-[0.82rem]">
                 <thead>
-                  <tr className="border-b border-rule">
-                    <th className="px-3 py-2 font-mono text-[0.6875rem] font-normal uppercase tracking-[0.12em] text-ink-faint">
-                      round
-                    </th>
-                    <th className="px-3 py-2 font-mono text-[0.6875rem] font-normal uppercase tracking-[0.12em] text-ink-faint">
-                      phase
-                    </th>
-                    <th className="px-3 py-2 text-right font-mono text-[0.6875rem] font-normal uppercase tracking-[0.12em] text-ink-faint">
-                      clearing
-                    </th>
-                    <th className="px-3 py-2 font-mono text-[0.6875rem] font-normal uppercase tracking-[0.12em] text-ink-faint">
-                      winner
-                    </th>
+                  {/* `.table-head`, not the hand-composed mono-uppercase recipe that used
+                      to be repeated four times here. `.card-head` cannot be used on a <tr>
+                      -- it is display:flex with negative margins a table cell discards --
+                      which is why this improvised, and why globals.css now carries a
+                      primitive for the one case it could not cover. `py-2.5` is the table
+                      ROW UNIT: the same cell height /rounds uses, so the row a visitor
+                      learns on the front door is the row they meet in the full ledger. */}
+                  <tr>
+                    <th className="table-head px-3 py-2.5 text-left">round</th>
+                    <th className="table-head px-3 py-2.5 text-left">phase</th>
+                    <th className="table-head px-3 py-2.5 text-right">clearing</th>
+                    <th className="table-head px-3 py-2.5 text-left">winner</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -285,7 +285,7 @@ export default function Home() {
                     const p = livePhase(a, head);
                     return (
                       <tr key={a.orderHash} className="row-link border-b border-rule">
-                        <td className="tnum px-3 py-2">
+                        <td className="tnum px-3 py-2.5">
                           <a
                             href={`/r/${a.orderHash}`}
                             className="text-glass underline decoration-rule underline-offset-2 hover:decoration-glass"
@@ -293,16 +293,16 @@ export default function Home() {
                             {num(a.round)}
                           </a>
                         </td>
-                        <td className="px-3 py-2 text-ink-soft">
+                        <td className="px-3 py-2.5 text-ink-soft">
                           {a.settled ? `${p} · settled` : p}
                         </td>
                         {/* NOT A ZERO. `clearingBps` is null before settle() runs, which is
                             a different fact from "cleared at 0", and an em dash is the only
                             honest rendering of a number that does not exist yet. */}
-                        <td className="tnum px-3 py-2 text-right text-ink">
+                        <td className="tnum px-3 py-2.5 text-right text-ink">
                           {a.clearingBps === null ? "—" : `${a.clearingBps} bps`}
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-3 py-2.5">
                           {a.bestBidder ? (
                             <AddressLink
                               addr={a.bestBidder}
@@ -347,8 +347,12 @@ export default function Home() {
               )}
             </figcaption>
           </figure>
+          {/* The icon, not a `→` character. A text arrow takes the font's metrics -- it
+              does not scale with the label and sits on the baseline rather than the
+              optical centre -- and `.btn` already centres a flex child for free. */}
           <Link href="/rounds" className="btn btn-secondary mt-4">
             Every round so far
+            <ArrowRight />
           </Link>
         </section>
       ) : null}

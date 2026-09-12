@@ -68,7 +68,7 @@ export function Loading({
       transition={{ duration: 0.2 }}
     >
       <LoadingBar />
-      <div className="px-5 py-4">
+      <div className="px-4 py-4">
         <p className="font-mono text-[0.72rem] uppercase tracking-[0.12em] text-ink-soft">
           {what}
           <Ellipsis />

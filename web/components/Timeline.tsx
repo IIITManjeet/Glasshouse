@@ -170,7 +170,7 @@ export function Timeline({ maker, orderHash }: { maker: string; orderHash: strin
         <div className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">
           the ladder · {num(a.committedCount)} sealed, {num(a.revealedCount)} opened
         </div>
-        <ul className="mt-2 space-y-1.5">
+        <ul className="mt-2 space-y-2">
           {a.bids.map((b) => {
             // `house` when this bidder IS the maker of the round it is bidding in -- the
             // disclosure the ladder most needs, since a maker's own bid sits in it looking
@@ -270,7 +270,7 @@ function Row({
   });
 
   return (
-    <li className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-2.5 text-[0.86rem]">
+    <li className="flex flex-wrap items-baseline gap-x-3 gap-y-2 px-4 py-2.5 text-[0.86rem]">
       <a
         href={tx(e.txHash)}
         target="_blank"

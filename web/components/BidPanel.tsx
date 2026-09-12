@@ -6,6 +6,7 @@ import { useAccount, useConnect, useWaitForTransactionReceipt } from "wagmi";
 import { base } from "wagmi/chains";
 import { useAvailableConnectors } from "@/components/WalletBar";
 import { type Auction } from "@/lib/useAuctions";
+import { Seal, Eye, Wallet, Copy as CopyIcon, Check } from "./Icon";
 // Plain ESM, deliberately untyped: bid.js is the same file the static page and the Node
 // tests load, and adding a .d.ts would create a second place for the shape to drift.
 // `allowJs` lets TypeScript infer it rather than a suppression -- but inference reads
@@ -304,9 +305,9 @@ function Sentence({ text, detail, tone = "brick" }: { text: string; detail?: str
     <div className={`mt-2 border-l-2 ${border} px-3 py-2 text-[0.78rem] leading-snug text-ink-soft`} role="status">
       {text}
       {detail ? (
-        <details className="mt-1">
+        <details className="mt-2">
           <summary className="cursor-pointer text-[0.72rem] text-ink-faint">raw</summary>
-          <code className="tnum block break-all pt-1 text-[0.7rem] text-ink-faint">{detail}</code>
+          <code className="tnum block break-all pt-2 text-[0.7rem] text-ink-faint">{detail}</code>
         </details>
       ) : null}
     </div>
@@ -347,12 +348,17 @@ function CopySecret({ orderHash, bidder }: { orderHash: string; bidder: string }
   return (
     <div className="mt-2">
       <div className="flex flex-wrap items-center gap-1">
+        {/* The tick is a STATE, not an ornament: it appears only once the clipboard has
+            actually taken the text, which is the distinction Copy.tsx's header comment is
+            entirely about. A `✓` character was doing this job at the font's own weight,
+            a stroke lighter than everything else on the control. */}
         <button type="button" onClick={copy} className="btn btn-tertiary">
-          {copied ? "Copied ✓" : "Copy bid secret"}
+          {copied ? <Check /> : <CopyIcon />}
+          {copied ? "Copied" : "Copy bid secret"}
         </button>
         <FaqLink to="secret">what the secret is</FaqLink>
       </div>
-      <p className="mt-1 text-[0.72rem] leading-snug text-ink-faint">
+      <p className="mt-2 text-[0.72rem] leading-snug text-ink-faint">
         Stored in this browser only. Copy it if you might reveal from another one.
       </p>
       {shown ? (
@@ -361,7 +367,7 @@ function CopySecret({ orderHash, bidder }: { orderHash: string; bidder: string }
           rows={7}
           value={shown}
           onFocus={(e) => e.currentTarget.select()}
-          className="tnum mt-2 w-full border border-rule bg-sunk p-2 text-[0.7rem]"
+          className="input input-area tnum mt-2 w-full"
         />
       ) : null}
     </div>
@@ -497,6 +503,7 @@ function RevealButton({
     // outcome guaranteed to fail. The label says exactly why it is offering anyway.
     label = (
       <>
+        <Eye />
         Reveal <span className="tnum">{record.bps} bps</span> — block height not read, sending anyway
       </>
     );
@@ -505,6 +512,7 @@ function RevealButton({
     // view. Filled brick at the same 44px geometry, so it replaces the primary in place.
     label = (
       <>
+        <Eye />
         Reveal <span className="tnum">{record.bps} bps</span> ·{" "}
         <span className="tnum">
           {Math.max(0, left)} block{left === 1 ? "" : "s"}
@@ -516,6 +524,7 @@ function RevealButton({
   } else {
     label = (
       <>
+        <Eye />
         Reveal <span className="tnum">{record.bps} bps</span> · <span className="tnum">{left} blocks</span> left
       </>
     );
@@ -534,7 +543,7 @@ function RevealButton({
         {label}
       </button>
       {!compact && !disabled ? (
-        <p className={`mt-1 flex flex-wrap items-center gap-1 text-[0.74rem] ${left <= 10 && !headUnknown ? "text-brick" : "text-ink-faint"}`}>
+        <p className={`mt-2 flex flex-wrap items-center gap-1 text-[0.74rem] ${left <= 10 && !headUnknown ? "text-brick" : "text-ink-faint"}`}>
           <span className="tnum">
             {headUnknown
               ? "block height not read — the contract decides whether it is late"
@@ -547,7 +556,7 @@ function RevealButton({
       ) : null}
       {err ? <Sentence text={err.sentence} detail={err.detail} /> : null}
       {stage === "sent" && tx && !compact ? (
-        <p className="mt-1 text-[0.74rem] text-ink-faint">
+        <p className="mt-2 text-[0.74rem] text-ink-faint">
           <TxLine hash={tx} verb="reveal sent" />
         </p>
       ) : null}
@@ -564,22 +573,22 @@ function EnterSecret({ maker, orderHash, bidder, bounds }: { maker: string; orde
   return (
     <details className="mt-3 border-t border-rule pt-2">
       <summary className="cursor-pointer font-mono text-[0.74rem] text-glass">Enter secret</summary>
-      <p className="mt-1 text-[0.74rem] leading-snug text-ink-faint">
+      <p className="mt-2 text-[0.74rem] leading-snug text-ink-faint">
         Paste the bps and salt you copied when you bid. <FaqLink to="secret">what the secret is</FaqLink>
       </p>
-      <div className="mt-2 flex flex-wrap gap-2">
+      <div className="mt-2 flex flex-wrap items-center gap-2">
         <input
           inputMode="numeric"
           value={bps}
           onChange={(e) => setBps(e.target.value.replace(/[^0-9]/g, ""))}
           placeholder="bps"
-          className="tnum w-24 border border-rule bg-raised rounded-card shadow-card px-2 py-1 text-[0.78rem]"
+          className="input tnum w-24"
         />
         <input
           value={salt}
           onChange={(e) => setSalt(e.target.value.trim())}
           placeholder="0x… (32 bytes)"
-          className="tnum min-w-0 flex-1 border border-rule bg-raised rounded-card shadow-card px-2 py-1 text-[0.78rem]"
+          className="input tnum min-w-0 flex-1"
         />
         <button
           type="button"
@@ -726,8 +735,13 @@ function BidForm({ auction, st, head, headUnknown }: { auction: Auction; st: Der
     // cleanly and could then never be opened, so the page refuses before the contract can.
     label = `${parsed} bps cannot be revealed — this round accepts ${auction.reserveBps} to ${auction.maxBps}`;
   } else {
+    // A CLOSED PADLOCK, and it is the one icon in this file that is load-bearing. Sealed
+    // is the mechanism: the commitment is hash(bps, salt, orderHash), and nobody -- not the
+    // other bidders, not the maker, not us -- can read it until the reveal window opens.
+    // The glyph says that inside the four seconds this button has before somebody signs.
     label = (
       <>
+        <Seal />
         Place sealed bid · <span className="tnum">{parsed} bps</span>
       </>
     );
@@ -746,11 +760,15 @@ function BidForm({ auction, st, head, headUnknown }: { auction: Auction; st: Der
           // things uint24 cannot hold, and rejecting them at the keystroke is quieter than a
           // validation message after the fact.
           onChange={(e) => setRaw(e.target.value.replace(/[^0-9]/g, ""))}
-          className="tnum mt-1 block w-32 border border-rule bg-raised rounded-card shadow-card px-2 py-1 text-base"
+          // `.input`, not the hand-composed card recipe this and the two `Enter secret`
+          // fields all carried. `border border-rule bg-raised rounded-card shadow-card` IS
+          // `.card`, so every text field on the site was drawn as a small raised container
+          // with a caret in it -- and at `py-1` it stood 26px tall beside a 36px button.
+          className="input tnum mt-2 block w-32"
           placeholder={String(auction.reserveBps)}
         />
       </label>
-      <p className="tnum mt-1 text-[0.74rem] text-ink-faint">
+      <p className="tnum mt-2 text-[0.74rem] text-ink-faint">
         between {auction.reserveBps} (reserve) and {auction.maxBps} (max)
       </p>
 
@@ -758,7 +776,7 @@ function BidForm({ auction, st, head, headUnknown }: { auction: Auction; st: Der
         {label}
       </button>
 
-      <p className="tnum mt-1 text-[0.74rem] text-ink-faint">
+      <p className="tnum mt-2 text-[0.74rem] text-ink-faint">
         {headUnknown
           ? "chain head not read — the contract judges the commit window, not this page"
           : `commit closes at block ${num(auction.commitEnd)} · ${gloss(st.blocksToCommitEnd)}`}
@@ -768,7 +786,7 @@ function BidForm({ auction, st, head, headUnknown }: { auction: Auction; st: Der
           is that this transaction is not the bid and that a missing reveal voids it. The rest
           of the mechanism -- why a hash, why a salt, why two transactions -- is an argument,
           and an argument belongs behind the link rather than between a person and a button. */}
-      <p className="mt-1 text-[0.74rem] leading-snug text-ink-faint">
+      <p className="mt-2 text-[0.74rem] leading-snug text-ink-faint">
         Only a hash is sent now. You must come back and reveal it in the reveal window, or the
         bid is void. <FaqLink to="round">how it works</FaqLink>
       </p>
@@ -835,7 +853,14 @@ function ConnectPrimary() {
       onClick={() => connect({ connector: available[0] })}
       className="btn btn-primary mt-3 w-full"
     >
-      {status === "pending" ? "Confirm in wallet…" : "Connect wallet to bid"}
+      {status === "pending" ? (
+        "Confirm in wallet…"
+      ) : (
+        <>
+          <Wallet />
+          Connect wallet to bid
+        </>
+      )}
     </button>
   );
 }
@@ -963,7 +988,7 @@ export function BidPanel({ auction, head }: { auction: Auction | null; head: num
             Nothing was taken from your wallet beyond gas. The bid does not count and the round
             cleared without it. <FaqLink to="reveal">why reveal matters</FaqLink>
           </p>
-          <p className="mt-1 text-[0.78rem] text-ink-faint">Bid again in the round now open.</p>
+          <p className="mt-2 text-[0.78rem] text-ink-faint">Bid again in the round now open.</p>
         </Shell>
       );
     }
@@ -975,7 +1000,7 @@ export function BidPanel({ auction, head }: { auction: Auction | null; head: num
           <p className="tnum text-sm text-ink">
             Sealed · {record.bps} bps · reveal opens at block {num(auction.commitEnd + 1)}
           </p>
-          <p className="tnum mt-1 text-[0.74rem] text-ink-faint">{gloss(st.blocksToCommitEnd + 1)}</p>
+          <p className="tnum mt-2 text-[0.74rem] text-ink-faint">{gloss(st.blocksToCommitEnd + 1)}</p>
           {/* The one sentence the page owes anyone who has committed. Stated once, here,
               where they are waiting -- not as a toast that a person can miss. */}
           <p className="mt-2 border-l-2 border-amber bg-amber-soft px-3 py-2 text-[0.78rem] leading-snug text-ink-soft">
@@ -1045,14 +1070,14 @@ export function BidPanel({ auction, head }: { auction: Auction | null; head: num
         <p className="tnum text-sm text-ink-soft">
           between {auction.reserveBps} (reserve) and {auction.maxBps} (max) bps
         </p>
-        <p className="tnum mt-1 text-[0.74rem] text-ink-faint">
+        <p className="tnum mt-2 text-[0.74rem] text-ink-faint">
           commit closes at block {num(auction.commitEnd)} · {gloss(st.blocksToCommitEnd)}
         </p>
         <ConnectPrimary />
         {/* The rule the whole site is built on, in four words and a link rather than the
             two sentences that used to sit here. Nothing above this panel needed a wallet
             and nothing above it was withheld until one arrived. */}
-        <p className="mt-1 text-[0.74rem] leading-snug text-ink-faint">
+        <p className="mt-2 text-[0.74rem] leading-snug text-ink-faint">
           Reading needs no wallet. Only bidding does. <FaqLink to="real">is this real money</FaqLink>
         </p>
       </Shell>

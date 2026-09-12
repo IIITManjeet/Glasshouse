@@ -160,7 +160,7 @@ function RoundView() {
 
   return (
     <>
-      <div className="mt-5 flex flex-wrap items-center gap-3">
+      <div className="mt-8 flex flex-wrap items-center gap-3">
         <SourceChip source={source} head={head} isFork={isFork} />
         <span
           className={[
@@ -190,7 +190,7 @@ function RoundView() {
         <Timeline maker={a.maker} orderHash={a.orderHash} />
       </div>
 
-      <div className="mt-10 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+      <div className="mt-12 flex flex-wrap gap-x-6 gap-y-2 text-sm">
         <Link href="/rounds" className="text-glass underline underline-offset-2">
           ← Every round
         </Link>
@@ -207,7 +207,7 @@ function RoundView() {
 
 export default function RoundPage() {
   return (
-    <main className="relative mx-auto max-w-[62rem] px-4 py-10 sm:px-6" style={pageBand("/art/header-round.webp")}>
+    <main className="relative" style={pageBand("/art/header-round.webp")}>
       {/* ONE LINE, AND NO BACK-LINK IN THE MASTHEAD. The nav marks the page you are on and
           carries Live · Rounds · Evidence · FAQ, so a second "← every round" beside the
           title was a third navigation affordance for a route that already had two. The one
@@ -215,7 +215,7 @@ export default function RoundPage() {
           reaches for it. */}
       <div>
         <h1 className="font-display text-3xl font-semibold text-ink">One round</h1>
-        <p className="mt-1 text-sm text-ink-soft">
+        <p className="mt-3 text-sm text-ink-soft">
           Everything this Book recorded about a single auction.
         </p>
       </div>

@@ -118,7 +118,7 @@ export function Countdown({ a, head }: { a: Auction; head: number }) {
 
   return (
     <div className="card">
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2">
         <span className="tnum text-[2.5rem] leading-none font-medium text-glass sm:text-[3rem]">
           {left}
         </span>
@@ -185,8 +185,8 @@ export function PhaseTrack({ a, head }: { a: Auction; head: number }) {
             ].join(" ")}
           >
             <div className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">{c.key}</div>
-            <div className="tnum mt-1 text-[0.78rem] text-glass">{c.range}</div>
-            {isVoid ? <div className="chip mt-1.5">no reveals — collapses</div> : null}
+            <div className="tnum mt-2 text-[0.78rem] text-glass">{c.range}</div>
+            {isVoid ? <div className="chip mt-2">no reveals — collapses</div> : null}
           </div>
         );
       })}
@@ -277,11 +277,11 @@ export function BidCards({ a }: { a: Auction }) {
             </div>
             {sealed ? (
               <>
-                <div className="tnum my-1 text-lg tracking-[0.1em] text-ink-faint">▨▨▨▨▨▨</div>
+                <div className="tnum my-2 text-lg tracking-[0.1em] text-ink-faint">▨▨▨▨▨▨</div>
                 <div className="text-[0.78rem]">
                   <AddressLink addr={b.bidder} role={role} />
                 </div>
-                <div className="mt-1 text-[0.76rem] text-ink-faint">
+                <div className="mt-2 text-[0.76rem] text-ink-faint">
                   sealed · block {num(b.committedAtBlock)}
                   {tx && (
                     <>
@@ -300,11 +300,11 @@ export function BidCards({ a }: { a: Auction }) {
               </>
             ) : (
               <>
-                <div className="tnum my-1 text-lg text-ink">{b.bps} bps</div>
+                <div className="tnum my-2 text-lg text-ink">{b.bps} bps</div>
                 <div className="text-[0.78rem]">
                   <AddressLink addr={b.bidder} role={role} />
                 </div>
-                <div className={`mt-1 text-[0.76rem] ${leading ? "text-glass" : "text-ink-faint"}`}>
+                <div className={`mt-2 text-[0.76rem] ${leading ? "text-glass" : "text-ink-faint"}`}>
                   {leading ? "leading" : b.bps === a.secondBps ? "sets the price" : "outbid"}
                   {tx && (
                     <>
@@ -327,7 +327,7 @@ export function BidCards({ a }: { a: Auction }) {
       })}
     </div>
     {hasHouse ? (
-      <div className="mt-1">
+      <div className="mt-2">
         <Link href="/faq#house" className="btn btn-tertiary">
           why the house bids
         </Link>
@@ -365,7 +365,7 @@ export function Stats({ a, head }: { a: Auction; head: number }) {
       {items.map(([k, v]) => (
         <div key={k}>
           <div className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">{k}</div>
-          <div className="tnum mt-0.5 text-sm text-ink">{v}</div>
+          <div className="tnum mt-2 text-sm text-ink">{v}</div>
         </div>
       ))}
     </div>

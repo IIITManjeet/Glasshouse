@@ -10,6 +10,7 @@ import { Profile } from "@/components/Profile";
 import { IdentityCard, rolesOf } from "@/components/Identity";
 import { Loading } from "@/components/Loading";
 import { Record } from "@/components/Record";
+import { Search } from "@/components/Icon";
 
 // Static export (next.config.mjs: output: "export") means no dynamic route segment can
 // exist -- there is no server at request time to resolve `/account/[address]` against, only
@@ -65,7 +66,7 @@ function AddressForm({ initial, current }: { initial: string; current?: string |
         // and this is a deliberate lookup action rather than idle navigation.
         window.location.assign(`/profile/${encodeURIComponent(next)}`);
       }}
-      className="mt-4 flex flex-wrap items-start gap-2"
+      className="mt-4 flex flex-wrap items-center gap-2"
     >
       <input
         value={value}
@@ -76,13 +77,18 @@ function AddressForm({ initial, current }: { initial: string; current?: string |
         aria-invalid={hint ? true : undefined}
         placeholder={current ? "Look up another address — 0x…" : "0x…"}
         spellCheck={false}
-        className="tnum min-w-[16rem] flex-1 rounded-control border border-rule bg-raised px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-glass focus:outline-none"
+        // `.input`, not a hand-composed field. It is the primitive globals.css was
+        // missing: the recipe here was a near-copy of `.card`'s, and a 34px raised box
+        // beside a 36px `.btn-secondary` in the same flex row is exactly the misaligned
+        // pair this pass exists to remove. The variant owns the height now, both of them.
+        className="input tnum min-w-[16rem] flex-1"
       />
       {/* A .btn, not a hand-rolled bordered span with uppercase mono in it -- that exact
           shape is the DESIGN.md F-3 regression, where a label and a control became
           indistinguishable. Secondary rather than primary because the wallet control in the
           layout is this view's one filled thing. */}
       <button type="submit" className="btn btn-secondary">
+        <Search />
         Look up
       </button>
       {hint ? (
@@ -153,7 +159,7 @@ function AccountView() {
     return (
       <div className="rounded-control border border-brick bg-brick-soft p-4">
         <h1 className="font-sans text-2xl font-semibold text-brick">Not an address</h1>
-        <p className="mt-1 text-brick">
+        <p className="mt-2 text-brick">
           <span className="tnum break-all">{raw}</span> is not a well-formed address.
         </p>
         <p className="mt-2 text-sm text-ink-faint">
@@ -224,7 +230,7 @@ function AccountView() {
 
 export default function AccountPage() {
   return (
-    <main className="mx-auto max-w-[62rem] px-4 py-10 sm:px-6">
+    <main>
       {/* THE ROUTE NAME IS AN EYEBROW HERE, AND IT IS THE ONLY PAGE WHERE THAT IS TRUE.
           /rounds, /board and /round are named by what they show; this page's subject is one
           participant, so the address (or its ENS name) is the h1 and "Account" is the label
@@ -242,7 +248,7 @@ export default function AccountPage() {
         </Link>
       </div>
 
-      <div className="mt-5">
+      <div className="mt-8">
         <Suspense fallback={<p className="text-sm text-ink-faint">Loading…</p>}>
           <AccountView />
         </Suspense>

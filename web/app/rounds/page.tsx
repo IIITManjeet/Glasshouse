@@ -13,6 +13,7 @@ import {
   type RoundFilterId,
 } from "@/components/RoundsFilter";
 import { Loading } from "@/components/Loading";
+import { Refresh } from "@/components/Icon";
 
 /**
  * The rounds/history view.
@@ -131,6 +132,7 @@ export default function RoundsPage() {
             // globals.css forbids -- refresh is not the act this page exists for.
             className="btn btn-tertiary"
           >
+            <Refresh />
             refresh
           </button>
         </div>
@@ -157,7 +159,11 @@ export default function RoundsPage() {
                 into a claim about a quiet market. */}
             <OpenNow auctions={auctions} head={head} />
 
-          <div className="mt-6">
+          {/* 32px, not 24. The source chip is 24px above the promoted tile, and the tile was
+              24px above this ledger -- one distance for two different relationships, so the
+              tile read as the first row of the history table rather than as the answer to
+              "can I bid right now". The ledger is the next SECTION of the page. */}
+          <div className="mt-8">
             {error && source === "snapshot" ? (
               <p className="mb-3 border border-amber bg-amber-soft px-3 py-2 text-[0.78rem] text-amber">
                 The live chain read failed, so these rounds come from the checked-in
@@ -190,7 +196,7 @@ export default function RoundsPage() {
             {shown.length === 0 ? (
               // An empty result is a real answer about the chain, not a failure, and it
               // says which question it is the answer to.
-              <p className="mt-4 border border-rule bg-raised rounded-card px-4 py-6 text-sm text-ink-soft">
+              <p className="card mt-4 text-sm text-ink-soft">
                 No round matches &ldquo;{filter.label}&rdquo; in the {auctions.length} round
                 {auctions.length === 1 ? "" : "s"} this build can see.
               </p>

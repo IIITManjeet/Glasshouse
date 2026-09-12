@@ -158,7 +158,7 @@ export function Settlement({ a, head, source }: { a: Auction; head: number; sour
         </span>
       </figcaption>
 
-      <div className="overflow-x-auto px-4 py-5">
+      <div className="overflow-x-auto px-4 py-4">
         <svg
           viewBox={`0 0 ${W} ${H}`}
           className="w-full min-w-[44rem]"

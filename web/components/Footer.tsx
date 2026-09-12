@@ -114,7 +114,7 @@ export function Footer() {
         Glasshouse sells the right to fill an order by sealed bid, on Base. The winner pays
         the runner-up&rsquo;s price.
       </p>
-      <p className="mt-1 text-[0.8125rem] font-normal text-ink-faint">
+      <p className="mt-2 text-[0.8125rem] font-normal text-ink-faint">
         A custom 1inch SwapVM instruction, opcode 0x2e. ETHOnline 2026.
       </p>
 

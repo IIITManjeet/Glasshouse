@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { Auction, Source } from "@/lib/useAuctions";
 import { reserveWindow } from "@/lib/reserve-window";
 import { recommendReserve } from "@/lib/reserve-rule";
+import { Copy as CopyIcon, Check } from "./Icon";
 
 /**
  * The next auction's reserve. ui-spec.md section S5.
@@ -76,14 +77,14 @@ export function ReservePanel({ auctions, source, head }: { auctions: Auction[]; 
           <div className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">
             recommended reserve
           </div>
-          <div className="tnum mt-1 text-2xl text-glass">{num(rec.bps)} bps</div>
+          <div className="tnum mt-2 text-2xl text-glass">{num(rec.bps)} bps</div>
         </div>
         <div>
           <div className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">band</div>
-          <div className="tnum mt-1 text-[0.9rem] text-ink">
+          <div className="tnum mt-2 text-[0.9rem] text-ink">
             {num(rec.band[0])} – {num(rec.band[1])} bps
           </div>
-          <div className="mt-1 text-[0.76rem] text-ink-faint">
+          <div className="mt-2 text-[0.76rem] text-ink-faint">
             {rec.band[0] === rec.band[1]
               ? "the window supports only the floor"
               : "floor to one below the lowest winner seen"}
@@ -91,8 +92,8 @@ export function ReservePanel({ auctions, source, head }: { auctions: Auction[]; 
         </div>
         <div>
           <div className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">reason</div>
-          <div className="mt-1 font-mono text-[0.8rem] text-ink">{rec.reason}</div>
-          <div className="mt-1 text-[0.76rem] text-ink-faint">{REASONS[rec.reason] ?? ""}</div>
+          <div className="mt-2 font-mono text-[0.8rem] text-ink">{rec.reason}</div>
+          <div className="mt-2 text-[0.76rem] text-ink-faint">{REASONS[rec.reason] ?? ""}</div>
         </div>
       </div>
 
@@ -109,13 +110,13 @@ export function ReservePanel({ auctions, source, head }: { auctions: Auction[]; 
           </>
         )}
         {win.unreadable > 0 && (
-          <div className="mt-1 text-amber">
+          <div className="mt-2 text-amber">
             {num(win.unreadable)} settled round{win.unreadable === 1 ? "" : "s"} left out: their reveals could
             not be read. Not counted as zero-reveal rounds, which would have pushed this recommendation on the
             strength of a network error.
           </div>
         )}
-        <div className="mt-1 text-ink-faint">
+        <div className="mt-2 text-ink-faint">
           Bidder breakdown (team / invited / unknown) is not shown: that list is ours and lives in the
           subgraph, which this panel does not read — its rows come from the board&rsquo;s chain read, and a
           chain read cannot answer it. <code className="font-mono">scripts/reserve-advisor.mjs</code> queries
@@ -149,7 +150,8 @@ export function ReservePanel({ auctions, source, head }: { auctions: Auction[]; 
             }}
             className="btn btn-tertiary"
           >
-            {copied ? "Copied ✓" : "Copy"}
+            {copied ? <Check /> : <CopyIcon />}
+            {copied ? "Copied" : "Copy"}
           </button>
         </div>
         <pre className="overflow-x-auto bg-sunk p-3 font-mono text-[0.74rem] leading-relaxed text-ink-soft">

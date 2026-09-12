@@ -87,7 +87,7 @@ export function Verification() {
             </span>
             <div className="min-w-0">
               <div className="font-mono text-[0.74rem] text-ink">{c.name}</div>
-              <p className="lede mt-0.5 text-[0.8rem] leading-relaxed text-ink-faint">{c.detail}</p>
+              <p className="lede mt-2 text-[0.8rem] leading-relaxed text-ink-faint">{c.detail}</p>
             </div>
           </li>
         ))}

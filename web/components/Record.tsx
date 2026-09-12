@@ -140,13 +140,13 @@ export function Record({ address }: { address: string }) {
         <div className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">
           bids opened
         </div>
-        <div className="tnum mt-1.5 text-2xl">
+        <div className="tnum mt-2 text-2xl">
           <span className={sealed === 0 && a.bidsCommitted > 0 ? "text-glass" : ""}>
             {num(a.bidsRevealed)}
           </span>
           <span className="text-ink-faint"> of {num(a.bidsCommitted)} sealed</span>
         </div>
-        <p className="mt-1.5 max-w-xl text-[0.82rem] text-ink-faint">
+        <p className="mt-2 max-w-xl text-[0.82rem] text-ink-faint">
           {a.bidsCommitted === 0
             ? "Has never committed a bid."
             : sealed === 0
@@ -199,8 +199,8 @@ function Stat({
   return (
     <div className="bg-raised px-4 py-3">
       <dt className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">{label}</dt>
-      <dd className={`tnum mt-1 text-lg ${tone}`}>{num(value)}</dd>
-      <dd className="mt-0.5 text-[0.74rem] text-ink-faint">{note}</dd>
+      <dd className={`tnum mt-2 text-lg ${tone}`}>{num(value)}</dd>
+      <dd className="mt-2 text-[0.74rem] text-ink-faint">{note}</dd>
     </div>
   );
 }
