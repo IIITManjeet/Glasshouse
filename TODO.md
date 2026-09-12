@@ -143,6 +143,32 @@ something real to make it against. `crosscheck`: **135 field comparisons across 
 agreeing**. Static export clean. All five deployed routes 200. Repo public. `main` level with
 `origin/main`.
 
+### Disclosure gap: demonstration bidders render as strangers
+
+- [ ] **`TEAM_ADDRESSES` has one entry and the ephemeral bidders are not in it.**
+      `subgraph/src/provenance.ts:19` lists only the maker, `0xeebf…ecdf`. The bidders that
+      `scripts/run-live-fill.ts` generates and funds -- `0x1d59A25a…` (winner, 400 bps) and
+      `0x3b699D49…` (rival, 250) in `.ephemeral-bidders.json` -- resolve to `UNKNOWN`, which
+      `components/Record.tsx:39-43` correctly calls "the value nearly every real visitor
+      gets". So on the contested round that carries this project's headline claim, two wallets
+      we funded from the maker minutes earlier are rendered exactly like two strangers who
+      wandered in.
+
+      Nothing about this is hidden -- the funding transactions are on chain and the docs say
+      plainly that the script generates its own bidders -- but the site has a mechanism whose
+      entire job is saying "this participant is ours", and it is not being fed. The house bid
+      gets a `house` chip on every card; these get nothing. That asymmetry is the defect.
+
+      **Not fixable before the deadline**: `provenance.ts` is subgraph mapping code, so adding
+      two addresses means republishing and waiting for a reindex. Until then the disclosure is
+      spoken rather than rendered -- if a demonstration round is shown on camera, SAY the
+      bidders are ours. The mechanism does not care who bids, which is the point, and a
+      disclosed demonstration is worth more than an undisclosed one that a judge can unpick
+      from the funding transactions.
+
+      After the deadline: add both addresses to `TEAM_ADDRESSES`, republish, and they carry a
+      `TEAM` chip like the maker does.
+
 ### Housekeeping, after the deadline
 
 - [ ] `.nowrap-token` is declared in `globals.css` and has zero call sites anywhere in `web/`.
