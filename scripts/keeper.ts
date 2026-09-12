@@ -55,7 +55,30 @@ const REVEAL_BLOCKS = 60n;
 const EXCLUSIVE_BLOCKS = 15n;
 const RESERVE_BPS = 50;
 const MAX_BPS = 500;
-const BOND = 0n;
+/**
+ * THE BOND, NORMALLY ZERO AND DELIBERATELY SETTABLE.
+ *
+ * Every round this project has ever opened used bond = 0, which left claimBond,
+ * claimForfeit and claimUnrevealed unexercised on any chain and verify-run's BONDS check
+ * reading "n/a" rather than passing. It was the last contract surface with no live
+ * evidence behind it.
+ *
+ * Zero stays the default because a bond is a cost to BIDDERS: the Book pulls it from the
+ * bidder at commit (GlasshouseBook.sol:172), and a demo that charges strangers to look at
+ * it is a demo nobody enters. KEEPER_BOND_WEI opens a bonded round on purpose.
+ *
+ * THE HOUSE GETS IT BACK, and which function returns it is worth knowing before spending
+ * anything. `claimBond` is blocked for a winner who forfeited -- but settle() only sets
+ * winnerForfeited when someone ELSE actually filled (`a.filledBy != 0 && != a.best`,
+ * line 277), and a keeper round is never filled. So the flag stays false, the clean path
+ * applies, and the house reclaims its own bond. If a round ever DID get filled by a
+ * rival, the maker would collect it through claimForfeit instead -- and the maker is the
+ * same address here, so the money comes home either way.
+ *
+ * Denominated in tokenIn, which is WETH for these rounds, and pulled by the BOOK rather
+ * than by Aqua -- a different spender from the two the pre-flight already approves.
+ */
+const BOND = BigInt(process.env.KEEPER_BOND_WEI ?? 0);
 
 // Declared depth per round. Deliberately small: several rounds are shippable at once and
 // each one advertises this much, so the SUM must stay inside what the maker actually
@@ -77,6 +100,7 @@ const GAS = {
   reveal: 250_000n,
   settle: 200_000n,
   dock: 200_000n,
+  claimBond: 120_000n,
 } as const;
 
 // THE FORK AND MAINNET MUST NOT SHARE A STATE FILE.
@@ -205,6 +229,23 @@ async function main() {
       const r = await send(token, encodeFunctionData({ abi: erc20Abi, functionName: "approve", args: [AQUA, depth * 100n] }), GAS.approve, `approve ${label}`);
       console.log(link(r.transactionHash));
     }
+  }
+
+  // THE BOND'S SPENDER IS THE BOOK, NOT AQUA. The pre-flight above approves Aqua for the
+  // depth it ships; commit() pulls the bond with transferFrom to the BOOK. Different
+  // spender, different allowance, and missing it would revert the house's own commit
+  // after ship and open had already been paid for.
+  if (BOND > 0n) {
+    const bookAllowance = await rpc(
+      () => pub.readContract({ address: WETH, abi: erc20Abi, functionName: "allowance", args: [maker, BOOK], blockNumber: head0 }),
+      "WETH allowance to the Book",
+    );
+    if (bookAllowance < BOND * 4n) {
+      console.log(`  approving WETH to the Book for bonds (${formatEther(BOND)} per round)`);
+      const r = await send(WETH, encodeFunctionData({ abi: erc20Abi, functionName: "approve", args: [BOOK, BOND * 20n] }), GAS.approve, "approve WETH to Book");
+      console.log(link(r.transactionHash));
+    }
+    console.log(`  bond       ${formatEther(BOND)} WETH per bidder, reclaimed after settle`);
   }
 
   const state = loadState();
@@ -437,6 +478,20 @@ async function main() {
       console.log("    docked");
     } catch (e: any) {
       console.error(`    dock failed (not fatal): ${String(e.message ?? e).slice(0, 90)}`);
+    }
+
+    // THE BOND COMES BACK. Left unclaimed it simply sits in the Book forever, which is
+    // not a loss the contract intends and not a state worth demonstrating. Non-fatal for
+    // the same reason dock is: the round is already settled and correct, and a keeper
+    // that aborts a session over a recoverable claim is worse than one that says so.
+    if (BOND > 0n && hasCommitted) {
+      try {
+        const cb = await send(BOOK, encodeFunctionData({ abi: bookAbi, functionName: "claimBond", args: [maker, orderHash] }), GAS.claimBond, "claimBond");
+        console.log(`    bond reclaimed (${formatEther(BOND)} WETH)`);
+        console.log(link(cb.transactionHash));
+      } catch (e: any) {
+        console.error(`    claimBond failed (not fatal, the bond is still claimable): ${String(e.message ?? e).slice(0, 90)}`);
+      }
     }
 
     state.nextRound = spec.round + 1;
