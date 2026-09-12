@@ -406,6 +406,48 @@ th,
   animation: live-pulse 2.4s ease-in-out infinite;
 }
 
+/* SCROLLBARS: THIN AND QUIET, NOT ABSENT.
+
+   The default chrome is a heavy light-grey slab that appears on every horizontally
+   scrolling table and reads as operating-system furniture dropped onto the page -- on a
+   dark instrument it is frequently the brightest thing on screen.
+
+   NOT hidden outright, which was the obvious request and is the wrong answer. A table wide
+   enough to scroll has exactly one cue that it scrolls, and on a desktop pointer that cue
+   is the bar. Remove it and the rounds table simply looks truncated: the columns past the
+   edge stop existing for anyone who does not think to drag. `overflow-x: auto` already
+   hides it whenever the content fits, so the only time it shows is the only time it is
+   load-bearing.
+
+   Thin, tinted to the palette, and brightening on hover: invisible until you are looking
+   for it, which is what "unseen" should mean here. Touch devices never render it at all. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-rule) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--color-rule);
+  border-radius: 9999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-ink-faint);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

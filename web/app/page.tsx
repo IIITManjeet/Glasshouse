@@ -4,7 +4,7 @@ import Link from "next/link";
 import { livePhase } from "@/lib/useAuctions";
 import { useBoard } from "@/components/BoardProvider";
 import { Mechanism } from "@/components/Mechanism";
-import { Settlement } from "@/components/Settlement";
+import { SettlementReel } from "@/components/SettlementReel";
 import { LoadingBar, Swap } from "@/components/Loading";
 
 const num = (n?: number | null) =>
@@ -59,7 +59,44 @@ export default function Home() {
 
   return (
     <main>
-      <section className="relative -mx-5 px-5 pt-10 pb-16 sm:pt-16 sm:pb-20">
+      {/* THE ONLY DECORATIVE IMAGE ON THE SITE, and the reasons do not generalise.
+
+          It carries no information, sits behind nothing but the headline and the lede, and
+          is faded out entirely before the settlement chart begins -- that chart is real
+          data and must never sit on texture. The image is dark and empty across its left
+          half by construction, which is where the type is.
+
+          It is NOT an illustration of anything. The two previous art directions here drew
+          a glasshouse and then drew envelopes, and both were withdrawn for illustrating a
+          word rather than saying anything (art-prompts/README.md). This is light through
+          glass: atmosphere, nameless, and deletable without the page losing one fact.
+
+          A BACKGROUND RATHER THAN AN <img>. The first attempt was an absolutely positioned
+          image at -z-10, which put it behind the body's own background colour and rendered
+          nothing at all -- a negative z-index escapes the section when the section creates
+          no stacking context. As a background layer there is no stacking to get wrong, and
+          the gradient that fades it out is the same declaration. */}
+      <section
+        className="relative -mx-5 overflow-hidden px-5 pt-10 pb-16 sm:pt-16 sm:pb-20"
+        style={{
+          backgroundImage:
+            // Three layers, painted front to back: a horizontal fade that dissolves the
+            // left and right edges, a vertical fade that ends the image before the chart,
+            // then the image. Without the horizontal one the section's own width became a
+            // visible rectangle and the atmosphere read as a panel someone had pasted on.
+            "linear-gradient(to right, var(--color-ground) 0%, transparent 14%, transparent 86%, var(--color-ground) 100%), " +
+            "linear-gradient(to bottom, color-mix(in srgb, var(--color-ground) 45%, transparent) 0%, color-mix(in srgb, var(--color-ground) 78%, transparent) 55%, var(--color-ground) 100%), " +
+            "url(/art/hero-field.webp)",
+          // ALL THREE THE SAME HEIGHT. The image was `cover` -- the full height of the
+          // section -- while the two fades were 34rem, so everything below 34rem was raw
+          // un-faded image and the band ended in a hard horizontal line with visible left
+          // and right edges. The fades can only dissolve what they are drawn over.
+          backgroundSize: "100% 34rem, 100% 34rem, 100% 34rem",
+          backgroundPosition: "right top, right top, right top",
+          backgroundRepeat: "no-repeat, no-repeat, no-repeat",
+        }}
+      >
+
 
         <p className="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-ink-faint">
           A custom 1inch SwapVM instruction · live on Base
@@ -114,7 +151,7 @@ export default function Home() {
             linted like every other figure. DESIGN.md asked for this under "Still open". */}
         {demonstration ? (
           <div className="mt-10 max-w-3xl">
-            <Settlement a={demonstration} head={head} source={source} />
+            <SettlementReel a={demonstration} head={head} source={source} />
           </div>
         ) : null}
 

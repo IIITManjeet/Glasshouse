@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { ImageResponse } from "next/og";
 
 /**
@@ -30,15 +32,34 @@ export const alt =
   "Glasshouse — taker priority by sealed bid. The winner bids 400 basis points and pays 250, the runner-up's price.";
 
 // The palette, from web/app/globals.css. Hard-coded because ImageResponse renders outside
-// the document and cannot read a CSS custom property.
-const GROUND = "#F1F4F3";
-const RAISED = "#FAFCFB";
-const INK = "#0F1A18";
-const INK_SOFT = "#4A5C58";
-const INK_FAINT = "#5A6B67";
-const RULE = "#D2DCD9";
-const GLASS = "#1F6F66";
-const AMBER = "#8A5A14";
+// the document and cannot read a CSS custom property -- which means it does not follow the
+// site when the site changes, and it did not: the card kept painting the light green-tinted
+// palette for hours after c46eeca made the product dark and neutral. A link preview that
+// looks like a different product than the one behind the link is worse than no preview.
+//
+// THE DARK VALUES, because the card is the product's face and the product is dark.
+const GROUND = "#0A0C10";
+const RAISED = "#12161C";
+const INK = "#E8ECF1";
+const INK_SOFT = "#A3ADB8";
+const INK_FAINT = "#7F8896";
+const RULE = "#262D37";
+const GLASS = "#3ECFB2";
+const AMBER = "#E6B345";
+
+/**
+ * The background, inlined.
+ *
+ * Read from disk at build time and embedded as a data URI rather than referenced by URL:
+ * this renders during `next build` with no server running and no origin to resolve a path
+ * against, so a relative src would simply produce a card with no background and no error.
+ *
+ * It is 12 KB of JPEG. The source is `public/art/social-card.jpg`, cropped from the
+ * generated original to remove the generator's watermark -- see art-prompts/README.md.
+ */
+const BG = `data:image/jpeg;base64,${readFileSync(
+  join(process.cwd(), "public", "art", "social-card.jpg"),
+).toString("base64")}`;
 
 export default function OpengraphImage() {
   return new ImageResponse(
@@ -54,8 +75,20 @@ export default function OpengraphImage() {
           color: INK,
           padding: "64px 72px",
           fontFamily: "monospace",
+          position: "relative",
         }}
       >
+        {/* Behind everything. The image is dark and empty across its left half by
+            construction, which is where the type sits; it carries its interest to the
+            right, where nothing is written. It is atmosphere and it says nothing -- the
+            card's claim is made entirely in text, and removing this changes no fact on
+            it. */}
+        <img
+          src={BG}
+          width={1200}
+          height={630}
+          style={{ position: "absolute", top: 0, left: 0, width: "1200px", height: "630px" }}
+        />
         <div style={{ display: "flex", flexDirection: "column" }}>
           <div
             style={{
