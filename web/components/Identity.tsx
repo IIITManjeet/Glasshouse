@@ -105,7 +105,7 @@ export function IdentityCard({ address }: { address: string }) {
       <div className="min-w-0">
         {name ? (
           <>
-            <div className="font-display text-2xl font-light text-ink">{name}</div>
+            <div className="font-display text-2xl font-semibold text-ink">{name}</div>
             <div className="tnum mt-0.5 text-sm break-all text-ink-faint">{address}</div>
           </>
         ) : (

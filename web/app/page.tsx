@@ -4,8 +4,6 @@ import Link from "next/link";
 import { livePhase } from "@/lib/useAuctions";
 import { useBoard } from "@/components/BoardProvider";
 import { Mechanism } from "@/components/Mechanism";
-import { Atmosphere } from "@/components/Atmosphere";
-import { Reveal } from "@/components/Reveal";
 import { LoadingBar, Swap } from "@/components/Loading";
 
 const num = (n?: number | null) =>
@@ -37,13 +35,12 @@ export default function Home() {
   return (
     <main>
       <section className="relative -mx-5 px-5 pt-10 pb-16 sm:pt-16 sm:pb-20">
-        <Atmosphere />
 
         <p className="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-ink-faint">
           A custom 1inch SwapVM instruction · live on Base
         </p>
 
-        <h1 className="mt-5 max-w-4xl font-display text-4xl leading-[1.1] font-light sm:text-5xl lg:text-6xl">
+        <h1 className="mt-5 max-w-4xl font-display text-4xl leading-[1.1] font-semibold sm:text-5xl lg:text-6xl">
           Who fills your order should be decided by{" "}
           <em className="text-glass">what it is worth</em>, not by who is fastest.
         </h1>
@@ -131,21 +128,21 @@ export default function Home() {
         </div>
       </section>
 
-      <Reveal>
+      <div>
         <section className="border-t border-rule py-14 sm:py-16">
           <p className="font-mono text-[0.68rem] uppercase tracking-[0.14em] text-glass">
             End to end
           </p>
-          <h2 className="mt-3 mb-8 max-w-2xl font-display text-2xl leading-snug font-light sm:text-3xl">
+          <h2 className="mt-3 mb-8 max-w-2xl font-display text-2xl leading-snug font-semibold sm:text-3xl">
             One round, from sealed to paid.
           </h2>
           <Mechanism />
         </section>
-      </Reveal>
+      </div>
 
-      <Reveal>
+      <div>
         <section className="border-t border-rule py-14">
-          <h2 className="max-w-2xl font-display text-2xl leading-snug font-light sm:text-3xl">
+          <h2 className="max-w-2xl font-display text-2xl leading-snug font-semibold sm:text-3xl">
             Three ways in.
           </h2>
           <div className="mt-8 grid gap-px border border-rule bg-rule sm:grid-cols-3">
@@ -155,7 +152,7 @@ export default function Home() {
               ["/rounds", "The history", "Every round this Book has opened, newest first."],
             ].map(([href, title, note]) => (
               <Link key={href} href={href} className="group bg-raised p-5 hover:bg-glass-soft">
-                <div className="font-display text-xl font-light text-ink group-hover:text-glass">
+                <div className="font-display text-xl font-semibold text-ink group-hover:text-glass">
                   {title}
                 </div>
                 <p className="mt-2 text-sm text-ink-soft">{note}</p>
@@ -166,7 +163,7 @@ export default function Home() {
             ))}
           </div>
         </section>
-      </Reveal>
+      </div>
     </main>
   );
 }

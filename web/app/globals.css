@@ -360,42 +360,25 @@ th,
   );
 }
 
-/* ---- the hero's atmosphere (components/Atmosphere.tsx) --------------------------
-   Decoration, and the only decoration on this page. It carries no number, so it is the
-   one element here that is not accountable to a source -- which is exactly why it says
-   nothing and sits at a tenth of an opacity behind everything else.
+/* THE HERO HAS NO ATMOSPHERE LAYER, AND THAT IS THE THIRD ANSWER TO ONE QUESTION.
 
-   The two drift distances are ONE PATTERN TILE each (72px and 104px), which is what makes
-   the loop seamless: at the end of the cycle the field is translated exactly onto its own
-   next repeat, so it can restart with no jump. Changing a tile size means changing the
-   matching translate here or the seam becomes visible. */
-@keyframes atmo-drift-near {
-  from { transform: translate3d(0, 0, 0); }
-  to   { transform: translate3d(-72px, -72px, 0); }
-}
-@keyframes atmo-drift-far {
-  from { transform: translate3d(0, 0, 0); }
-  to   { transform: translate3d(104px, -104px, 0); }
-}
+   `components/Atmosphere.tsx` drew two drifting fields of sealed-envelope glyphs behind
+   the landing hero, over a mesh gradient, under a scroll fade. Component and rules are
+   both deleted.
 
-.atmo-drift-near { animation: atmo-drift-near 42s linear infinite; }
-.atmo-drift-far  { animation: atmo-drift-far 67s linear infinite; }
+   The art direction here has been wrong twice in the same way and art-prompts/README.md
+   records both. First it decorated the NAME: a glasshouse is a building, so it drew ferns
+   and Victorian ironwork. Then it decorated the WORD: told to represent the auction
+   instead, it drew envelopes and wax seals. That README then declared the whole direction
+   abandoned -- and the envelopes stayed in the code anyway, drifting behind every visit,
+   so the repository has been arguing with itself ever since.
 
-/* Two faint pools rather than a flat ground: teal where the page's accent lives, amber
-   where its "provisional" state does. color-mix keeps them tied to the tokens, so both
-   themes are handled by the same two lines -- and if a browser cannot parse it the
-   gradient is simply dropped, which costs a background and breaks nothing. */
-.atmo-mesh {
-  background:
-    radial-gradient(60rem 32rem at 8% -10%, color-mix(in srgb, var(--color-glass) 22%, transparent), transparent 70%),
-    radial-gradient(48rem 28rem at 92% 4%, color-mix(in srgb, var(--color-amber) 15%, transparent), transparent 70%);
-}
-
-/* The field has to stop before the instrument starts. Anything textured behind a table of
-   block numbers makes them harder to read, and legibility outranks atmosphere here. */
-.atmo-fade {
-  background: linear-gradient(to bottom, transparent 42%, var(--color-ground) 100%);
-}
+   What sits in the hero instead is `components/Settlement.tsx`: every bid from a real
+   settled mainnet round on one scale of basis points, the clearing price drawn at the
+   RUNNER-UP's height, passing through the winner's column without touching it. It carries
+   real values, names what produced them, and is linted like every other figure here. An
+   abstract image that merely RESEMBLED a chart is the thing this project forbids. A real
+   chart is not decoration. */
 
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -403,12 +386,6 @@ th,
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
-  }
-  /* The drift is decorative and infinite, so "almost instant" would leave it stuck at its
-     end position rather than stopping it. Kill it outright. */
-  .atmo-drift-near,
-  .atmo-drift-far {
-    animation: none !important;
   }
 }
 

@@ -29,7 +29,7 @@ export default function Error({
 
   return (
     <main className="mx-auto max-w-2xl py-16">
-      <h1 className="font-display text-2xl font-light">Something on this page failed to render.</h1>
+      <h1 className="font-display text-2xl font-semibold">Something on this page failed to render.</h1>
       <p className="mt-4 text-ink-soft">
         The contracts are unaffected — this is a fault in the page, not on chain. Every auction
         is readable directly from{" "}

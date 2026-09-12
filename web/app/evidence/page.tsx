@@ -12,7 +12,6 @@ import { ReservePanel } from "@/components/Reserve";
 import { Leaderboard } from "@/components/Leaderboard";
 import { Comparison } from "@/components/Comparison";
 import { LatencyLens } from "@/components/Lens";
-import { Reveal } from "@/components/Reveal";
 import { Loading } from "@/components/Loading";
 
 /**
@@ -178,10 +177,10 @@ export default function EvidencePage() {
         </p>
       )}
 
-      <Reveal>
+      <div>
         <section id="receipt" className="mb-14 scroll-mt-6">
           <p className="panel-id">GH 04 · Did it work</p>
-          <h2 className="mt-1.5 mb-1 font-display text-2xl font-light">Did it work</h2>
+          <h2 className="mt-1.5 mb-1 font-display text-2xl font-semibold">Did it work</h2>
           <p className="mb-5 max-w-2xl text-sm text-ink-soft">
             The claim in one card: what the winner bid, what the winner paid, and the gap between
             them that went to the maker.
@@ -197,55 +196,55 @@ export default function EvidencePage() {
             <PinnedReceipt />
           </Suspense>
         </section>
-      </Reveal>
+      </div>
 
-      <Reveal>
+      <div>
         <section id="bidders" className="mb-14 scroll-mt-6">
           <p className="panel-id">GH 05 · Who is bidding</p>
-          <h2 className="mt-1.5 mb-1 font-display text-2xl font-light">Who is bidding</h2>
+          <h2 className="mt-1.5 mb-1 font-display text-2xl font-semibold">Who is bidding</h2>
           <p className="mb-5 max-w-2xl text-sm text-ink-soft">
             Counts, never shares. A round is only counted as won once it has settled, because
             until then a later reveal can still take it away.
           </p>
           <Leaderboard auctions={auctions} source={source} />
         </section>
-      </Reveal>
+      </div>
 
-      <Reveal>
+      <div>
         <section id="comparison" className="mb-14 scroll-mt-6">
           <p className="panel-id">GH 06 · Is it actually better</p>
-          <h2 className="mt-1.5 mb-1 font-display text-2xl font-light">Is it actually better</h2>
+          <h2 className="mt-1.5 mb-1 font-display text-2xl font-semibold">Is it actually better</h2>
           <p className="mb-5 max-w-2xl text-sm text-ink-soft">
             The same order, three ways. Every number in this section came from a unit test — mock
             tokens, assigned valuations, nothing observed on a network.
           </p>
           <Comparison />
         </section>
-      </Reveal>
+      </div>
 
-      <Reveal>
+      <div>
         <section id="lens" className="mb-14 scroll-mt-6">
           <p className="panel-id">GH 07 · Why not a clock</p>
-          <h2 className="mt-1.5 mb-1 font-display text-2xl font-light">Why not a clock</h2>
+          <h2 className="mt-1.5 mb-1 font-display text-2xl font-semibold">Why not a clock</h2>
           <p className="mb-5 max-w-2xl text-sm text-ink-soft">
             The same three bidders under both rules. Only the rule for choosing among them
             differs — and the axis each rule ignores is drawn, not deleted.
           </p>
           <LatencyLens />
         </section>
-      </Reveal>
+      </div>
 
-      <Reveal>
+      <div>
         <section id="reserve" className="mb-14 scroll-mt-6">
           <p className="panel-id">GH 08 · What happens next</p>
-          <h2 className="mt-1.5 mb-1 font-display text-2xl font-light">What happens next</h2>
+          <h2 className="mt-1.5 mb-1 font-display text-2xl font-semibold">What happens next</h2>
           <p className="mb-5 max-w-2xl text-sm text-ink-soft">
             There is no maker dashboard. The advisor reads the rounds that already happened and
             prints the command, with the reason it recommends what it does.
           </p>
           <ReservePanel auctions={auctions} source={source} head={head} />
         </section>
-      </Reveal>
+      </div>
 
       <nav className="border-t border-rule pt-5 text-sm">
         <Link href="/board" className="text-glass underline underline-offset-2">

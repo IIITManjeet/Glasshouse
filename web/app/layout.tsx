@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import Link from "next/link";
 import { NavLink } from "@/components/NavLink";
-import { Newsreader, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
+import { IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { DemoBanner } from "@/components/DemoMode";
@@ -10,7 +10,14 @@ import { StatusBar } from "@/components/StatusBar";
 import { Theme } from "@/components/Theme";
 
 /**
- * The three faces ui-spec.md section 2.1 specifies, actually loaded.
+ * TWO faces now, not three. Newsreader is gone.
+ *
+ * A light serif at display size over a monospace table is what made this read as an essay
+ * with an appendix rather than as one instrument, and `--font-display` now resolves to
+ * Plex Sans like `--font-sans` does. Headings carry their weight instead of their shape.
+ * The saved fetch is a real one: it was a whole extra family for headings alone.
+ *
+ * The faces ui-spec.md section 2.1 specifies, actually loaded.
  *
  * They were not. `globals.css` named Newsreader and IBM Plex in its font stacks and
  * nothing ever fetched them, so every visitor got the fallbacks -- Georgia for the
@@ -24,13 +31,6 @@ import { Theme } from "@/components/Theme";
  * arguing for verifiability should not need. The cost is that `next build` needs the
  * network once; that fails loudly and immediately, which is the failure mode to prefer.
  */
-const display = Newsreader({
-  subsets: ["latin"],
-  style: ["normal", "italic"], // the h1 sets one clause in italic
-  variable: "--font-newsreader",
-  display: "swap",
-});
-
 const sans = IBM_Plex_Sans({
   subsets: ["latin"],
   weight: ["400", "500", "600"], // not a variable font: the weights must be named
@@ -80,7 +80,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${display.variable} ${sans.variable} ${mono.variable}`}>
+    <html lang="en" className={`${sans.variable} ${mono.variable}`}>
       <body className="bg-ground text-ink antialiased">
         {/* The round manifest and the cold-fallback snapshot are classic scripts, loaded
             before hydration, because they assign globals the data layer reads. They are
