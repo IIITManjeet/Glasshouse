@@ -159,10 +159,23 @@ failures.push(...scanForbidden(html, "site/index.html"));
 // runs -- which is also what a crawler and a screenshot see. Figures that only appear
 // after a fetch (the receipt) are not in here, and this does not pretend to cover them;
 // the shape test covers their data and the components carry their captions inline.
+//
+// `board/index.html` IS GONE FROM THIS LIST, and not because it stopped mattering. The
+// instrument moved from /board to /, so the figures that route carried are now checked as
+// `index.html`; /board is a permanent redirect (vercel.json) and the export writes no file
+// for it. Leaving it here would have been harmless -- a missing page is skipped, not failed
+// -- which is exactly the problem: the list would have silently checked one page fewer than
+// it claims to.
+//
+// `faq/index.html` IS NEW, and it is the page that most needs to be on this list. It is
+// where `<Mechanism>` and `<LatencyLens>` now live -- one drawing of a contract rule, one
+// drawing of a unit test, neither of them a record of anything that happened on a chain.
+// A figure like that with its caption lost in a move is the most expensive kind of error
+// this file exists to prevent: it would read as a measurement.
 const APP_PAGES = [
   "index.html",
-  "board/index.html",
   "evidence/index.html",
+  "faq/index.html",
   "rounds/index.html",
   "account/index.html",
 ];

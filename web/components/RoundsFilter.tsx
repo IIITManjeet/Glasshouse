@@ -112,10 +112,16 @@ export function RoundsFilterTabs({
   return (
     // A tablist, not a row of buttons: arrow-key navigation and the selected state both
     // come from the roles, and a screen reader announces "tab, 2 of 6, selected".
+    //
+    // ONE LINE, NOT A WRAPPING BLOCK. Six tabs wrapping to two rows above a table read as a
+    // second heading band and pushed the ledger below the fold on a laptop. `flex-nowrap`
+    // with its own `overflow-x-auto` keeps them a single strip of counts: the strip scrolls
+    // on a phone, the PAGE never does (globals.css's scrollbar rules are for exactly this),
+    // and no tab is hidden behind a "more" affordance.
     <div
       role="tablist"
       aria-label="Filter rounds"
-      className="flex flex-wrap items-center gap-1 rounded-control border border-rule bg-sunk p-1"
+      className="flex flex-nowrap items-center gap-1 overflow-x-auto rounded-control border border-rule bg-sunk p-1"
     >
       {ROUND_FILTERS.map((f) => {
         const n = countFor(f, auctions, head);
@@ -132,7 +138,7 @@ export function RoundsFilterTabs({
             disabled={n === 0 && f.id !== "all"}
             onClick={() => onChange(f.id)}
             className={[
-              "rounded-chip px-2.5 py-1 font-mono text-[0.7rem] uppercase tracking-[0.1em] transition-colors",
+              "whitespace-nowrap rounded-chip px-2.5 py-1 font-mono text-[0.7rem] uppercase tracking-[0.1em] transition-colors",
               selected
                 ? "bg-glass-soft text-glass"
                 : n === 0 && f.id !== "all"
@@ -140,7 +146,21 @@ export function RoundsFilterTabs({
                   : "text-ink-soft hover:text-ink",
             ].join(" ")}
           >
-            {f.label} <span className="tnum ml-0.5 text-[0.6875rem]">{n}</span>
+            {f.label}{" "}
+            <span
+              className={[
+                "tnum ml-0.5 text-[0.6875rem]",
+                // THE ONE COUNT THAT IS AN EVENT. "Live 1" is the difference between a
+                // history page and a venue with something happening in it, so it takes the
+                // accent even when its tab is not selected -- and it takes it only when the
+                // number is real, because a glass zero would be an announcement of nothing.
+                // Not the only signal: the tile above the table carries the same fact at
+                // 3rem with a countdown attached.
+                f.id === "live" && n > 0 && !selected ? "text-glass" : "",
+              ].join(" ")}
+            >
+              {n}
+            </span>
           </button>
         );
       })}

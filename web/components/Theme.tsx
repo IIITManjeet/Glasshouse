@@ -1,37 +1,37 @@
-"use client";
-
-import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
 /**
- * Two registers, chosen by route.
+ * ONE REGISTER. NOT TWO.
  *
- * The site read as the same page four times because it WAS the same page four times: one
- * set of tokens, one type scale, one panel treatment everywhere. But / is an argument and
- * /board is an instrument, and those are not the same kind of object -- a landing page
- * persuades, a terminal reports.
+ * This file used to hold a `TAPE_ROUTES = ["/board", "/evidence"]` list and pick a register
+ * by route, on the reasoning that "/ is an argument and /board is an instrument, and those
+ * are not the same kind of object". That reasoning was wrong, and the evidence is in
+ * `docs/design-direction-2026-09.md`:9-14 -- "a second 'tape' register bolted onto two
+ * routes... A venue is one thing, in one register" -- and again at :149-154, where the
+ * recorded symptom is that a visitor moving from `/` to `/board` "sees two products".
  *
- * So the tool routes render inside `.tape` (app/globals.css): dark-first, mono-primary,
- * amber labels, green for ours, red for revert. The landing keeps the quiet editorial
- * register. Moving between them should feel like moving between two different kinds of
- * thing, because it is.
+ * It was the single clearest signal of the problem the whole redesign is fixing: the site
+ * read as an essay with an appendix, because two of five routes were literally set in a
+ * different register from the other three.
  *
- * IT WRAPS THE CHROME TOO, not just the page body. The status bar and the nav are part of
- * the instrument when you are in the instrument -- a terminal with a light-mode masthead
- * bolted on top is two designs stapled together, which is the problem this is fixing.
+ * WHAT `.tape` IS NOW, and why applying it everywhere is safe rather than sweeping: it is a
+ * DENSITY modifier only -- `--radius-card`, `--radius-control`, `--radius-chip`,
+ * `--shadow-card`, `font-size`, `line-height` (see `app/globals.css`, the `.tape` block).
+ * The colour tokens and the `font-family` that used to live on it were deleted. So there is
+ * no longer a second palette or a second face for this to switch between, and the class
+ * that used to mean "a different product" now means "the venue's radius and body size".
  *
- * Route-driven rather than a user setting on purpose: this is not a theme switcher. Nobody
- * should be able to put the landing page in terminal colours, because the register carries
- * meaning here -- amber means "label" inside `.tape` and "provisional" outside it, and one
- * page cannot be both.
+ * WHY THE WRAPPER SURVIVES AT ALL. Two reasons, both small and both real. The tokens are
+ * declared on `.tape` rather than on `:root`, so something has to carry the class; and
+ * `min-h-screen` on it is what keeps the ground colour painted to the bottom of a short
+ * page. Folding it into `<body>` is a `globals.css` change, and this agent does not own
+ * that file.
+ *
+ * IT IS NO LONGER A CLIENT COMPONENT. `usePathname` was the only thing forcing "use client"
+ * here, and it wrapped every route's chrome -- so the header, the status bar and the nav
+ * were inside a client boundary for the sole purpose of reading a route this no longer
+ * cares about.
  */
-const TAPE_ROUTES = ["/board", "/evidence"];
-
 export function Theme({ children }: { children: ReactNode }) {
-  const pathname = usePathname() ?? "/";
-  // startsWith, not equality: trailingSlash: true means the real path is "/board/", and an
-  // exact match would silently never fire in production while working in development.
-  const tape = TAPE_ROUTES.some((r) => pathname === r || pathname.startsWith(`${r}/`));
-
-  return <div className={tape ? "tape min-h-screen" : undefined}>{children}</div>;
+  return <div className="tape min-h-screen">{children}</div>;
 }

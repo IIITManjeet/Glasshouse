@@ -1,8 +1,11 @@
 "use client";
 
-import { AddressLink } from "./Address";
+import { AddressLink, RoleChip } from "./Address";
+import { Copy } from "./Copy";
+import { rolesOf } from "./Identity";
 
 import { useState } from "react";
+import { useAccount } from "wagmi";
 import type { Auction, Source } from "@/lib/useAuctions";
 import { roundLabel } from "@/lib/useAuctions";
 
@@ -23,7 +26,6 @@ import { roundLabel } from "@/lib/useAuctions";
 
 const num = (n?: number | null) =>
   n === null || n === undefined || Number.isNaN(n) ? "—" : n.toLocaleString("en-US");
-const short = (a?: string | null) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "—");
 
 const BOOK = "0xc4ea91Fe700918220423ac307C6B1c59650FFbfe";
 
@@ -58,31 +60,6 @@ function inviteText(a: Auction, clearing: number | null): string {
     : `The ${roundLabel(a)} on Glasshouse is open. Sealed bids, second price — the winner pays what the runner-up offered.`;
 }
 
-function Copy({ text, label }: { text: string; label: string }) {
-  const [done, setDone] = useState(false);
-  return (
-    <button
-      type="button"
-      aria-label={`Copy ${label}`}
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(text);
-          setDone(true);
-          setTimeout(() => setDone(false), 1500);
-        } catch {
-          // Clipboard blocked (an insecure origin, or a permissions policy). Say so
-          // rather than showing a check for something that did not happen.
-          setDone(false);
-          window.prompt("Copy this:", text);
-        }
-      }}
-      className="ml-1.5 align-middle font-mono text-[0.7rem] text-ink-faint hover:text-glass"
-    >
-      {done ? "✓" : "⧉"}
-    </button>
-  );
-}
-
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="border-t border-rule py-2.5 first:border-t-0 sm:first:border-t">
@@ -93,6 +70,10 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export function Receipt({ a, source }: { a: Auction; source: Source }) {
+  // The reader's own wallet, for the one role that is about them. Called before the early
+  // return below, because a hook cannot be conditional.
+  const { address: connected } = useAccount();
+
   // A receipt for a round that has not settled would be a receipt for a transaction that
   // has not happened. The caller decides which round to pass; this decides whether there
   // is anything honest to print about it.
@@ -113,6 +94,19 @@ export function Receipt({ a, source }: { a: Auction; source: Source }) {
   const winnerTx =
     a.bids?.find((b) => b.bidder?.toLowerCase() === a.bestBidder?.toLowerCase())?.revealTx ?? null;
   const margin = won && clearing !== null ? a.bestBps - clearing : null;
+  // WHAT THE WINNER IS, READ FROM THIS ROUND'S FIELDS. `house` when the winner is the maker
+  // of the round it won -- the disclosure that matters most on a receipt, because a maker
+  // winning its own auction is exactly what a sceptical reader is looking for. `winner`
+  // rather than `leading` because a receipt only exists for a settled round.
+  const winnerRoles = rolesOf({
+    addr: a.bestBidder,
+    you: connected,
+    maker: a.maker,
+    bidder: true,
+    bestBidder: a.bestBidder,
+    settled: a.settled,
+  });
+  const makerRoles = rolesOf({ addr: a.maker, you: connected, maker: a.maker });
   const reserveBound = won && a.secondBps < a.reserveBps;
 
   return (
@@ -142,7 +136,10 @@ export function Receipt({ a, source }: { a: Auction; source: Source }) {
                   arrow beside it. A judge reading this receipt is one click from what the
                   index knows about this bidder, which is the question the receipt provokes
                   and could not previously answer. */}
-              <AddressLink addr={a.bestBidder} />
+              <AddressLink addr={a.bestBidder} role={winnerRoles[0]} />
+              {winnerRoles.slice(1).map((r) => (
+                <RoleChip key={r} role={r} />
+              ))}
               <Copy text={a.bestBidder!} label="winner address" />
               {winnerTx && (
                 <a
@@ -162,7 +159,8 @@ export function Receipt({ a, source }: { a: Auction; source: Source }) {
 
         <Field label="opened">
           <span className="tnum">block {num(a.openedAtBlock)}</span>
-          <span className="ml-2 text-ink-faint">by {short(a.maker)}</span>
+          <span className="ml-2 text-ink-faint">by</span>{" "}
+          <AddressLink addr={a.maker} role={makerRoles[0]} />
         </Field>
         <Field label="winning bid">
           {won ? <span className="tnum">{num(a.bestBps)} bps</span> : <span className="text-ink-faint">—</span>}
@@ -216,7 +214,10 @@ export function Receipt({ a, source }: { a: Auction; source: Source }) {
         <Field label="fill">
           {a.filled ? (
             <>
-              <span className="tnum text-glass">filled by {short(a.filledBy)}</span>
+              {/* `filled` is a chain field, not a guess: AuctionFilled named this address.
+                  The sentence beside it says whether that address was the winner. */}
+              <span className="text-ink-faint">filled by</span>{" "}
+              <AddressLink addr={a.filledBy} role="filled" />
               <span className="ml-2 text-ink-faint">
                 {a.filledBy?.toLowerCase() === a.bestBidder?.toLowerCase()
                   ? "the winner, inside the exclusive window"

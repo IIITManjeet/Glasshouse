@@ -1,11 +1,32 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useAccount } from "wagmi";
+import { AddressLink } from "@/components/Address";
 import { type Auction, livePhase, type Source } from "@/lib/useAuctions";
+import type { AddressRole } from "@/lib/identity";
 
 const num = (n?: number | null) =>
   n === null || n === undefined || Number.isNaN(n) ? "—" : n.toLocaleString("en-US");
-const short = (a?: string | null) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "—");
 const BLOCK_SECONDS = 2;
+
+/**
+ * The connected wallet, or null until the browser has answered.
+ *
+ * A static export renders this file in Node, where there is no wallet, so the `you` role
+ * cannot be decided during the first paint without the client disagreeing with the server
+ * and React discarding the tree. WalletChip and BidPanel both guard the same way; this is
+ * the third copy of the same two lines and it is cheaper than a shared hook nobody can
+ * find. It is only ever used to LABEL a row that is already on screen, so the one-render
+ * delay costs nothing.
+ */
+function useMe(): string | null {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const { address } = useAccount();
+  return mounted && address ? address.toLowerCase() : null;
+}
 
 /**
  * The source chip. Every figure on this page carries one.
@@ -65,6 +86,13 @@ const PHASES = ["commit", "reveal", "exclusive", "open"] as const;
  * The bar underneath is the whole round, not the current phase: commit, reveal and
  * exclusive in their real proportions, so the segment widths say how the windows compare.
  * It carries no number that is not already stated in words above it.
+ *
+ * NOW THE LARGEST THING ON THE FRONT PAGE, because the front page IS this instrument. The
+ * long sentence that used to follow the estimate ("~68s at 2s blocks, an estimate -- the
+ * contract counts blocks") is gone: it explained the same distinction three other places on
+ * the page also explained, and a countdown is the one element on a live venue that must be
+ * readable in one glance. The estimate keeps its tilde, which is the whole claim, and the
+ * argument for blocks moved to /faq#blocks behind a link nobody has to read to bid.
  */
 export function Countdown({ a, head }: { a: Auction; head: number }) {
   const phase = livePhase(a, head);
@@ -89,12 +117,19 @@ export function Countdown({ a, head }: { a: Auction; head: number }) {
         : "left in the winner's exclusive window";
 
   return (
-    <div className="border border-rule bg-raised rounded-card px-4 py-3.5">
+    <div className="card">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="tnum text-4xl leading-none font-medium text-glass sm:text-5xl">{left}</span>
-        <span className="text-sm text-ink">block{left === 1 ? "" : "s"} {label}</span>
-        <span className="tnum ml-auto text-[0.78rem] text-ink-faint">
-          ~{left * BLOCK_SECONDS}s at 2s blocks, an estimate — the contract counts blocks
+        <span className="tnum text-[2.5rem] leading-none font-medium text-glass sm:text-[3rem]">
+          {left}
+        </span>
+        <span className="text-base text-ink sm:text-lg">
+          block{left === 1 ? "" : "s"} {label}
+        </span>
+        <span className="ml-auto flex items-center gap-1">
+          <span className="tnum text-[0.8rem] text-ink-faint">~{left * BLOCK_SECONDS} s</span>
+          <Link href="/faq#blocks" className="btn btn-tertiary">
+            why blocks, not seconds
+          </Link>
         </span>
       </div>
 
@@ -110,13 +145,27 @@ export function Countdown({ a, head }: { a: Auction; head: number }) {
   );
 }
 
+/**
+ * PHASE NAMES AND BLOCK RANGES, AND NOTHING ELSE.
+ *
+ * Each cell used to carry a sentence under the range -- "sealed bids arrive", "bids open,
+ * top two settle", "winner fills at the improved price", "anyone fills, at base price".
+ * Four sentences that were correct, that a bidder mid-round does not read, and that said
+ * the same thing the round panel, the bid panel and the mechanism section all said again.
+ * The ranges are the part the contract enforces and the part a bidder checks, so they stay
+ * and the prose goes to /faq#round.
+ *
+ * ONE NOTE SURVIVES, and it is not an explanation: when nobody has revealed there will be
+ * no exclusive window at all, so the cell says that. It is a fact about THIS round read
+ * from `bestBidder`, not a description of the mechanism.
+ */
 export function PhaseTrack({ a, head }: { a: Auction; head: number }) {
   const active = livePhase(a, head);
   const cells = [
-    { key: "commit", range: `${num(a.openedAtBlock)}–${num(a.commitEnd)}`, note: "sealed bids arrive", end: a.commitEnd },
-    { key: "reveal", range: `${num(a.commitEnd + 1)}–${num(a.revealEnd)}`, note: "bids open, top two settle", end: a.revealEnd },
-    { key: "exclusive", range: `${num(a.revealEnd + 1)}–${num(a.exclusiveEnd)}`, note: "winner fills at the improved price", end: a.exclusiveEnd },
-    { key: "open", range: `from ${num(a.exclusiveEnd + 1)}`, note: "anyone fills, at base price", end: 0 },
+    { key: "commit", range: `${num(a.openedAtBlock)}–${num(a.commitEnd)}` },
+    { key: "reveal", range: `${num(a.commitEnd + 1)}–${num(a.revealEnd)}` },
+    { key: "exclusive", range: `${num(a.revealEnd + 1)}–${num(a.exclusiveEnd)}` },
+    { key: "open", range: `from ${num(a.exclusiveEnd + 1)}` },
   ];
 
   return (
@@ -126,10 +175,6 @@ export function PhaseTrack({ a, head }: { a: Auction; head: number }) {
         // The contract collapses the exclusive window to nothing when nobody revealed, so
         // the diagram says that rather than drawing a window that will never exist.
         const isVoid = c.key === "exclusive" && !a.bestBidder;
-        // commit() accepts while block.number <= commitEnd (GlasshouseBook.sol:159), so at
-        // head == commitEnd there is ONE block left, not two. The +1 disagreed with
-        // bid.js and printed a different countdown beside the same deadline.
-        const left = isActive && c.end ? Math.max(0, c.end - head) : 0;
         return (
           <div
             key={c.key}
@@ -141,13 +186,7 @@ export function PhaseTrack({ a, head }: { a: Auction; head: number }) {
           >
             <div className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">{c.key}</div>
             <div className="tnum mt-1 text-[0.78rem] text-glass">{c.range}</div>
-            {isActive && c.end ? (
-              <div className="tnum mt-1 text-[0.78rem] text-glass">
-                {left} block{left === 1 ? "" : "s"} · ~{left * BLOCK_SECONDS}s
-              </div>
-            ) : (
-              <div className="mt-1 text-[0.76rem] text-ink-faint">{isVoid ? "collapses if nobody reveals" : c.note}</div>
-            )}
+            {isVoid ? <div className="chip mt-1.5">no reveals — collapses</div> : null}
           </div>
         );
       })}
@@ -170,6 +209,8 @@ export function PhaseTrack({ a, head }: { a: Auction; head: number }) {
  * now says so on the card, not in a caption somewhere else.
  */
 export function BidCards({ a }: { a: Auction }) {
+  const me = useMe();
+
   // null means the log scan FAILED. That is not "no bids" -- rendering it as none is how
   // a rate-limited request turns into an accusation that nobody bid.
   if (a.bids == null) {
@@ -185,9 +226,27 @@ export function BidCards({ a }: { a: Auction }) {
   return (
     <div className="mt-4 flex flex-wrap gap-2">
       {a.bids.map((b) => {
+        const who = b.bidder?.toLowerCase() ?? null;
         const sealed = b.bps === null || b.bps === undefined;
-        const leading = a.bestBidder && b.bidder?.toLowerCase() === a.bestBidder.toLowerCase();
-        const isHouse = Boolean(a.maker && b.bidder?.toLowerCase() === a.maker.toLowerCase());
+        const leading = Boolean(a.bestBidder && who === a.bestBidder.toLowerCase());
+        const isHouse = Boolean(a.maker && who === a.maker.toLowerCase());
+        const isFilled = Boolean(a.filled && a.filledBy && who === a.filledBy.toLowerCase());
+        // ONE ROLE PER ADDRESS, AND `house` IS NOT IT HERE. Every value below is read from a
+        // chain field or from the connected wallet -- lib/identity.ts's rule -- and the
+        // ordering is by what the reader needs first: whether it is them, then whether it
+        // won, then whether it filled. `house` is deliberately absent: the amber chip in the
+        // card head already says "house · the maker" in the louder register the disclosure
+        // deserves, and a second, quieter "house" beside the address would be the same fact
+        // twice at two weights.
+        const role: AddressRole | null = (who && me && who === me
+          ? "you"
+          : leading
+            ? a.settled
+              ? "winner"
+              : "leading"
+            : isFilled
+              ? "filled"
+              : null) as AddressRole | null;
         const tx = b.revealTx ?? b.commitTx ?? null;
         return (
           <div
@@ -199,7 +258,7 @@ export function BidCards({ a }: { a: Auction }) {
               {isHouse && (
                 <span
                   title="The keeper bids from the maker's own address, always first, and cannot read a sealed rival."
-                  className="border border-amber px-1.5 py-0.5 font-mono text-[0.6875rem] uppercase tracking-[0.1em] text-amber"
+                  className="chip chip-warn"
                 >
                   house · the maker
                 </span>
@@ -208,7 +267,9 @@ export function BidCards({ a }: { a: Auction }) {
             {sealed ? (
               <>
                 <div className="tnum my-1 text-lg tracking-[0.1em] text-ink-faint">▨▨▨▨▨▨</div>
-                <div className="tnum text-[0.78rem] text-ink-soft">{short(b.bidder)}</div>
+                <div className="text-[0.78rem]">
+                  <AddressLink addr={b.bidder} role={role} />
+                </div>
                 <div className="mt-1 text-[0.76rem] text-ink-faint">
                   sealed · block {num(b.committedAtBlock)}
                   {tx && (
@@ -229,7 +290,9 @@ export function BidCards({ a }: { a: Auction }) {
             ) : (
               <>
                 <div className="tnum my-1 text-lg text-ink">{b.bps} bps</div>
-                <div className="tnum text-[0.78rem] text-ink-soft">{short(b.bidder)}</div>
+                <div className="text-[0.78rem]">
+                  <AddressLink addr={b.bidder} role={role} />
+                </div>
                 <div className={`mt-1 text-[0.76rem] ${leading ? "text-glass" : "text-ink-faint"}`}>
                   {leading ? "leading" : b.bps === a.secondBps ? "sets the price" : "outbid"}
                   {tx && (
@@ -258,7 +321,7 @@ export function BidCards({ a }: { a: Auction }) {
 export function Stats({ a, head }: { a: Auction; head: number }) {
   const p = livePhase(a, head);
   const state = a.settled ? "settled" : p === "open" || p === "exclusive" ? "final" : "running";
-  const items: [string, string][] = [
+  const items: [string, React.ReactNode][] = [
     ["clearing", a.clearingBps === null ? "—" : `${a.clearingBps} bps · ${state}`],
     // Both numbers, never a percentage. A ratio without its denominator is a claim the
     // data does not support -- subgraph/README.md's refusals list.
@@ -266,10 +329,17 @@ export function Stats({ a, head }: { a: Auction; head: number }) {
     // "winner" only once settled: until then a higher reveal can still displace them.
     // Profile.tsx already said "leading, not settled"; three views disagreeing about one
     // address is worse than any single one being wrong.
-    [a.settled ? "winner" : "leading", a.bestBidder ? short(a.bestBidder) : "no reveals"],
+    [
+      a.settled ? "winner" : "leading",
+      a.bestBidder ? (
+        <AddressLink addr={a.bestBidder} role={a.settled ? "winner" : "leading"} />
+      ) : (
+        "no reveals"
+      ),
+    ],
     ["reserve · max", `${a.reserveBps} · ${a.maxBps} bps`],
   ];
-  if (a.filled) items.push(["filled by", short(a.filledBy)]);
+  if (a.filled) items.push(["filled by", <AddressLink key="f" addr={a.filledBy} role="filled" />]);
 
   return (
     <div className="mt-4 flex flex-wrap gap-6">

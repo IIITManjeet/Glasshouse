@@ -1,10 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { useBoard } from "@/components/BoardProvider";
 import { pageBand } from "@/components/PageBand";
 import { SourceChip } from "@/components/Auction";
+import { OpenNow } from "@/components/OpenNow";
 import { RoundsTable } from "@/components/RoundsTable";
 import {
   ROUND_FILTERS,
@@ -30,7 +30,38 @@ import { Loading } from "@/components/Loading";
  * two behind it. This page does not invent a second data path -- it renders the same board
  * data as a table instead of cards, plus the provenance the live board doesn't need
  * repeated per-card.
+ *
+ * WHY THIS PAGE IS A TILE ON TOP OF A LEDGER, AND WHY IT STAYS SIX ROWS LONG.
+ *
+ * It used to be a table and nothing else, which made it read as an export rather than as a
+ * venue -- the question a visitor arrives with ("can I bid right now?") was answerable only
+ * by reading a phase word in row one. <OpenNow> answers it above the fold, at the size the
+ * answer deserves, and the ledger below is what it should have been all along: history.
+ *
+ * THE ROW COUNT IS NOT A BUG AND MUST NOT BE "FIXED". useAuctions.ts reads `limit: 6`. Each
+ * round costs an eth_call plus a log scan against Base's rate-limited public endpoint, and
+ * BoardProvider.tsx records that -32016 "already cost this project a day". Six honest rows
+ * beat twelve that sometimes fail to load, so the page is DESIGNED for six: one promoted
+ * tile, a single strip of filter counts, and a line under the table that says plainly this
+ * is the recent tail and where the rest lives. No chart, either -- six points is not a
+ * series, and a chart drawn from six of them is the decoration-shaped-like-data DESIGN.md
+ * calls worse than a wrong number.
  */
+
+/** The count in words, so the line under the table reads as a sentence rather than as a
+ *  variable. Digits past twelve, where the word stops being shorter than the number. */
+const COUNT_WORDS = [
+  "no", "one", "two", "three", "four", "five", "six",
+  "seven", "eight", "nine", "ten", "eleven", "twelve",
+];
+const countWord = (n: number) => COUNT_WORDS[n] ?? n.toLocaleString("en-US");
+
+/** Published to The Graph Network; the id is the one components/Footer.tsx links. */
+const SUBGRAPH_ID = "FPQdiZTAnR8ac6grgAF2x49bWqwDh87RzqUgQxAvoY2y";
+/** VERIFIED AGAINST README.md (line 26: "deployed at block 50,965,408") and against
+ *  subgraph/subgraph.yaml's `startBlock: 50965408` and
+ *  ignition/deployments/chain-8453/journal.jsonl's receipt blockNumber. All three agree. */
+const DEPLOY_BLOCK = 50_965_408;
 export default function RoundsPage() {
   const { auctions, head, source, isFork, loading, error, refresh } = useBoard();
 
@@ -48,6 +79,19 @@ export default function RoundsPage() {
   );
   const unreadable = unreadableCount(auctions);
 
+  // The line under the table names its own source in four words, because that line is the
+  // one a reader takes away and "read from the chain" is false in three of the four cases.
+  const sourceClause =
+    source === "chain"
+      ? isFork
+        ? "read from a local fork of Base, not mainnet"
+        : "read from the chain"
+      : source === "snapshot"
+        ? "read from the checked-in snapshot, not live"
+        : source === "sim"
+          ? "replayed by the rehearsal and read from no chain at all"
+          : "not read from anywhere yet";
+
   const caption =
     source === "chain"
       ? `useBoard() in web/lib/useAuctions.ts, reading GlasshouseBook (0xc4ea91Fe700918220423ac307C6B1c59650FFbfe) on Base directly over eth_call -- once per round listed in public/data/rounds.js -- as of block ${head.toLocaleString("en-US")}. Not the subgraph: it is published and served, but a phase that ticks needs the chain head, and an indexer is a block or two behind it.`
@@ -62,32 +106,30 @@ export default function RoundsPage() {
 
   return (
     <main className="relative mx-auto max-w-[62rem] px-4 py-10 sm:px-6" style={pageBand("/art/header-rounds.webp")}>
-      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-        <div>
-          <h1 className="font-display text-3xl text-ink">Rounds</h1>
-          <p className="mt-1 text-sm text-ink-soft">
-            Every round this build knows about, newest first. For the round in progress right
-            now, see the live board.
-          </p>
-        </div>
-        <Link
-          href="/"
-          className="whitespace-nowrap text-sm text-glass underline decoration-rule underline-offset-2 hover:decoration-glass"
-        >
-          ← live board
-        </Link>
-      </div>
+      {/* ONE LINE OF INTRO. The old three sentences plus a "← live board" link were doing
+          the job the tile below now does properly, and the link is redundant twice over: the
+          nav has it, and the tile's own call to action goes to the same place. */}
+      <h1 className="font-display text-3xl text-ink">Rounds</h1>
+      <p className="mt-1 text-sm text-ink-soft">
+        Every round this Book has opened, newest first.
+      </p>
 
-      <figure data-src={source} className="mt-8">
+      <figure data-src={source} className="mt-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <SourceChip source={source} head={head} isFork={isFork} />
           <button
             type="button"
             onClick={refresh}
-            // Secondary, not tertiary: this is the only control on the page, and the
-            // "invisible until reached for" treatment is for actions that crowd a view.
-            // One quiet action in an empty corner just looks like text.
-            className="btn btn-secondary"
+            // TERTIARY NOW, and this reverses a recorded correction rather than forgetting
+            // it. TODO.md holds "`refresh` was too quiet as tertiary when it is the only
+            // control on the page" -- true then, because the page had no other control and
+            // a bare-text button in an empty corner just looked like text. Two things
+            // changed: `.btn-tertiary` gained a hairline underline at rest precisely so it
+            // stays discoverable in that situation, and this page now has a real primary in
+            // the tile below. A 44px filled primary and a 36px outlined refresh in the same
+            // eyeline is the "two of them on one page means neither is primary" failure that
+            // globals.css forbids -- refresh is not the act this page exists for.
+            className="btn btn-tertiary"
           >
             refresh
           </button>
@@ -107,7 +149,15 @@ export default function RoundsPage() {
             Could not read any round: {error}
           </p>
         ) : (
-          <div className="mt-4">
+          <>
+            {/* THE PROMOTED TILE, above the ledger and below the source chip -- provenance
+                first, always. It draws nothing when `auctions` is empty, which is why it
+                sits in this branch: "we could not read the chain" is the branch above, and
+                a last-print tile rendered over a failed read would turn a network error
+                into a claim about a quiet market. */}
+            <OpenNow auctions={auctions} head={head} />
+
+          <div className="mt-6">
             {error && source === "snapshot" ? (
               <p className="mb-3 border border-amber bg-amber-soft px-3 py-2 text-[0.78rem] text-amber">
                 The live chain read failed, so these rounds come from the checked-in
@@ -147,9 +197,32 @@ export default function RoundsPage() {
             ) : (
               <div className="mt-3">
                 <RoundsTable auctions={shown} head={head} />
+                {/* NOT A PAGINATION LINE, because there is no page two and pretending
+                    otherwise would be a control that does nothing. This says what the six
+                    rows ARE -- the recent tail, read live -- and points at the one place the
+                    whole history exists. Raising `limit` to fill the table is the temptation
+                    this line is here to remove. */}
+                <p className="mt-3 text-[0.78rem] text-ink-faint">
+                  The {countWord(auctions.length)} most recent round
+                  {auctions.length === 1 ? "" : "s"} this Book has opened, {sourceClause}.
+                  Every round since block{" "}
+                  <span className="tnum">{DEPLOY_BLOCK.toLocaleString("en-US")}</span> is in
+                  the{" "}
+                  <a
+                    href={`https://thegraph.com/explorer/subgraphs/${SUBGRAPH_ID}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={SUBGRAPH_ID}
+                    className="text-glass underline decoration-rule underline-offset-2 hover:decoration-glass"
+                  >
+                    subgraph ↗
+                  </a>
+                  .
+                </p>
               </div>
             )}
           </div>
+          </>
         )}
 
         {/* An error alongside data that DID load is a different, quieter claim -- the rows

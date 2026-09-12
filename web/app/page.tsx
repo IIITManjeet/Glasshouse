@@ -1,257 +1,361 @@
 "use client";
 
 import Link from "next/link";
-import { livePhase } from "@/lib/useAuctions";
+import { livePhase, type Auction } from "@/lib/useAuctions";
 import { useBoard } from "@/components/BoardProvider";
-import { Mechanism } from "@/components/Mechanism";
+import { pageBand } from "@/components/PageBand";
+import { PhaseTrack, BidCards, Stats, ReplayCheck, Countdown } from "@/components/Auction";
+import { WalletBar } from "@/components/WalletBar";
+import { BidPanel, RevealStrip } from "@/components/BidPanel";
 import { SettlementReel } from "@/components/SettlementReel";
-import { LoadingBar, Swap } from "@/components/Loading";
+import { AddressLink } from "@/components/Address";
+import { Loading, Swap } from "@/components/Loading";
 
 const num = (n?: number | null) =>
   n === null || n === undefined || Number.isNaN(n) ? "—" : n.toLocaleString("en-US");
 
 /**
- * The front door, and only the front door.
+ * THE INSTRUMENT IS THE FRONT DOOR.
  *
- * It used to be the landing page AND the live board AND four feature bands AND the
- * mechanism, which meant neither job could be done properly: the pitch could not be short
- * because the tool was inside it, and the tool could not be deep because the pitch was on
- * top of it. There was also no URL that meant "here is the thing running".
+ * What used to be here was a pitch: a hero image, a headline in two clauses, a lede, three
+ * 48px numbers, a settlement chart, a READ-ONLY "pulse" card, the mechanism diagram and a
+ * three-up grid of doors. Its own code comment gave the game away -- "the live strip here is
+ * deliberately READ-ONLY -- a pulse, not a panel" -- and the pulse's only job was to say the
+ * thing was alive and then send you one click away to the thing itself. A product whose
+ * front page links to the product is a brochure.
  *
- * Now: the claim, proof that it is alive, how it works, and three doors. The instrument is
- * at /board, the evidence at /evidence, the history at /rounds.
+ * So /board's contents are now /. The countdown, the phases, the bids, the stats, the replay
+ * check and the panel that lets a visitor join the round they are watching arrive on the URL
+ * people are given. /board redirects here, so every shared link still works.
  *
- * The live strip here is deliberately READ-ONLY -- a pulse, not a panel. It exists to show
- * a stranger the mechanism is running before asking them to care, and it links to the board
- * rather than trying to be one. Bidding, phase tracks and reveal deadlines belong where a
- * participant is, not where a visitor arrives.
+ * ONE SENTENCE SURVIVES FROM THE PITCH, and it is deliberate rather than a leftover. The
+ * first plan for this page deleted the headline outright, which goes too far: a stranger
+ * would land on a live auction with a block countdown and no statement of what they are
+ * looking at. One line says it. It is not a hero, it has no standfirst, and everything else
+ * that was persuasion -- the mechanism section, the three doors, the three big bps numbers,
+ * "New here? How to take part" -- moved to /faq, where an argument can be as long as it
+ * needs to be without standing between a bidder and a deadline.
+ *
+ * WHAT IS NOT HERE, AND WHY. No "panel-id" eyebrows (GH 01 · Book 0xc4ea…): the layout's
+ * status bar carries the Book, the chain and the head block on every page, which is what
+ * makes a screenshot of this page carry its own provenance. No bottom nav: the masthead has
+ * one. No explanation under a panel where a four-word link to the right /faq anchor does the
+ * same job without competing with the act.
  */
 export default function Home() {
-  const { auctions, head, source, loading, demo, setDemo } = useBoard();
+  const { auctions, head, source, loading, error, demo, setDemo } = useBoard();
 
   const live = auctions.find((a) => livePhase(a, head) !== "open");
-  const featured = live ?? auctions[0];
-  const phase = featured ? livePhase(featured, head) : null;
+  const featured: Auction | undefined = live ?? auctions[0];
 
-  // THE ROUND THE HEADLINE IS ABOUT.
-  //
-  // The three numbers below used to be the string literals "400 bps", "250 bps" and
-  // "150 bps" -- correct, because they describe the real mainnet fill, and unsourced,
-  // because nothing connected them to it. On a site that fails its own build when a figure
-  // lacks a "what produced this" line, the first three numbers a visitor sees were the
-  // only ones exempt. They were an illustration that happened to be true.
-  //
-  // This finds a settled round with a winner AND a runner-up, because a round with one
-  // bidder clears at the reserve and demonstrates nothing about second price. The fill at
-  // 250 is that round. If none is available the static example is shown and SAYS it is an
-  // example, rather than quietly implying a chain read.
-  const demonstration =
-    auctions.find(
-      (a) => a.settled && a.bestBidder && a.clearingBps !== null && (a.bids?.length ?? 0) > 1,
-    ) ?? null;
-  const shown = demonstration
-    ? {
-        best: demonstration.bestBps,
-        clearing: demonstration.clearingBps as number,
-        toMaker: demonstration.bestBps - (demonstration.clearingBps as number),
-      }
-    : null;
+  // THE LAST PRINT. What every exchange shows when the market is quiet, and the right
+  // opening shot when no round is open at all -- a venue between auctions is not a broken
+  // page. A round with one bidder clears at the reserve and demonstrates nothing about
+  // second price, so this wants a winner AND a clearing price; `SettlementReel` replays the
+  // reveals of whichever round it gets and carries its own source chip and caption.
+  const settledRounds = auctions.filter((a) => a.settled && a.bestBidder && a.clearingBps !== null);
+  const lastSettled =
+    settledRounds.find((a) => a.orderHash !== featured?.orderHash) ?? settledRounds[0] ?? null;
+
+  const recent = auctions.slice(0, 5);
 
   return (
-    <main>
-      {/* THE ONLY DECORATIVE IMAGE ON THE SITE, and the reasons do not generalise.
+    <main className="relative" style={pageBand("/art/header-board.webp")}>
+      {/* THE ONE LINE. Sans, and the largest type on the page after the countdown -- which
+          outranks it on purpose: the sentence is what this is, the countdown is what is
+          happening, and on a live venue the second one is why you are still reading. */}
+      <h1 className="max-w-3xl text-[1.5rem] leading-[1.25] font-semibold text-ink sm:text-[1.875rem]">
+        The right to fill an order, sold by sealed bid. The winner pays the runner-up&rsquo;s
+        price.
+      </h1>
 
-          It carries no information, sits behind nothing but the headline and the lede, and
-          is faded out entirely before the settlement chart begins -- that chart is real
-          data and must never sit on texture. The image is dark and empty across its left
-          half by construction, which is where the type is.
+      <WalletBar className="mt-5 mb-4" />
 
-          It is NOT an illustration of anything. The two previous art directions here drew
-          a glasshouse and then drew envelopes, and both were withdrawn for illustrating a
-          word rather than saying anything (art-prompts/README.md). This is light through
-          glass: atmosphere, nameless, and deletable without the page losing one fact.
+      {loading && !featured && (
+        <Loading
+          what="Reading the Book"
+          detail={<>One eth_call per round against Base&rsquo;s public endpoint, plus a log scan for the bidders. The public RPC rate-limits, so this backs off and retries rather than hammering it — if it fails entirely the page falls back to the checked-in snapshot and says so.</>}
+        />
+      )}
 
-          A BACKGROUND RATHER THAN AN <img>. The first attempt was an absolutely positioned
-          image at -z-10, which put it behind the body's own background colour and rendered
-          nothing at all -- a negative z-index escapes the section when the section creates
-          no stacking context. As a background layer there is no stacking to get wrong, and
-          the gradient that fades it out is the same declaration. */}
-      <section
-        className="relative -mx-5 overflow-hidden px-5 pt-10 pb-16 sm:pt-16 sm:pb-20"
-        style={{
-          backgroundImage:
-            // Three layers, painted front to back: a horizontal fade that dissolves the
-            // left and right edges, a vertical fade that ends the image before the chart,
-            // then the image. Without the horizontal one the section's own width became a
-            // visible rectangle and the atmosphere read as a panel someone had pasted on.
-            "linear-gradient(to right, var(--color-ground) 0%, transparent 14%, transparent 86%, var(--color-ground) 100%), " +
-            "linear-gradient(to bottom, color-mix(in srgb, var(--color-ground) 45%, transparent) 0%, color-mix(in srgb, var(--color-ground) 78%, transparent) 55%, var(--color-ground) 100%), " +
-            "url(/art/hero-field.webp)",
-          // ALL THREE THE SAME HEIGHT. The image was `cover` -- the full height of the
-          // section -- while the two fades were 34rem, so everything below 34rem was raw
-          // un-faded image and the band ended in a hard horizontal line with visible left
-          // and right edges. The fades can only dissolve what they are drawn over.
-          backgroundSize: "100% 34rem, 100% 34rem, 100% 34rem",
-          backgroundPosition: "right top, right top, right top",
-          backgroundRepeat: "no-repeat, no-repeat, no-repeat",
-        }}
-      >
+      {/* TWO DIFFERENT FACTS, TWO DIFFERENT VOICES.
+          A failed read with nothing to fall back on is a broken page and should look like
+          one. A failed read that the checked-in snapshot covered is a page showing history
+          instead of live data -- worth saying plainly, not worth a red bar. /rounds already
+          made this distinction after e7a7c46; the board still shouted either way, which
+          meant the loudest thing on screen was frequently the least important.
 
-
-        <p className="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-ink-faint">
-          A custom 1inch SwapVM instruction · live on Base
+          NEITHER VOICE SAYS "NOBODY BID". A read that failed is not a round with no bids,
+          and the two must never collapse into one sentence -- BidCards keeps the same
+          distinction one level down, where `bids == null` means the log scan failed. */}
+      {error && (
+        <p
+          className={[
+            "mb-4 border-l-2 px-3 py-2 text-sm",
+            featured
+              ? "border-amber bg-amber-soft text-amber"
+              : "border-brick bg-brick-soft text-ink-soft",
+          ].join(" ")}
+        >
+          {featured
+            ? `The live chain read failed, so this is the last state read rather than the chain right now: ${error}`
+            : `Could not reach the chain: ${error}`}
         </p>
+      )}
 
-        <h1 className="mt-5 max-w-4xl font-display text-4xl leading-[1.1] font-semibold sm:text-5xl lg:text-6xl">
-          Who fills your order should be decided by{" "}
-          <em className="text-glass">what it is worth</em>, not by who is fastest.
-        </h1>
-
-        <p className="mt-6 max-w-2xl text-lg leading-relaxed text-ink-soft">
-          SwapVM ships two ways to allocate the right to fill an order. One asks who you are.
-          The other asks what time it is. Glasshouse asks what you will pay — a sealed-bid,
-          second-price auction, settled on chain.
-        </p>
-
-        <div className="mt-10 flex flex-wrap gap-x-12 gap-y-6">
-          {(
-            [
-              ["highest bid", shown ? `${shown.best} bps` : "400 bps", "wins the right to fill", "text-glass"],
-              ["pays", shown ? `${shown.clearing} bps` : "250 bps", "the runner-up's bid", "text-amber"],
-              ["to the maker", shown ? `${shown.toMaker} bps` : "150 bps", "the difference", "text-ink"],
-            ] as const
-          ).map(([label, value, note, tone]) => (
-            <div key={label}>
-              <div className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">
-                {label}
-              </div>
-              <div className={`tnum mt-1.5 text-4xl sm:text-5xl ${tone}`}>{value}</div>
-              <div className="mt-1 text-[0.82rem] text-ink-faint">{note}</div>
-            </div>
-          ))}
-        </div>
-        <p className="mt-3 text-[0.78rem] text-ink-faint">
-          {shown && demonstration
-            ? source === "sim"
-              ? "From the simulated round below. Nothing here was read from a chain."
-              : `From ${
-                  demonstration.round === null || demonstration.round === undefined
-                    ? `order ${String(demonstration.orderHash).slice(0, 10)}…`
-                    : `round ${num(demonstration.round)}`
-                } on Base, settled and filled. The chart below is that round.`
-            : "An example of the rule, not a round. The chart below carries the real numbers when a settled round is loaded."}
-        </p>
-
-        {/* THE ONE PICTURE THIS PROJECT IS ALLOWED.
-            Not an illustration of the word "auction" -- the two previous art directions
-            were exactly that and both were withdrawn (art-prompts/README.md). This is the
-            round itself: every bid on one scale of basis points in commit order, with the
-            clearing price drawn at the RUNNER-UP's height, passing through the winner's
-            column without touching it. It carries its own source chip and caption and is
-            linted like every other figure. DESIGN.md asked for this under "Still open". */}
-        {demonstration ? (
-          <div className="mt-10 max-w-3xl">
-            <SettlementReel a={demonstration} head={head} source={source} />
+      {!loading && !featured && (
+        <div className="card">
+          <p className="text-ink-soft">No round has been opened on this Book yet.</p>
+          <p className="mt-2 text-sm text-ink-faint">
+            Rounds are opened by a keeper, and this page has no way to tell whether one is
+            running right now. It says so rather than showing a spinner.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button type="button" onClick={() => setDemo(true)} className="btn btn-secondary">
+              Watch a simulated round
+            </button>
+            <Link href="/faq#rehearsal" className="btn btn-tertiary">
+              what a rehearsal is
+            </Link>
           </div>
-        ) : null}
+        </div>
+      )}
 
-        {/* The pulse. Read-only by design: it says "this is running", then gets out of the
-            way and sends you to the tool. */}
-        <div className="mt-11 max-w-2xl border border-rule bg-raised rounded-card shadow-card">
-          <Link href="/board" className="group block px-5 py-4">
-            <Swap showing={loading && !featured ? "loading" : featured ? "live" : "empty"}>
-            {loading && !featured ? (
-              <span className="flex flex-col gap-2">
-                <span className="font-mono text-[0.7rem] uppercase tracking-[0.12em] text-ink-faint">
-                  Reading the Book
-                </span>
-                <LoadingBar className="max-w-[14rem]" />
-              </span>
-            ) : featured ? (
-              <span className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                <span
-                  className={[
-                    "border px-2 py-0.5 font-mono text-[0.6875rem] uppercase tracking-[0.12em]",
-                    phase === "commit" ? "border-rule bg-sunk text-ink-soft"
-                      : phase === "reveal" ? "border-amber bg-amber-soft text-amber"
-                        : phase === "exclusive" ? "border-glass bg-glass-soft text-glass"
-                          : "border-rule text-ink-faint",
-                  ].join(" ")}
-                >
-                  {phase}
-                </span>
-                <span className="tnum text-sm text-ink">
-                  Round {num(featured.round)}
-                </span>
-                <span className="tnum text-sm text-ink-faint">
-                  {featured.committedCount} sealed
-                  {featured.revealedCount !== null && ` · ${featured.revealedCount} opened`}
-                  {featured.clearingBps !== null && (
-                    <span className="text-glass"> · clearing {featured.clearingBps} bps</span>
+      {featured && (
+        <Swap showing={`${featured.orderHash}-${livePhase(featured, head)}`}>
+          <div>
+            {/* THE BIGGEST THING ON THE PAGE, and above the split rather than inside it.
+                It is one fact about the whole round, so it spans the whole width; the two
+                columns below it are the round and the way in. */}
+            <Countdown a={featured} head={head} />
+
+            {/* 1.4fr / 1fr: the round is wider because it holds four bid cards and a phase
+                track, and the bid panel is a single column of controls. ON A PHONE THE BID
+                PANEL COMES FIRST, which is the reason for the `order` classes rather than
+                simply writing them in this sequence -- a visitor who has read the countdown
+                should reach the act next, not scroll a phase track to find it. */}
+            <div className="mt-4 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+              <article className="card order-2 lg:order-1">
+                <div className="card-head">
+                  <span className="tnum">
+                    Round {num(featured.round)} · {featured.orderHash.slice(0, 10)}…
+                  </span>
+                  <span className="flex flex-wrap items-center gap-2">
+                    <PhaseChip phase={livePhase(featured, head)} settled={featured.settled} />
+                    {!live && <span className="chip">most recent — nothing live</span>}
+                  </span>
+                </div>
+
+                <PhaseTrack a={featured} head={head} />
+                <BidCards a={featured} />
+                <Stats a={featured} head={head} />
+                <ReplayCheck a={featured} />
+
+                {/* THE THESIS, AND THE LINT. Every figure on this site names what produced
+                    it, and scripts/lint-provenance.mjs fails the build over a missing "What
+                    produced this". It is also the whole claim of the product, so it is the
+                    one caption the strip-the-explanation pass does not touch. */}
+                <p className="card-foot">
+                  <strong className="font-medium text-ink-soft">What produced this:</strong>{" "}
+                  {demo ? (
+                    <>
+                      <code className="font-mono">web/lib/simulate.ts</code>, stepping one scripted
+                      round forward a block every 0.4 s. The phase, the clearing price and the
+                      winner are computed from the block shown by the same functions the live board
+                      uses — the simulation supplies the reveals, not the rules.
+                    </>
+                  ) : (
+                    <>
+                      the <code className="font-mono">GlasshouseBook</code> contract on Base, read at
+                      block <span className="tnum">{num(head)}</span>. The phase is computed here
+                      against that same block — the contract stores no phase, it compares{" "}
+                      <code className="font-mono">block.number</code> against boundaries written
+                      when the round opened, so any honest reader has to do the same.
+                    </>
                   )}
-                </span>
-                <span className="ml-auto text-sm text-glass group-hover:underline">
-                  Open the board →
-                </span>
-              </span>
-            ) : (
-              <span className="flex flex-wrap items-center gap-3 text-sm">
-                <span className="text-ink-soft">No round is open right now.</span>
-                <button
-                  type="button"
-                  onClick={(e) => { e.preventDefault(); setDemo(true); }}
-                  className="text-glass underline underline-offset-2"
-                >
-                  Watch a simulated one
-                </button>
-              </span>
-            )}
-            </Swap>
-          </Link>
-          <p className="border-t border-rule px-5 py-2.5 text-[0.74rem] text-ink-faint">
-            {source === "sim"
-              ? "Simulated — the status line above says so on every page."
-              : "Read from the GlasshouseBook contract on Base. Phase computed here, against the block in the status line."}
-          </p>
-        </div>
-      </section>
+                </p>
+              </article>
 
-      <div>
-        <section className="border-t border-rule py-14 sm:py-16">
-          <p className="font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-glass">
-            End to end
-          </p>
-          <h2 className="mt-3 mb-8 max-w-2xl font-display text-2xl leading-snug font-semibold sm:text-3xl">
-            One round, from sealed to paid.
-          </h2>
-          <Mechanism />
-        </section>
-      </div>
+              <div className="order-1 lg:order-2">
+                {/* Bidding is cut out entirely during the rehearsal: a commitment is
+                    hash(bps, salt, ORDER HASH), and a synthetic hash names no auction in the
+                    Book, so it would bind to nothing and could never be revealed. A disabled
+                    button still invites the click. */}
+                {demo ? (
+                  <div className="card">
+                    <div className="card-head">
+                      <span>Your bid</span>
+                      <span className="chip chip-warn">rehearsal</span>
+                    </div>
+                    <p className="text-sm text-ink-soft">
+                      <strong className="font-medium text-amber">
+                        Bidding is off during the rehearsal.
+                      </strong>{" "}
+                      A sealed bid commits to this round&rsquo;s <em>order hash</em>, and the
+                      rehearsal&rsquo;s hashes name no auction in the Book.
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setDemo(false)}
+                        className="btn btn-secondary"
+                      >
+                        Switch to the real chain
+                      </button>
+                      <Link href="/faq#rehearsal" className="btn btn-tertiary">
+                        what a rehearsal is
+                      </Link>
+                    </div>
+                  </div>
+                ) : (
+                  <BidPanel auction={featured} head={head} />
+                )}
+              </div>
+            </div>
+          </div>
+        </Swap>
+      )}
 
-      <div>
-        <section className="border-t border-rule py-14">
-          <h2 className="max-w-2xl font-display text-2xl leading-snug font-semibold sm:text-3xl">
-            Three ways in.
+      {/* ---- BELOW THE INSTRUMENT ------------------------------------------------------
+          Two panels and one door, in the order a reader wants them: the last print, then
+          the last five rounds, then everything. Nothing here explains the mechanism. */}
+
+      {lastSettled ? (
+        <section className="mt-10">
+          <h2 className="text-base font-semibold text-ink">
+            {featured ? "Last settled" : "The last round this Book settled"}
           </h2>
-          <div className="mt-8 grid gap-px border border-rule bg-rule sm:grid-cols-3">
-            {[
-              ["/board", "The board", "Watch a round run, and bid in it if one is open."],
-              ["/evidence", "The evidence", "A finished receipt, the three gates compared, the reserve advisor."],
-              ["/rounds", "The history", "Every round this Book has opened, newest first."],
-            ].map(([href, title, note]) => (
-              <Link key={href} href={href} className="group bg-raised p-5 hover:bg-glass-soft">
-                <div className="font-display text-xl font-semibold text-ink group-hover:text-glass">
-                  {title}
-                </div>
-                <p className="mt-2 text-sm text-ink-soft">{note}</p>
-                <div className="mt-4 font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-glass">
-                  Open →
-                </div>
-              </Link>
-            ))}
+          {/* WHY THIS IS THE OPENING SHOT WHEN NOTHING IS LIVE. A venue between auctions
+              shows the last print; it does not show an empty frame and hope. The reel is
+              playback of reveals that genuinely happened, and it carries its own source
+              chip and "what produced this" caption, so it is honest at any width. */}
+          <div className="mt-3 max-w-3xl">
+            <SettlementReel a={lastSettled} head={head} source={source} />
           </div>
         </section>
-      </div>
+      ) : null}
+
+      {recent.length > 0 ? (
+        <section className="mt-10">
+          <h2 className="text-base font-semibold text-ink">Recent rounds</h2>
+          {/* A <table> has to sit inside a <figure data-src> whose body contains the words
+              "What produced this" or scripts/lint-provenance.mjs fails the build. */}
+          <figure data-src={source} className="mt-3">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-left text-[0.82rem]">
+                <thead>
+                  <tr className="border-b border-rule">
+                    <th className="px-3 py-2 font-mono text-[0.6875rem] font-normal uppercase tracking-[0.12em] text-ink-faint">
+                      round
+                    </th>
+                    <th className="px-3 py-2 font-mono text-[0.6875rem] font-normal uppercase tracking-[0.12em] text-ink-faint">
+                      phase
+                    </th>
+                    <th className="px-3 py-2 text-right font-mono text-[0.6875rem] font-normal uppercase tracking-[0.12em] text-ink-faint">
+                      clearing
+                    </th>
+                    <th className="px-3 py-2 font-mono text-[0.6875rem] font-normal uppercase tracking-[0.12em] text-ink-faint">
+                      winner
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recent.map((a) => {
+                    const p = livePhase(a, head);
+                    return (
+                      <tr key={a.orderHash} className="row-link border-b border-rule">
+                        <td className="tnum px-3 py-2">
+                          <a
+                            href={`/r/${a.orderHash}`}
+                            className="text-glass underline decoration-rule underline-offset-2 hover:decoration-glass"
+                          >
+                            {num(a.round)}
+                          </a>
+                        </td>
+                        <td className="px-3 py-2 text-ink-soft">
+                          {a.settled ? `${p} · settled` : p}
+                        </td>
+                        {/* NOT A ZERO. `clearingBps` is null before settle() runs, which is
+                            a different fact from "cleared at 0", and an em dash is the only
+                            honest rendering of a number that does not exist yet. */}
+                        <td className="tnum px-3 py-2 text-right text-ink">
+                          {a.clearingBps === null ? "—" : `${a.clearingBps} bps`}
+                        </td>
+                        <td className="px-3 py-2">
+                          {a.bestBidder ? (
+                            <AddressLink
+                              addr={a.bestBidder}
+                              role={
+                                a.filled && a.filledBy?.toLowerCase() === a.bestBidder.toLowerCase()
+                                  ? "filled"
+                                  : a.settled
+                                    ? "winner"
+                                    : "leading"
+                              }
+                              mark={false}
+                            />
+                          ) : (
+                            <span className="text-ink-faint">
+                              {a.revealedCount == null ? "not read" : "no reveals"}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <figcaption className="mt-3 text-[0.78rem] leading-relaxed text-ink-faint">
+              <span className="text-ink-soft">What produced this:</span>{" "}
+              {source === "sim" ? (
+                <>
+                  <code className="font-mono">web/lib/simulate.ts</code> — a scripted rehearsal.
+                  Nothing in this table was read from a chain.
+                </>
+              ) : (
+                <>
+                  the <code className="font-mono">GlasshouseBook</code> contract on Base, read at
+                  block <span className="tnum">{num(head)}</span> by{" "}
+                  <code className="font-mono">web/lib/chain.js</code>. Phase is computed here
+                  against that block. <strong className="font-medium">Winner</strong> is the highest
+                  revealed bid: it reads &ldquo;leading&rdquo; until the round settles, because a
+                  later reveal can still displace it, and &ldquo;not read&rdquo; when the log scan
+                  for that round failed — which is not the same as no reveals.
+                </>
+              )}
+            </figcaption>
+          </figure>
+          <Link href="/rounds" className="btn btn-secondary mt-4">
+            Every round so far
+          </Link>
+        </section>
+      ) : null}
+
+      {/* The round on screen already has a 44px reveal button of its own, so the strip would
+          be the same act twice -- and two candidate primaries on one view. */}
+      <RevealStrip
+        head={head}
+        auctions={demo ? [] : auctions}
+        excludeOrderHash={featured?.orderHash ?? null}
+      />
     </main>
+  );
+}
+
+/**
+ * `.chip` variants, not the hand-rolled `border px-2 py-0.5 font-mono text-[0.6875rem]
+ * uppercase` span this used to be -- the exact shape DESIGN.md F-3 records as "a chip that
+ * looked identical to a button". A phase is a label; it is not clickable and now does not
+ * look it.
+ */
+function PhaseChip({ phase, settled }: { phase: string; settled: boolean }) {
+  const tone =
+    phase === "reveal" ? "chip-warn" : phase === "exclusive" ? "chip-live" : "";
+  return (
+    <span className="flex gap-2">
+      <span className={`chip ${tone}`}>{phase}</span>
+      {settled && <span className="chip chip-live">settled</span>}
+    </span>
   );
 }

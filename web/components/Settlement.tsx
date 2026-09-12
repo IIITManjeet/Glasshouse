@@ -1,5 +1,6 @@
 "use client";
 
+import { addressHues } from "@/lib/identity";
 import { type Auction, type Source, livePhase, roundLabel } from "@/lib/useAuctions";
 
 /**
@@ -45,6 +46,41 @@ const H = 320;
 const num = (n: number) => n.toLocaleString("en-US");
 const short = (a?: string | null) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "—");
 
+/**
+ * THE ONLY THING THIS FIGURE'S VOCABULARY GAINS, AND IT IS DELIBERATELY TINY.
+ *
+ * A 6px two-hue square beside each column's `#n`, drawn from the bidder's own address bytes
+ * -- the same two hues `.addr-mark` paints in the bid ladder, the rounds table and the
+ * account header. It exists because this chart names its columns `#1 #2 #3` and the ladder
+ * beneath names the same bids by address: matching them meant reading forty hex characters
+ * twice. The square makes it one glance.
+ *
+ * WHAT IT MUST NOT BECOME. The colour rule for this figure (see the file header) is one
+ * meaning per hue -- teal is a revealed value, ochre is money to the maker, terracotta a
+ * forfeit -- and an address hue is arbitrary, so it is confined to a 6px axis swatch. It is
+ * never a column, never the price line, and never text. Columns stay teal and the clearing
+ * line stays exactly where it was.
+ *
+ * WHY THE LIGHTNESS IS 50% AND NOT 42/60. `.addr-mark` picks 42% on the light theme and
+ * 60% on dark, which it can do because it is CSS and can see a media query. An SVG `fill`
+ * cannot, and this file cannot add a token to globals.css, so it takes one value that is
+ * legible on both grounds. The HUES -- the part that identifies the address -- are
+ * identical to the mark's, which is what makes the match work.
+ *
+ * The diagonal split mirrors the mark's 135deg gradient: h1 is the upper-left triangle.
+ */
+function ColumnMark({ addr, x, y }: { addr?: string | null; x: number; y: number }) {
+  if (!addr) return null;
+  const { h1, h2 } = addressHues(addr);
+  const s = 6;
+  return (
+    <g aria-hidden="true">
+      <polygon points={`${x},${y + s} ${x},${y} ${x + s},${y}`} fill={`hsl(${h1} 58% 50%)`} />
+      <polygon points={`${x + s},${y} ${x + s},${y + s} ${x},${y + s}`} fill={`hsl(${h2} 58% 50%)`} />
+    </g>
+  );
+}
+
 export function Settlement({ a, head, source }: { a: Auction; head: number; source: Source }) {
   // THE SOURCE IS A PROP BECAUSE THIS FIGURE CANNOT KNOW IT OTHERWISE, and getting that
   // wrong is the one mistake this project cannot afford. The first version of this file
@@ -82,6 +118,10 @@ export function Settlement({ a, head, source }: { a: Auction; head: number; sour
   const showBlock = slot >= 112;
   const showBidder = slot >= 74;
   const x = (i: number) => PAD.left + slot * i + (slot - colW) / 2;
+  // One string, used twice: once to draw and once to measure, so the mark beside it cannot
+  // drift from the label it belongs to.
+  const slotLabel = (b: (typeof bids)[number]) =>
+    `#${b.commitIdx}${showBlock ? ` · blk ${num(b.committedAtBlock)}` : ""}`;
 
   const winner = a.bestBidder?.toLowerCase() ?? null;
   const clearing = a.clearingBps;
@@ -202,9 +242,18 @@ export function Settlement({ a, head, source }: { a: Auction; head: number; sour
                 {/* Three lines, because the queue slot, the bidder and the state are three
                     different facts and collapsing them loses one. The slot comes first: it
                     is fixed at commit and is what the price line points back to. */}
+                {/* The mark hangs off the LEFT EDGE of the slot label, which is why the
+                    label's width is computed rather than guessed: the text is centred, so
+                    there is no fixed edge to anchor to. 6px per character is the advance of
+                    10px mono here -- the same figure the label-density note above uses to
+                    predict a collision at ~110px, and it has held. */}
+                <ColumnMark
+                  addr={b.bidder}
+                  x={x(i) + colW / 2 - (slotLabel(b).length * 6) / 2 - 9}
+                  y={H - PAD.bottom + 11}
+                />
                 <text x={x(i) + colW / 2} y={H - PAD.bottom + 16} textAnchor="middle" className="fill-[var(--color-ink-faint)] font-mono text-[10px]">
-                  #{b.commitIdx}
-                  {showBlock && ` · blk ${num(b.committedAtBlock)}`}
+                  {slotLabel(b)}
                 </text>
                 {showBidder && (
                   <text x={x(i) + colW / 2} y={H - PAD.bottom + 29} textAnchor="middle" className="fill-[var(--color-ink-faint)] font-mono text-[9px]">

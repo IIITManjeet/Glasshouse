@@ -3,10 +3,11 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useAccount } from "wagmi";
 import { useBoard } from "@/components/BoardProvider";
 import { SourceChip } from "@/components/Auction";
 import { Profile } from "@/components/Profile";
-import { IdentityCard } from "@/components/Identity";
+import { IdentityCard, rolesOf } from "@/components/Identity";
 import { Loading } from "@/components/Loading";
 import { Record } from "@/components/Record";
 
@@ -38,12 +39,13 @@ function AddressForm({ initial }: { initial: string }) {
         onChange={(e) => setValue(e.target.value)}
         placeholder="0x…"
         spellCheck={false}
-        className="tnum min-w-[16rem] flex-1 border border-rule bg-raised rounded-card shadow-card px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-glass focus:outline-none"
+        className="tnum min-w-[16rem] flex-1 rounded-control border border-rule bg-raised px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-glass focus:outline-none"
       />
-      <button
-        type="submit"
-        className="rounded-control border border-rule px-3 py-2 font-mono text-[0.7rem] uppercase tracking-[0.12em] text-ink-soft hover:border-glass hover:text-glass"
-      >
+      {/* A .btn, not a hand-rolled bordered span with uppercase mono in it -- that exact
+          shape is the DESIGN.md F-3 regression, where a label and a control became
+          indistinguishable. Secondary rather than primary because the wallet control in the
+          layout is this view's one filled thing. */}
+      <button type="submit" className="btn btn-secondary">
         Look up
       </button>
     </form>
@@ -62,6 +64,11 @@ function AddressForm({ initial }: { initial: string }) {
 function AccountView() {
   const params = useSearchParams();
   const pathname = usePathname() ?? "";
+  // Read here, with the other hooks, because everything below it returns early. It feeds
+  // the `you` role on the header: the one label on this page that is about the reader
+  // rather than about the address, and the reason a person can tell their own profile from
+  // somebody else's at a glance.
+  const { address: connected } = useAccount();
 
   // THE ADDRESS CAN ARRIVE BY TWO ROUTES, AND ONLY ONE OF THEM IS A QUERY STRING.
   //
@@ -86,8 +93,11 @@ function AccountView() {
 
   if (!raw) {
     return (
-      <div className="border border-rule bg-raised rounded-card shadow-card p-6">
-        <p className="text-ink-soft">No address in the URL.</p>
+      <div className="card">
+        {/* The page's h1 lives on the subject, which here is the absence of one. Exactly one
+            h1 per branch: the alternative was a standing "Account" heading competing with
+            the address underneath it. */}
+        <h1 className="font-sans text-2xl font-semibold text-ink">No address in the URL</h1>
         <p className="mt-2 text-sm text-ink-faint">
           This page reads an address from <code className="font-mono">?a=0x…</code> — there is no per-address route,
           because the build is a fully static export with no server to resolve one against.
@@ -99,9 +109,10 @@ function AccountView() {
 
   if (!ADDRESS_RE.test(raw)) {
     return (
-      <div className="border border-rule bg-brick-soft p-6">
-        <p className="text-brick">
-          <span className="font-mono">{raw}</span> is not a well-formed address.
+      <div className="rounded-control border border-brick bg-brick-soft p-4">
+        <h1 className="font-sans text-2xl font-semibold text-brick">Not an address</h1>
+        <p className="mt-1 text-brick">
+          <span className="tnum break-all">{raw}</span> is not a well-formed address.
         </p>
         <p className="mt-2 text-sm text-ink-faint">
           Expected 0x followed by 40 hex characters. Nothing was looked up — a malformed value is shown honestly
@@ -115,12 +126,24 @@ function AccountView() {
 
   const address = raw.toLowerCase();
 
+  // The two roles a header can honestly carry with no round in hand. `maker` is read from
+  // the loaded rounds rather than assumed, and it is deliberately NOT shown when the board
+  // has loaded nothing -- an empty board would otherwise silently mean "not a maker".
+  const opened = auctions.some((a) => a.maker?.toLowerCase() === address);
+  const headerRoles = rolesOf({ addr: address, you: connected, opened });
+
   return (
     <>
       {/* Who this is, before what they did. ENS is read from mainnet, where the registry
-          lives; an address with no name renders as the address, which is the truth. */}
-      <div className="mb-6 border border-rule bg-raised rounded-card shadow-card p-5 sm:p-6">
-        <IdentityCard address={raw} />
+          lives; an address with no name renders as the address, which is the truth. The
+          card foot carries the sentence that used to sit under the route heading -- it
+          describes what the figures below are computed from, so it belongs against them. */}
+      <div className="card mb-6">
+        <IdentityCard address={raw} roles={headerRoles} />
+        <p className="card-foot">
+          What one address has done across the rounds this build has loaded — as maker,
+          bidder, or filler.
+        </p>
       </div>
 
       {/* The indexer's answer -- every round the Book has ever had -- above the board's
@@ -160,13 +183,15 @@ function AccountView() {
 export default function AccountPage() {
   return (
     <main className="mx-auto max-w-[62rem] px-4 py-10 sm:px-6">
+      {/* THE ROUTE NAME IS AN EYEBROW HERE, AND IT IS THE ONLY PAGE WHERE THAT IS TRUE.
+          /rounds, /board and /round are named by what they show; this page's subject is one
+          participant, so the address (or its ENS name) is the h1 and "Account" is the label
+          above it. Two headings both claiming to name the page -- "Account", then the
+          address immediately beneath it -- is what this replaced. */}
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-        <div>
-          <h1 className="font-display text-3xl text-ink">Account</h1>
-          <p className="mt-1 text-sm text-ink-soft">
-            What one address has done across the rounds this build has loaded — as maker, bidder, or filler.
-          </p>
-        </div>
+        <p className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">
+          Account
+        </p>
         <Link
           href="/rounds"
           className="whitespace-nowrap text-sm text-glass underline decoration-rule underline-offset-2 hover:decoration-glass"
@@ -175,7 +200,7 @@ export default function AccountPage() {
         </Link>
       </div>
 
-      <div className="mt-8">
+      <div className="mt-5">
         <Suspense fallback={<p className="text-sm text-ink-faint">Loading…</p>}>
           <AccountView />
         </Suspense>

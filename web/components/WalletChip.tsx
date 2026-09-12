@@ -75,7 +75,11 @@ export function WalletChip() {
       disabled={status === "pending"}
       className="whitespace-nowrap text-[0.8125rem] font-medium text-glass hover:underline disabled:opacity-60"
     >
-      {status === "pending" ? "connecting…" : "Connect wallet"}
+      {/* One word. The masthead is not where the offer gets explained -- the bid panel's own
+          primary reads "Connect wallet to bid" and is the control that means it. Two
+          controls a page apart both reading "Connect wallet", one of them the page's
+          loudest element, is how the preamble ended up outranking the act. */}
+      {status === "pending" ? "connecting…" : "Connect"}
     </button>
   );
 }

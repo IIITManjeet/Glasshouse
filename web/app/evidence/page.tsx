@@ -12,7 +12,6 @@ import { Verification } from "@/components/Verification";
 import { ReservePanel } from "@/components/Reserve";
 import { Leaderboard } from "@/components/Leaderboard";
 import { Comparison } from "@/components/Comparison";
-import { LatencyLens } from "@/components/Lens";
 import { Loading } from "@/components/Loading";
 
 /**
@@ -32,11 +31,23 @@ import { Loading } from "@/components/Loading";
  * reader with JavaScript off, and the lint all still see the figures.
  */
 
+/**
+ * FOUR SECTIONS, NOT FIVE. `lens` LEFT.
+ *
+ * `<LatencyLens>` is a drawing of a unit test with assigned valuations and an assigned
+ * arrival order -- a picture of an ARGUMENT, not of a chain event. It was the one panel on
+ * an evidence page that could not point at anything that happened, and a reader scanning
+ * for "did this work" had to walk past it. It now opens the `#why-not-clock` answer on
+ * /faq, which is where the question is actually asked.
+ *
+ * The page was ~1,600 words. Everything cut was a second and third sentence restating a
+ * heading; every figure and every caption is untouched, because the captions are the
+ * evidence.
+ */
 const SECTIONS = [
   ["receipt", "the receipt"],
   ["bidders", "who is bidding"],
   ["comparison", "three gates"],
-  ["lens", "why not a clock"],
   ["reserve", "next auction"],
 ] as const;
 
@@ -152,15 +163,17 @@ export default function EvidencePage() {
 
   return (
     <main className="relative" style={pageBand("/art/header-evidence.webp")}>
+      {/* THE EYEBROWS ARE GONE, ALL FIVE OF THEM. `GH 03 · Evidence · 5 panels` and its
+          siblings were an academic paper's figure numbers: they numbered panels nobody
+          refers to by number, and they announced a count that went stale the moment a panel
+          moved. Nothing on the site linked to "GH 07". */}
       <section className="mb-8 max-w-3xl">
-        <p className="panel-id">GH 03 · Evidence · 5 panels</p>
-        <h1 className="mt-2">
+        <h1>
           Everything here is <em className="text-glass not-italic">checkable</em>, and says how.
         </h1>
         <p className="lede mt-4 text-ink-soft">
-          Some of this was read from Base and some came from a unit test with mock tokens and
-          assigned valuations. Which is which is printed on each figure rather than left for you
-          to guess — including where the numbers are less flattering.
+          Every figure says whether it came from Base or from a unit test — including where the
+          number is less flattering.
         </p>
       </section>
 
@@ -180,11 +193,9 @@ export default function EvidencePage() {
 
       <div>
         <section id="receipt" className="mb-14 scroll-mt-6">
-          <p className="panel-id">GH 04 · Did it work</p>
-          <h2 className="mt-1.5 mb-1 font-display text-2xl font-semibold">Did it work</h2>
+          <h2 className="mb-1 font-display text-2xl font-semibold">Did it work</h2>
           <p className="mb-5 max-w-2xl text-sm text-ink-soft">
-            The claim in one card: what the winner bid, what the winner paid, and the gap between
-            them that went to the maker.
+            What the winner bid, what the winner paid, and the gap that went to the maker.
           </p>
           <Suspense
             fallback={
@@ -201,11 +212,9 @@ export default function EvidencePage() {
 
       <div>
         <section id="bidders" className="mb-14 scroll-mt-6">
-          <p className="panel-id">GH 05 · Who is bidding</p>
-          <h2 className="mt-1.5 mb-1 font-display text-2xl font-semibold">Who is bidding</h2>
+          <h2 className="mb-1 font-display text-2xl font-semibold">Who is bidding</h2>
           <p className="mb-5 max-w-2xl text-sm text-ink-soft">
-            Counts, never shares. A round is only counted as won once it has settled, because
-            until then a later reveal can still take it away.
+            Counts, never shares — and a round counts as won only once it has settled.
           </p>
           <Leaderboard auctions={auctions} source={source} />
         </section>
@@ -213,51 +222,38 @@ export default function EvidencePage() {
 
       <div>
         <section id="comparison" className="mb-14 scroll-mt-6">
-          <p className="panel-id">GH 06 · Is it actually better</p>
-          <h2 className="mt-1.5 mb-1 font-display text-2xl font-semibold">Is it actually better</h2>
+          <h2 className="mb-1 font-display text-2xl font-semibold">Is it actually better</h2>
           <p className="mb-5 max-w-2xl text-sm text-ink-soft">
-            The same order, three ways. Every number in this section came from a unit test — mock
-            tokens, assigned valuations, nothing observed on a network.
+            The same order, three ways — every number from a unit test, not from a network.
           </p>
           <Comparison />
         </section>
       </div>
 
       <div>
-        <section id="lens" className="mb-14 scroll-mt-6">
-          <p className="panel-id">GH 07 · Why not a clock</p>
-          <h2 className="mt-1.5 mb-1 font-display text-2xl font-semibold">Why not a clock</h2>
-          <p className="mb-5 max-w-2xl text-sm text-ink-soft">
-            The same three bidders under both rules. Only the rule for choosing among them
-            differs — and the axis each rule ignores is drawn, not deleted.
-          </p>
-          <LatencyLens />
-        </section>
-      </div>
-
-      <div>
         <section id="reserve" className="mb-14 scroll-mt-6">
-          <p className="panel-id">GH 08 · What happens next</p>
-          <h2 className="mt-1.5 mb-1 font-display text-2xl font-semibold">What happens next</h2>
+          <h2 className="mb-1 font-display text-2xl font-semibold">What happens next</h2>
           <p className="mb-5 max-w-2xl text-sm text-ink-soft">
-            There is no maker dashboard. The advisor reads the rounds that already happened and
-            prints the command, with the reason it recommends what it does.
+            The advisor reads the rounds that already happened and prints the command.
           </p>
           <ReservePanel auctions={auctions} source={source} head={head} />
         </section>
       </div>
 
+      {/* "The long version" LEFT THIS ROW for the footer, where it sits on every route
+          instead of only on the page a reader has already finished. /board became / when
+          the instrument moved, so the first link is the live board at its new address. */}
       <nav className="border-t border-rule pt-5 text-sm">
-        <Link href="/board" className="text-glass underline underline-offset-2">
+        <Link href="/" className="text-glass underline underline-offset-2">
           Watch a round →
         </Link>
         {" · "}
-        <a href="/argument.html" className="text-glass underline underline-offset-2">
-          The long version
-        </a>
-        {" · "}
         <Link href="/rounds" className="text-glass underline underline-offset-2">
           Every round so far
+        </Link>
+        {" · "}
+        <Link href="/faq#why-not-clock" className="text-glass underline underline-offset-2">
+          Why not a clock →
         </Link>
       </nav>
     </main>

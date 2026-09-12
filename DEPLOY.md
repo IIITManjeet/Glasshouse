@@ -9,6 +9,18 @@ is a MakerTraits bit handled in SwapVM core rather than an opcode, so the router
 with no Aqua at all. That fallback cannot satisfy The Graph's live-data rule against real
 Aqua activity, so it is a fallback and not the plan.
 
+**What is already deployed**, so nobody has to grep for it:
+
+| | |
+|---|---|
+| Site | <https://glasshouse-ashy.vercel.app> |
+| `GlasshouseBook` | [`0xc4ea91Fe700918220423ac307C6B1c59650FFbfe`](https://basescan.org/address/0xc4ea91Fe700918220423ac307C6B1c59650FFbfe) |
+| `GlasshouseRouter` | [`0x5c3baE054e8b4915a13726B397b1AeA864247DBf`](https://basescan.org/address/0x5c3baE054e8b4915a13726B397b1AeA864247DBf) |
+| Subgraph | [`FPQdiZTAnR8ac6grgAF2x49bWqwDh87RzqUgQxAvoY2y`](https://thegraph.com/explorer/subgraphs/FPQdiZTAnR8ac6grgAF2x49bWqwDh87RzqUgQxAvoY2y) |
+| Open query URL | `https://api.studio.thegraph.com/query/1758826/glasshouse/version/latest` |
+
+Both contracts are on Base mainnet (8453) from block 50,965,408.
+
 ## 0. Before anything
 
 Hardhat 3 does **not** auto-load `.env`. Provide configuration variables as environment

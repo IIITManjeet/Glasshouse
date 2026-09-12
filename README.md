@@ -6,6 +6,12 @@ A custom SwapVM instruction — opcode `0x2e` — for [1inch Aqua](https://githu
 [SwapVM](https://github.com/1inch/swap-vm), deployed on Base mainnet, with a live board you
 can watch it run on. ETHOnline 2026.
 
+**Live: [glasshouse-ashy.vercel.app](https://glasshouse-ashy.vercel.app)** — no wallet needed
+to read it. If you open one thing, open
+[`/evidence`](https://glasshouse-ashy.vercel.app/evidence): under the receipt is the output of
+an independent replay that re-derives every auction outcome from the raw reveals without
+importing the contract's rule, the subgraph's copy of it, or the page's.
+
 ---
 
 ## Thirty seconds
@@ -21,6 +27,8 @@ Both on Base mainnet (8453), deployed at block 50,965,408. The router points at 
 Aqua, `0x1111113CCf1426A8E30e2bfF5E005d929bF6a90a`.
 
 **2. The board.**
+
+Deployed at **<https://glasshouse-ashy.vercel.app>**, or run it yourself:
 
 ```bash
 cd web && npm install && npm run dev      # http://localhost:3000

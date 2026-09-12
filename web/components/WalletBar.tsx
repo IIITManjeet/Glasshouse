@@ -10,15 +10,25 @@ import { explainRevert } from "@/lib/bid.js";
 
 const short = (a?: string | null) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "—");
 
-// These now come from the shared control primitives in app/globals.css (DESIGN.md F-3/F-4)
-// rather than being defined here. The old rule -- "no filled buttons except where urgency is
-// the message" -- produced a page where urgency was never the message and nothing was ever
-// emphasised, while a non-clickable provenance chip wore the same border and the same accent
-// text as this button. Connect wallet is the primary action of /board and now looks like it.
+// THE PREAMBLE, NOT THE ACT -- and this is a demotion, recorded because it reverses a
+// decision made in this same file.
+//
+// `Connect wallet` was `.btn-primary`: the one filled, 44px, weight-600 control on the whole
+// site. The comment that used to sit here said "Connect wallet is the primary action of
+// /board and now looks like it", and on a /board that was one page away from the front door
+// that was arguable. It is not arguable now. The instrument IS the front page, and the front
+// page's primary has to be the thing the product exists to do -- seal a bid, then open it.
+// Connecting is the step before the act, the bid panel's own primary already reads "Connect
+// wallet to bid", and a filled button here made the site's loudest element its own preamble.
+//
+// So: secondary. A real control, bordered, inverting on hover, 36px -- and no longer
+// competing with the button a bidder has to find in four seconds.
 const BTN = "btn";
-const BTN_IDLE = "btn-primary";
-const BTN_WARN = "btn-danger";
-const BTN_OFF = "";
+const BTN_IDLE = "btn-secondary";
+// Switching chains is a correction, not a danger: nothing is lost by being on the wrong
+// chain, bid.js refuses to write off Base, and the brick outline here read as an error the
+// visitor had caused. The sentence beside it already says which chain is which.
+const BTN_WARN = "btn-secondary";
 
 /**
  * The wallet surface: connect, the connected address, and the wrong-chain switch.

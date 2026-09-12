@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useAccount, useWaitForTransactionReceipt } from "wagmi";
+import Link from "next/link";
+import { useAccount, useConnect, useWaitForTransactionReceipt } from "wagmi";
 import { base } from "wagmi/chains";
+import { useAvailableConnectors } from "@/components/WalletBar";
 import { type Auction } from "@/lib/useAuctions";
 // Plain ESM, deliberately untyped: bid.js is the same file the static page and the Node
 // tests load, and adding a .d.ts would create a second place for the shape to drift.
@@ -113,18 +115,52 @@ const num = (n?: number | null) =>
   n === null || n === undefined || Number.isNaN(n) ? "—" : n.toLocaleString("en-US");
 const short = (a?: string | null) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "—");
 
-/** Blocks are the fact; seconds are an estimate and are labelled as one. Never a clock time. */
+/**
+ * Blocks are the fact; seconds are an estimate and are labelled as one. Never a clock time.
+ *
+ * The trailing "at 2s/block" is gone. It appeared beside every deadline on the page -- four
+ * times on one screen at the worst -- to make a point the countdown's tilde already makes
+ * and /faq#blocks now argues properly. What a bidder needs at the moment of bidding is the
+ * block count and a rough feel for how long that is.
+ */
 function gloss(blocks: number) {
   const b = Math.max(0, blocks);
-  return `${b} block${b === 1 ? "" : "s"} · ~${b * BLOCK_SECONDS}s at ${BLOCK_SECONDS}s/block`;
+  return `${b} block${b === 1 ? "" : "s"} · ~${b * BLOCK_SECONDS} s`;
 }
 
-const BTN = "border px-3 py-2 text-left font-mono text-[0.78rem] leading-snug tracking-[0.02em] transition-colors";
-const BTN_IDLE = "border-glass text-glass hover:bg-glass-soft";
-const BTN_URGENT = "border-brick bg-brick-soft text-brick hover:bg-brick hover:text-raised";
-const BTN_LAST = "border-brick bg-brick text-raised";
-const BTN_OFF = "cursor-not-allowed border-rule bg-sunk text-ink-faint";
+/* THE FIVE BUTTON CONSTANTS THAT USED TO LIVE HERE ARE GONE, and their deletion is the
+   whole point of this pass.
+
+   The base and the idle variant together came to `border px-3 py-2 font-mono text-[0.78rem]
+   border-glass text-glass` -- a 12px monospace outline in the accent colour. So "Place
+   sealed bid · 250 bps" and
+   "Reveal 250 bps · 23 blocks left", the only two acts this product exists for, rendered at
+   exactly the weight of the inert provenance chips beside them, while the one FILLED button
+   on the site was `Connect wallet`. The site filled the preamble and outlined the act, and
+   the owner's report was blunt: the CTAs are not visible.
+
+   Everything here now uses the shared primitives in app/globals.css, which own the size,
+   the face and the fill (`.btn-primary` is 44px sans 600 filled; `.btn .tnum` keeps a chain
+   value monospace inside a sans sentence). The four states this panel walks through --
+   connect, place, reveal, last call -- are ONE control in ONE slot changing its label, so
+   there is never a second primary on the page and the target never moves out from under a
+   cursor already travelling towards it. `.btn-danger-solid` shares `.btn-primary`'s exact
+   geometry for that reason and REPLACES it rather than joining it.
+
+   The disabled labels are untouched. They are not decoration: "Closing — 2 blocks is too
+   few to sign" and "350 bps cannot be revealed — this round accepts 50 to 500" are the
+   explanation, stated at the moment it applies, and they now arrive as `disabled` on a real
+   button instead of as a dead bordered span. */
 const LABEL = "font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint";
+
+/** The one FAQ link shape this panel uses: four words, tertiary, never a paragraph. */
+function FaqLink({ to, children }: { to: string; children: React.ReactNode }) {
+  return (
+    <Link href={`/faq#${to}`} className="btn btn-tertiary">
+      {children}
+    </Link>
+  );
+}
 
 /** Records live in localStorage, which React cannot subscribe to. This is the nudge. */
 const RECORDS_CHANGED = "glasshouse:records-changed";
@@ -310,12 +346,14 @@ function CopySecret({ orderHash, bidder }: { orderHash: string; bidder: string }
 
   return (
     <div className="mt-2">
-      <button type="button" onClick={copy} className="font-mono text-[0.74rem] text-glass underline underline-offset-2">
-        {copied ? "Copied ✓" : "Copy bid secret"}
-      </button>
+      <div className="flex flex-wrap items-center gap-1">
+        <button type="button" onClick={copy} className="btn btn-tertiary">
+          {copied ? "Copied ✓" : "Copy bid secret"}
+        </button>
+        <FaqLink to="secret">what the secret is</FaqLink>
+      </div>
       <p className="mt-1 text-[0.72rem] leading-snug text-ink-faint">
-        Stored in this browser only. Copy it if you might reveal from another one — a sealed bid
-        can only be opened with its secret, by anyone, including us.
+        Stored in this browser only. Copy it if you might reveal from another one.
       </p>
       {shown ? (
         <textarea
@@ -421,65 +459,90 @@ function RevealButton({
     }
   }, [record.maker, record.orderHash, left, headUnknown]);
 
-  let label: string;
-  let cls: string;
+  // THE LABEL IS A SENTENCE WITH ONE MONO VALUE IN IT. `bps` is a chain number and has to
+  // line up with the same figure in the table above, so it is wrapped in `.tnum` inside the
+  // sans button rather than dragging the whole label into monospace (globals.css `.btn .tnum`).
+  let label: React.ReactNode;
+  // The live variants only. Every disabled state falls through to `btn btn-primary` plus
+  // `disabled`, which globals.css paints as "not now" while keeping the 44px slot -- so the
+  // control does not resize as the round moves through its states.
+  let cls = "btn btn-primary";
   let disabled = false;
 
   if (stage === "done" || st.revealed) {
     label = "Revealed ✓";
-    cls = BTN_OFF;
     disabled = true;
   } else if (stage === "sent" && tx) {
     label = `Revealing · ${short(tx)}${headUnknown ? "" : ` · ${Math.max(0, left)} block${left === 1 ? "" : "s"} left`}`;
-    cls = BTN_OFF;
     disabled = true;
   } else if (stage === "wallet") {
     label = `Confirm in wallet…${headUnknown ? "" : ` · ${Math.max(0, left)} block${left === 1 ? "" : "s"} left`}`;
-    cls = BTN_OFF;
     disabled = true;
   } else if (!isConnected) {
     label = `Connect ${short(record.bidder)} to reveal this bid`;
-    cls = BTN_OFF;
     disabled = true;
   } else if (wrongAccount) {
     // Revealing from the wrong account is a guaranteed NoCommitment revert, so this one is
     // safe to disable: the contract would not accept it from this wallet under any head.
     label = `Sealed from ${short(record.bidder)} — switch to that account to reveal`;
-    cls = BTN_OFF;
     disabled = true;
   } else if (chainId !== undefined && chainId !== base.id) {
     label = "Switch to Base to reveal";
-    cls = BTN_OFF;
     disabled = true;
   } else if (closed) {
     label = `Reveal closed at block ${num(record.revealEnd ?? 0)} — the bid is void`;
-    cls = BTN_OFF;
     disabled = true;
   } else if (headUnknown) {
     // No head means no proof the window has closed, and an unattempted reveal is the only
     // outcome guaranteed to fail. The label says exactly why it is offering anyway.
-    label = `Reveal ${record.bps} bps — block height not read, sending anyway`;
-    cls = BTN_URGENT;
+    label = (
+      <>
+        Reveal <span className="tnum">{record.bps} bps</span> — block height not read, sending anyway
+      </>
+    );
   } else if (left <= 1) {
-    label = `Reveal ${record.bps} bps · ${Math.max(0, left)} block${left === 1 ? "" : "s"} left · may not land`;
-    cls = BTN_LAST;
+    // THE LAST BLOCK, and the one case on the site where urgency outranks one-primary-per-
+    // view. Filled brick at the same 44px geometry, so it replaces the primary in place.
+    label = (
+      <>
+        Reveal <span className="tnum">{record.bps} bps</span> ·{" "}
+        <span className="tnum">
+          {Math.max(0, left)} block{left === 1 ? "" : "s"}
+        </span>{" "}
+        left · may not land
+      </>
+    );
+    cls = "btn btn-danger-solid";
   } else {
-    label = `Reveal ${record.bps} bps · ${left} blocks left`;
-    cls = left <= 10 ? BTN_URGENT : BTN_IDLE;
+    label = (
+      <>
+        Reveal <span className="tnum">{record.bps} bps</span> · <span className="tnum">{left} blocks</span> left
+      </>
+    );
   }
+
+  // COMPACT IS NEVER PRIMARY. The sticky strip is a second surface, showing a reveal for a
+  // round that is NOT the one on screen, and a primary there would put two filled buttons on
+  // / at the same time -- the exact thing the CTA rule forbids. It carries its deadline in
+  // words instead, and still escalates to the filled brick in the last block, which globals
+  // .css explicitly allows to replace the primary rather than join it.
+  if (compact && cls === "btn btn-primary") cls = "btn btn-secondary";
 
   return (
     <div className={compact ? "" : "mt-3"}>
-      <button type="button" disabled={disabled} onClick={onClick} className={`${BTN} ${cls} w-full`}>
+      <button type="button" disabled={disabled} onClick={onClick} className={`${cls} w-full`}>
         {label}
       </button>
       {!compact && !disabled ? (
-        <p className={`tnum mt-1 text-[0.74rem] ${left <= 10 && !headUnknown ? "text-brick" : "text-ink-faint"}`}>
-          {headUnknown
-            ? "the chain head has not been read yet — the contract, not this page, decides whether it is late"
-            : left <= 10
-              ? `Reveal closes at block ${num(record.revealEnd ?? 0)} — sign now`
-              : `closes at block ${num(record.revealEnd ?? 0)} · ${gloss(left)}`}
+        <p className={`mt-1 flex flex-wrap items-center gap-1 text-[0.74rem] ${left <= 10 && !headUnknown ? "text-brick" : "text-ink-faint"}`}>
+          <span className="tnum">
+            {headUnknown
+              ? "block height not read — the contract decides whether it is late"
+              : left <= 10
+                ? `Reveal closes at block ${num(record.revealEnd ?? 0)} — sign now`
+                : `closes at block ${num(record.revealEnd ?? 0)} · ${gloss(left)}`}
+          </span>
+          <FaqLink to="reveal">what reveal does</FaqLink>
         </p>
       ) : null}
       {err ? <Sentence text={err.sentence} detail={err.detail} /> : null}
@@ -502,8 +565,7 @@ function EnterSecret({ maker, orderHash, bidder, bounds }: { maker: string; orde
     <details className="mt-3 border-t border-rule pt-2">
       <summary className="cursor-pointer font-mono text-[0.74rem] text-glass">Enter secret</summary>
       <p className="mt-1 text-[0.74rem] leading-snug text-ink-faint">
-        Paste the bps and salt you copied when you bid. Nothing is validated here — the
-        contract checks the pair at reveal, and a wrong one is rejected without costing the bid.
+        Paste the bps and salt you copied when you bid. <FaqLink to="secret">what the secret is</FaqLink>
       </p>
       <div className="mt-2 flex flex-wrap gap-2">
         <input
@@ -521,7 +583,7 @@ function EnterSecret({ maker, orderHash, bidder, bounds }: { maker: string; orde
         />
         <button
           type="button"
-          className={`${BTN} ${BTN_IDLE}`}
+          className="btn btn-secondary"
           onClick={() => {
             setErr(null);
             try {
@@ -632,47 +694,43 @@ function BidForm({ auction, st, head, headUnknown }: { auction: Auction; st: Der
     }
   }, [parsed, auction.maker, auction.orderHash, me]);
 
-  let label: string;
-  let cls = BTN_IDLE;
+  // Every label below is the one that was here before. Only the rendering changed: one 44px
+  // slot, `disabled` where it used to be a dead bordered span, and the bps value kept in
+  // monospace inside the sans sentence.
+  let label: React.ReactNode;
   let disabled = true;
 
   if (stage === "done") {
     label = `Sealed ✓ · reveal opens at block ${num(auction.commitEnd + 1)}`;
-    cls = BTN_OFF;
   } else if (stage === "sent" && tx) {
     label = `Sealing · ${short(tx)}`;
-    cls = BTN_OFF;
   } else if (stage === "wallet") {
     label = "Secret saved · confirm in wallet…";
-    cls = BTN_OFF;
   } else if (stage === "checking") {
     label = "Checking the round…";
-    cls = BTN_OFF;
   } else if (noWallet) {
     label = "No wallet found — bidding needs one, the board does not";
-    cls = BTN_OFF;
   } else if (!isConnected) {
     label = "Connect wallet to bid";
-    cls = BTN_OFF;
   } else if (chainId !== undefined && chainId !== base.id) {
+    // The enabled control for this lives in WalletBar, directly above, as `Switch to Base`.
     label = "Switch to Base to bid";
-    cls = BTN_OFF;
   } else if (!headUnknown && st.blocksToCommitEnd < 0) {
     label = `Commit closed at block ${num(auction.commitEnd)}`;
-    cls = BTN_OFF;
   } else if (tooLateToSign) {
     label = `Closing — ${Math.max(0, st.blocksToCommitEnd)} block${st.blocksToCommitEnd === 1 ? "" : "s"} is too few to sign`;
-    cls = BTN_OFF;
   } else if (parsed === null) {
     label = `Enter a bid between ${auction.reserveBps} and ${auction.maxBps} bps`;
-    cls = BTN_OFF;
   } else if (!inRange) {
     // `commit()` does not range-check; `reveal()` does. A bid outside the range would seal
     // cleanly and could then never be opened, so the page refuses before the contract can.
     label = `${parsed} bps cannot be revealed — this round accepts ${auction.reserveBps} to ${auction.maxBps}`;
-    cls = BTN_OFF;
   } else {
-    label = `Place sealed bid · ${parsed} bps`;
+    label = (
+      <>
+        Place sealed bid · <span className="tnum">{parsed} bps</span>
+      </>
+    );
     disabled = false;
   }
 
@@ -696,18 +754,23 @@ function BidForm({ auction, st, head, headUnknown }: { auction: Auction; st: Der
         between {auction.reserveBps} (reserve) and {auction.maxBps} (max)
       </p>
 
-      <button type="button" disabled={disabled} onClick={submit} className={`${BTN} ${cls} mt-3 w-full`}>
+      <button type="button" disabled={disabled} onClick={submit} className="btn btn-primary mt-3 w-full">
         {label}
       </button>
 
       <p className="tnum mt-1 text-[0.74rem] text-ink-faint">
         {headUnknown
-          ? "chain head not read yet — the commit window is judged by the contract, not by this page"
+          ? "chain head not read — the contract judges the commit window, not this page"
           : `commit closes at block ${num(auction.commitEnd)} · ${gloss(st.blocksToCommitEnd)}`}
       </p>
+      {/* ONE SENTENCE, WHERE THERE WERE TWO. Both were true and the second repeated the
+          first's second half; what a bidder has to know in the four seconds before they sign
+          is that this transaction is not the bid and that a missing reveal voids it. The rest
+          of the mechanism -- why a hash, why a salt, why two transactions -- is an argument,
+          and an argument belongs behind the link rather than between a person and a button. */}
       <p className="mt-1 text-[0.74rem] leading-snug text-ink-faint">
-        Your number is hashed with a random salt and only the hash is sent. You come back in the
-        reveal window and open it — if nothing signs that second transaction, the bid is void.
+        Only a hash is sent now. You must come back and reveal it in the reveal window, or the
+        bid is void. <FaqLink to="round">how it works</FaqLink>
       </p>
 
       {/* Beside the button from the instant the record exists, which is before the wallet
@@ -720,6 +783,60 @@ function BidForm({ auction, st, head, headUnknown }: { auction: Auction; st: Der
       ) : null}
       {err ? <Sentence text={err.sentence} detail={err.detail} /> : null}
     </div>
+  );
+}
+
+/**
+ * THE FIRST RUNG OF THE LADDER, and the reason `Connect wallet` in the status bar above is
+ * no longer the one filled button on the site.
+ *
+ * The panel used to answer "no wallet connected" with a paragraph and no control, so the
+ * only way into the product was to find a separate button somewhere else on the page. That
+ * button was primary, which meant the site's single loudest element was its PREAMBLE while
+ * the two acts it exists for -- seal a bid, open a bid -- were outlined 12px monospace.
+ *
+ * This is the same 44px slot the bid button and the reveal button occupy, in the same place,
+ * so the primary never moves as the round walks through connect -> place -> reveal. It
+ * connects; it does not gate. Nothing above it needs a wallet and nothing above it is hidden
+ * until one arrives.
+ *
+ * The `available`/`status` handling is `useAvailableConnectors`'s, imported rather than
+ * rewritten: a second, simpler copy of "is there a wallet" is how EIP-6963 wallets end up
+ * told they do not exist (see the comment on that hook).
+ */
+function ConnectPrimary() {
+  const mounted = useMounted();
+  const { connect, status } = useConnect();
+  const available = useAvailableConnectors();
+
+  if (!mounted) {
+    return (
+      <button type="button" disabled className="btn btn-primary mt-3 w-full">
+        Reading wallet state…
+      </button>
+    );
+  }
+  if (available.length === 0) {
+    return (
+      <button
+        type="button"
+        disabled
+        className="btn btn-primary mt-3 w-full"
+        title="Bidding needs a browser wallet on Base. Everything else on this page is read from the chain and works without one."
+      >
+        No wallet found — bidding needs one, the board does not
+      </button>
+    );
+  }
+  return (
+    <button
+      type="button"
+      disabled={status === "pending"}
+      onClick={() => connect({ connector: available[0] })}
+      className="btn btn-primary mt-3 w-full"
+    >
+      {status === "pending" ? "Confirm in wallet…" : "Connect wallet to bid"}
+    </button>
   );
 }
 
@@ -770,9 +887,7 @@ export function BidPanel({ auction, head }: { auction: Auction | null; head: num
       <Shell round={null}>
         <p className="text-sm text-ink-soft">No round is open on the Book right now.</p>
         <p className="mt-2 text-[0.78rem] leading-snug text-ink-faint">
-          The keeper opens a fresh round every couple of minutes when it is running. There is
-          nothing to bid on until it does, and this says so rather than showing a form that
-          would fail.
+          Nothing to bid on until a keeper opens one. <FaqLink to="keeper">who opens rounds</FaqLink>
         </p>
       </Shell>
     );
@@ -831,8 +946,8 @@ export function BidPanel({ auction, head }: { auction: Auction | null; head: num
         <Shell round={auction.round}>
           <p className="tnum text-sm text-glass">Revealed ✓ · {record.bps} bps</p>
           <p className="mt-2 text-[0.78rem] leading-snug text-ink-faint">
-            Your number is public now and counted by the contract. The board&rsquo;s clearing price is
-            the runner-up&rsquo;s bid, so revealing is what makes the second price real.
+            Your number is public now and counted by the contract.{" "}
+            <FaqLink to="reveal">why reveal matters</FaqLink>
           </p>
         </Shell>
       );
@@ -845,8 +960,8 @@ export function BidPanel({ auction, head }: { auction: Auction | null; head: num
             Reveal closed at block {num(auction.revealEnd)} · this bid is void
           </p>
           <p className="mt-2 text-[0.78rem] leading-snug text-ink-soft">
-            Nothing was taken from your wallet beyond gas. The bid simply does not count, and the
-            round cleared without it — which is exactly the cost of silence the bond exists to price.
+            Nothing was taken from your wallet beyond gas. The bid does not count and the round
+            cleared without it. <FaqLink to="reveal">why reveal matters</FaqLink>
           </p>
           <p className="mt-1 text-[0.78rem] text-ink-faint">Bid again in the round now open.</p>
         </Shell>
@@ -915,11 +1030,10 @@ export function BidPanel({ auction, head }: { auction: Auction | null; head: num
               minutes." It is not a property of the system, it is a property of whether a
               process happens to be running -- and it was not running for most of today,
               so the panel told every visitor to expect something that was not coming.
-              Two other copies of this sentence already hedged with "when it is running";
-              this one did not. */}
-          A keeper opens the rounds. While it is running a new one arrives every couple of
-          minutes and takes bids for its whole commit window — but nothing here can tell you
-          whether it is running now, so this is what usually happens rather than a promise.
+              The hedge survives the trim, because dropping it is how the promise came back:
+              "a keeper opens the rounds" says nothing about whether one is running now. */}
+          A keeper opens the rounds, and nothing here can tell you whether one is running now.{" "}
+          <FaqLink to="keeper">who opens rounds</FaqLink>
         </p>
       </Shell>
     );
@@ -928,15 +1042,18 @@ export function BidPanel({ auction, head }: { auction: Auction | null; head: num
   if (!isConnected) {
     return (
       <Shell round={auction.round}>
-        <p className="text-sm text-ink-soft">
-          Connect a wallet on Base to place a sealed bid between {auction.reserveBps} and{" "}
-          {auction.maxBps} bps.
+        <p className="tnum text-sm text-ink-soft">
+          between {auction.reserveBps} (reserve) and {auction.maxBps} (max) bps
         </p>
         <p className="tnum mt-1 text-[0.74rem] text-ink-faint">
           commit closes at block {num(auction.commitEnd)} · {gloss(st.blocksToCommitEnd)}
         </p>
-        <p className="mt-2 text-[0.78rem] leading-snug text-ink-faint">
-          Everything above is read straight from the contract and needs no wallet. Only bidding does.
+        <ConnectPrimary />
+        {/* The rule the whole site is built on, in four words and a link rather than the
+            two sentences that used to sit here. Nothing above this panel needed a wallet
+            and nothing above it was withheld until one arrived. */}
+        <p className="mt-1 text-[0.74rem] leading-snug text-ink-faint">
+          Reading needs no wallet. Only bidding does. <FaqLink to="real">is this real money</FaqLink>
         </p>
       </Shell>
     );
@@ -949,13 +1066,19 @@ export function BidPanel({ auction, head }: { auction: Auction | null; head: num
   );
 }
 
+/**
+ * `.card` and `.card-head`, not the hand-composed `border border-rule bg-raised rounded-card
+ * shadow-card` recipe this used to spell out. That recipe existed at fifteen call sites on
+ * inert figures and clickable tiles alike, which is exactly why nobody could tell which
+ * boxes on the site did something (globals.css, "A CONTAINER IS NOT A CONTROL").
+ */
 function Shell({ round, children }: { round: number | null; children: React.ReactNode }) {
   return (
-    <section className="border border-rule bg-raised rounded-card shadow-card p-4">
-      <header className="mb-3 flex flex-wrap items-baseline justify-between gap-2 border-b border-rule pb-2">
-        <span className={LABEL}>your bid</span>
+    <section className="card">
+      <div className="card-head">
+        <span>Your bid</span>
         {round !== null ? <span className="tnum text-[0.72rem] text-ink-faint">round {num(round)}</span> : null}
-      </header>
+      </div>
       {children}
     </section>
   );
@@ -973,13 +1096,32 @@ function Shell({ round, children }: { round: number | null; children: React.Reac
  * board, so a round that has scrolled out of the board's six-round window still counts down
  * correctly. When the board does have the round, its bid rows are used as well, so a reveal
  * signed in another browser stops the strip nagging here.
+ *
+ * `excludeOrderHash` IS A CTA RULE, NOT A TIDY-UP. The instrument is now the front page, so
+ * the round whose reveal is due is frequently the round already on screen with its own 44px
+ * reveal button -- and the same bid appearing twice, once filled and once outlined, is two
+ * controls for one act and two candidate primaries on one view. The page passes the round it
+ * is showing; anything else, including a round that has scrolled out of the board entirely,
+ * still gets its strip. The premise of this component is "a reveal the visitor cannot see",
+ * and a reveal with a button in the panel above is one they can.
  */
-export function RevealStrip({ head, auctions = [] }: { head: number; auctions?: Auction[] }) {
+export function RevealStrip({
+  head,
+  auctions = [],
+  excludeOrderHash = null,
+}: {
+  head: number;
+  auctions?: Auction[];
+  /** The round the page is already showing a reveal control for, if any. */
+  excludeOrderHash?: string | null;
+}) {
   const mounted = useMounted();
   const tick = useRecordTick();
   const { address } = useAccount();
   const me = address?.toLowerCase() ?? null;
   const headUnknown = !Number.isFinite(head) || head <= 0;
+
+  const skip = excludeOrderHash?.toLowerCase() ?? null;
 
   const due = useMemo(() => {
     if (!mounted) return [] as { record: BidRecord; st: Derived }[];
@@ -990,6 +1132,7 @@ export function RevealStrip({ head, auctions = [] }: { head: number; auctions?: 
     // a strip that appears only after connecting is a strip that appears too late. The
     // button in each row names the account that has to sign.
     for (const record of listBids(me)) {
+      if (skip && record.orderHash?.toLowerCase() === skip) continue;
       const board = auctions.find((a) => a.orderHash?.toLowerCase() === record.orderHash);
       const auction = board ?? boundsFromRecord(record);
       if (!auction) continue; // a typed secret with no boundaries: the card handles it
@@ -1003,7 +1146,7 @@ export function RevealStrip({ head, auctions = [] }: { head: number; auctions?: 
     // Most urgent first: the one with the fewest blocks left is the one about to be lost.
     return rows.sort((a, b) => a.st.blocksToRevealEnd - b.st.blocksToRevealEnd);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mounted, me, head, headUnknown, auctions, tick]);
+  }, [mounted, me, head, headUnknown, auctions, skip, tick]);
 
   if (due.length === 0) return null;
 

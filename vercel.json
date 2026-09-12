@@ -83,6 +83,16 @@
   ],
   "redirects": [
     {
+      "source": "/board",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/board/",
+      "destination": "/",
+      "permanent": true
+    },
+    {
       "source": "/proof",
       "destination": "/evidence",
       "permanent": true

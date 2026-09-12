@@ -37,5 +37,24 @@ const nextConfig = {
       { source: "/r/:hash/", destination: "/round/?h=:hash" },
     ];
   },
+  // THE INSTRUMENT MOVED TO `/`, AND /board HAS ALREADY BEEN SHARED.
+  //
+  // The live board was its own route for the whole build; that URL is in a README, in the
+  // essay, in a Discord message and in whatever a judge bookmarked. Moving the instrument
+  // to `/` without this turns every one of those into a 404 on the one page that is the
+  // product.
+  //
+  // Same caveat as `rewrites` above, and it matters more here: `output: "export"` cannot
+  // honour a redirect either, so this entry serves `next dev` ONLY. The redirect that a
+  // visitor actually gets is the one in vercel.json, and the two must be kept in step by
+  // hand. A plain static server (`npx serve web/out`) will 404 on /board -- that is
+  // expected and is not evidence the redirect is broken; it has to be confirmed on a
+  // Vercel preview deployment.
+  async redirects() {
+    return [
+      { source: "/board", destination: "/", permanent: true },
+      { source: "/board/", destination: "/", permanent: true },
+    ];
+  },
 };
 export default nextConfig;

@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AddressLink } from "./Address";
+import { useAccount } from "wagmi";
+import { AddressLink, RoleChip } from "./Address";
+import { rolesOf } from "./Identity";
 import {
   fetchAuctionTimeline,
   subgraphConfigured,
@@ -41,7 +43,6 @@ import {
  */
 
 const num = (n: number | string) => Number(n).toLocaleString("en-US");
-const short = (a?: string | null) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "—");
 const tx = (h: string) => `https://basescan.org/tx/${h}`;
 
 // UNKNOWN is what an address not on our list gets, which is nearly everyone including every
@@ -73,6 +74,8 @@ const KIND_LABEL: Record<EventKind, string> = {
 
 export function Timeline({ maker, orderHash }: { maker: string; orderHash: string }) {
   const [res, setRes] = useState<SubgraphResult<AuctionTimeline> | null>(null);
+  // Before the early returns, because hooks cannot be conditional. Feeds the `you` role.
+  const { address: connected } = useAccount();
 
   useEffect(() => {
     let cancelled = false;
@@ -116,6 +119,13 @@ export function Timeline({ maker, orderHash }: { maker: string; orderHash: strin
   );
   const reveals = events.filter((e) => e.kind === "BID_REVEALED");
 
+  // ROLE CONTEXT, ALL OF IT READ FROM ROWS THIS PANEL ALREADY HAS. The maker is the round's
+  // own `maker` field; the filler and the winner are the actors on the AuctionFilled and
+  // AuctionSettled events, which is the only place the indexer records them for a round.
+  // Nothing here is inferred from a name, a list, or an ordering.
+  const roundMaker = a.maker.id;
+  const filledBy = events.find((e) => e.kind === "AUCTION_FILLED")?.actor ?? null;
+
   return (
     <figure data-src="base" className="rounded-card border border-rule bg-raised shadow-card">
       <figcaption className="flex flex-wrap items-center justify-between gap-2 border-b border-rule px-4 py-2.5">
@@ -130,7 +140,13 @@ export function Timeline({ maker, orderHash }: { maker: string; orderHash: strin
 
       <ol className="divide-y divide-rule">
         {events.map((e) => (
-          <Row key={e.id} e={e} reserveBps={a.reserveBps} />
+          <Row
+            key={e.id}
+            e={e}
+            reserveBps={a.reserveBps}
+            maker={roundMaker}
+            you={connected}
+          />
         ))}
       </ol>
 
@@ -155,10 +171,28 @@ export function Timeline({ maker, orderHash }: { maker: string; orderHash: strin
           the ladder · {num(a.committedCount)} sealed, {num(a.revealedCount)} opened
         </div>
         <ul className="mt-2 space-y-1.5">
-          {a.bids.map((b) => (
+          {a.bids.map((b) => {
+            // `house` when this bidder IS the maker of the round it is bidding in -- the
+            // disclosure the ladder most needs, since a maker's own bid sits in it looking
+            // like anybody else's. `winner` only once the round has settled; the identical
+            // position before that is `leading`, because a later reveal can still take it
+            // (components/Auction.tsx records the same distinction).
+            const roles = rolesOf({
+              addr: b.bidder.id,
+              you: connected,
+              maker: roundMaker,
+              bidder: true,
+              bestBidder: b.leading ? b.bidder.id : null,
+              settled: a.settled,
+              filledBy,
+            });
+            return (
             <li key={b.commitIdx} className="flex flex-wrap items-baseline gap-x-2 text-[0.82rem]">
               <span className="tnum text-ink-faint">#{b.commitIdx}</span>
-              <AddressLink addr={b.bidder.id} />
+              <AddressLink addr={b.bidder.id} role={roles[0]} />
+              {roles.slice(1).map((r) => (
+                <RoleChip key={r} role={r} />
+              ))}
               <span className="font-mono text-[0.6875rem] uppercase tracking-[0.1em] text-ink-faint">
                 {PROVENANCE_CHIP[b.bidder.provenance]}
               </span>
@@ -168,7 +202,8 @@ export function Timeline({ maker, orderHash }: { maker: string; orderHash: strin
               {b.leading && <span className="text-glass">· leads</span>}
               <span className="text-ink-faint">· {BOND[b.bondStatus]}</span>
             </li>
-          ))}
+            );
+          })}
         </ul>
       </div>
 
@@ -196,9 +231,43 @@ export function Timeline({ maker, orderHash }: { maker: string; orderHash: strin
   );
 }
 
-function Row({ e, reserveBps }: { e: TimelineEvent; reserveBps: number }) {
+function Row({
+  e,
+  reserveBps,
+  maker,
+  you,
+}: {
+  e: TimelineEvent;
+  reserveBps: number;
+  /** The round's maker, so an event acted by the maker says so. */
+  maker: string;
+  /** The connected wallet. */
+  you?: string | null;
+}) {
   const isReveal = e.kind === "BID_REVEALED";
   const reserveSet = isReveal && (e.secondBpsAfter ?? 0) < reserveBps;
+
+  // DELIBERATELY ONLY THE TIMELESS ROLES HERE. `house`, `you`, `maker` and `filled` are
+  // true of the actor at the moment of the event; `winner` and `leading` are not -- at the
+  // block a reveal landed, nobody knew who would win, and the row's own words ("took the
+  // lead", "did not take the lead") already say what was true then. Stamping the eventual
+  // winner onto their first reveal would be hindsight rendered as a fact.
+  const actorRoles = rolesOf({
+    addr: e.actor,
+    you,
+    maker,
+    bidder: e.kind === "BID_COMMITTED" || e.kind === "BID_REVEALED",
+    filledBy: e.kind === "AUCTION_FILLED" ? e.actor : null,
+  });
+  const winnerRoles = rolesOf({
+    addr: e.winner,
+    you,
+    maker,
+    bidder: true,
+    bestBidder: e.winner,
+    // An AUCTION_SETTLED event is the round settling, so "winner" is the honest word.
+    settled: true,
+  });
 
   return (
     <li className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-2.5 text-[0.86rem]">
@@ -213,7 +282,10 @@ function Row({ e, reserveBps }: { e: TimelineEvent; reserveBps: number }) {
       <span className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink">
         {KIND_LABEL[e.kind] ?? e.kind}
       </span>
-      <span className="tnum text-ink-faint">{short(e.actor)}</span>
+      <AddressLink addr={e.actor} role={actorRoles[0]} className="text-[0.8rem]" />
+      {actorRoles.slice(1).map((r) => (
+        <RoleChip key={r} role={r} />
+      ))}
 
       {isReveal && (
         <>
@@ -244,7 +316,8 @@ function Row({ e, reserveBps }: { e: TimelineEvent; reserveBps: number }) {
       {e.kind === "AUCTION_SETTLED" && (
         <>
           <span className="tnum text-ink">{num(e.clearingBps ?? 0)} bps</span>
-          <span className="tnum text-ink-faint">to {short(e.winner)}</span>
+          <span className="text-ink-faint">to</span>
+          <AddressLink addr={e.winner} role={winnerRoles[0]} className="text-[0.8rem]" />
           {e.winnerForfeited && <span className="text-brick">winner forfeited</span>}
           <span className={e.matchesDerivation ? "text-glass" : "text-brick"}>
             {e.matchesDerivation

@@ -1,5 +1,7 @@
 "use client";
 
+import { useAccount } from "wagmi";
+
 import { type Auction, livePhase } from "@/lib/useAuctions";
 
 const num = (n?: number | null) =>
@@ -14,7 +16,11 @@ const eq = (a: string | null | undefined, b: string) => !!a && a.toLowerCase() =
 // Was a local copy pointing at Basescan only; now the shared one, which leads with the
 // address's own record here. On this page that also means a visitor can walk from one
 // bidder to another rather than reaching a dead end at a block explorer.
-import { AddressLink } from "./Address";
+import { AddressLink, RoleChip } from "./Address";
+// The role vocabulary, computed from the fields this component already derived. `rolesOf`
+// lives beside the account header so the header and this section cannot disagree about what
+// one address is -- the same reason ROLE_COPY is in lib/identity.ts rather than inline.
+import { rolesOf } from "./Identity";
 
 // The three the mapping emits, and ONLY those -- subgraph/src/provenance.ts is the single
 // place these values are produced. This said "UNLISTED" until web/lib/subgraph.ts was
@@ -235,7 +241,7 @@ function StatTiles({ account }: { account: Account }) {
     ["fills", num(account.fillsRecorded)],
   ];
   return (
-    <div className="border border-rule bg-raised rounded-card shadow-card p-5">
+    <div className="card">
       <div className="flex flex-wrap gap-6">
         {items.map(([k, v, tone]) => (
           <div key={k}>
@@ -317,8 +323,10 @@ function RoundsList({ account }: { account: Account }) {
                 r.filledByThem ? (
                   <span className="text-glass">filled by them</span>
                 ) : (
-                  <span className="tnum text-ink-soft">
-                    filled · <AddressLink addr={r.filledBy} />
+                  <span className="text-ink-soft">
+                    {/* `filled` is read, not inferred: this cell exists because
+                        `Auction.filledBy` named this address on this round. */}
+                    filled · <AddressLink addr={r.filledBy} role="filled" />
                   </span>
                 )
               ) : r.winnerForfeited ? (
@@ -358,20 +366,38 @@ function RoundsList({ account }: { account: Account }) {
  * this address (as maker, bidder, or filler) unlocks the stat tiles below.
  */
 export function Profile({ address, auctions, head }: { address: string; auctions: Auction[]; head: number }) {
+  const { address: connected } = useAccount();
   const account = deriveAccount(address, auctions, head);
   const touched = account.rounds.length > 0;
 
+  // THE ROLES THIS SECTION CAN HONESTLY CLAIM, and no others. `maker` only when at least
+  // one loaded round names this address as its maker (`deriveAccount` counted them), `you`
+  // only from the connected wallet. There is no round in hand here, so `house`, `winner`,
+  // `leading` and `filled` -- all facts ABOUT a round -- are left to the rows below, where
+  // the round they belong to is on screen beside them.
+  //
+  // An untouched account therefore carries at most "you": a mark and a chip must not make
+  // an empty record look like a populated one, which is the same failure as the wall of
+  // zeros this page already refuses.
+  const roles = rolesOf({ addr: address, you: connected, opened: account.auctionsOpened > 0 });
+
   return (
     <div>
-      <header className="mb-5 flex flex-wrap items-center gap-3">
-        <h2 className="font-display text-xl font-normal">
-          <AddressLink addr={address} />
-        </h2>
+      {/* Not the address as a heading: the page header above already carries it as the h1,
+          and the same 42 characters twice reads as a rendering bug. This names the SECTION
+          -- the board's recent window -- and keeps the address beside it as a link, marked,
+          so a reader can see it is the same participant. */}
+      <header className="mb-5 flex flex-wrap items-baseline gap-x-3 gap-y-2">
+        <h2 className="font-display text-xl font-normal">On the board</h2>
+        <AddressLink addr={address} role={roles[0]} />
+        {roles.slice(1).map((r) => (
+          <RoleChip key={r} role={r} />
+        ))}
         {account.provenance && <ProvenanceChip provenance={account.provenance} />}
       </header>
 
       {!touched ? (
-        <div className="border border-rule bg-raised rounded-card shadow-card p-6">
+        <div className="card">
           {auctions.length === 0 ? (
             <p className="text-ink-soft">Nothing has loaded from the chain or the fallback snapshot yet.</p>
           ) : (

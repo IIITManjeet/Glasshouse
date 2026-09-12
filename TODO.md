@@ -8,6 +8,117 @@ Findings referenced as F-n live in `DESIGN.md`.
 
 ---
 
+## SUBMISSION — 2026-09-13, 12:00 ET. Everything below is dated 2026-09-12 evening.
+
+Path chosen: **Finalist + Partner Prizes** (so Round 1 async screening, then live judging Mon
+14th if it passes: 4 min demo + 3 min Q&A). Partner prizes to select, max 3: **The Graph,
+1inch, Uniswap**. Rules read from `ethglobal.com/events/ethonline2026/info/details` and the
+prizes page; organiser email treated as authoritative where the two differ.
+
+### Only you can do these — they are outside the repo
+
+- [ ] **Submit the Uniswap Developer Feedback Form.** The $5K Best Stack Contribution track
+      requires "a completed submission" to their external form. `FEEDBACK.md` existing in the
+      repo does NOT satisfy it — grep for `feedback form|forms.gle|typeform` returns nothing,
+      so this has almost certainly never been done. Paste from `FEEDBACK.md`; the struct
+      incompatibility between `SwapRouter` and `SwapRouter02` is the substantive finding.
+- [ ] **Confirm every team member is staked and marked a confirmed hacker** on the Hacker
+      Dashboard. Not checkable from the repo. Unstaked members cannot be on the team.
+- [ ] **Fill in the dashboard submission form** — repo URL, description, the three partner
+      prizes, the video link, and the Finalist-vs-Partner-only choice. It can be edited up to
+      the deadline, so put placeholders in early and hit Submit again after each edit.
+- [ ] **Record the demo video.** Hard gate: 2–4 minutes (anything outside is AUTO-REJECTED,
+      and do not speed footage up to fit), minimum 720p, real spoken human narration, **no
+      music**, no text-to-speech or AI voiceover, not recorded on a phone, intro under ~20 s,
+      and if slides appear, max 4 bullets each. Two Graph tracks require a video of their own.
+- [ ] **Export `GRAPH_API_KEY` in whichever shell you record from.** It is NOT in `.env.local`
+      (that file holds only `VERCEL_OIDC_TOKEN`); the crosscheck passed today only because the
+      key was in the ambient environment. `npm run crosscheck` dies without it, and running it
+      on camera is one of the strongest things we can show.
+- [ ] **Run a capped keeper batch shortly before recording** so a visitor finds a round taking
+      bids: `KEEPER_MAX_ROUNDS=5`. Measured cost ~0.0000022 ETH/round against a balance good
+      for ~240 rounds. Deliberately not left running unattended — the risk to manage is
+      arriving at judging with the money already spent.
+
+### Fix before recording
+
+- [ ] **The video script narrates fork numbers.** `DECISIONS.md:224` beat 3 says "0.01 WETH in,
+      38.986354 USDC out" — that is the anvil fork. The mainnet fill is order `0x58296d32…`,
+      **0.00001 WETH in, 24,096 USDC out**, cleared at the runner-up's 250 bps
+      (`README.md:245-250`). The script predates the mainnet run. The 1inch track explicitly
+      wants on-chain token execution shown in the demo, so this beat has to be re-cut to the
+      real order — and it is a stronger beat, not a weaker one.
+- [ ] **The production URL is nowhere in `README.md` or `DEPLOY.md`.** It is
+      `https://glasshouse-ashy.vercel.app`, found only in `DESIGN.md` and
+      `scripts/shoot-screens.mjs`. A judge should not have to grep for the deployed site.
+- [ ] **After the keeper batch:** `node scripts/verify-run.mjs --emit`, then
+      `npm --prefix web run build`, then redeploy, so `/evidence` shows the newest round rather
+      than block 51,208,894. Then re-check `/`, `/rounds`, `/evidence`, `/account`, `/faq`.
+- [ ] **Give `/rounds` a pause before you point a camera at it.** F-11: its chain read takes
+      ~2.3 s and an early capture looks exactly like a broken table.
+- [ ] `DECISIONS.md` has several blank `[ ] In your words` lines (around :31, :41, :74, :108,
+      :145, :157). That file's stated purpose is to be the source the video is narrated from
+      and the evidence of human direction, so the blanks are worth filling in your own voice.
+
+### Frontend restructure — the owner's six complaints, in flight tonight
+
+Diagnosis: the site was an essay wearing a venue's palette. `/evidence` alone is ~1,600 words;
+`.btn-primary` had ONE call site in the entire app (the wallet button) while the two buttons
+the product exists for were drawn in `BidPanel`'s own outline constants; there was no `.card`
+primitive at all, so fifteen-odd hand-composed card recipes made clickable tiles and inert
+figures byte-identical; and `RoundsTable` lit up a whole row on hover while only one cell was a
+link. Architecture decided by Fable, recorded in this session.
+
+- [x] **Step 0 — the shared contract.** `.card`/`.card-head`/`.card-foot`, `.row-link`,
+      `.addr-mark`, `.prose-measure`, `.btn-danger-solid`; primary is now 44px sans 600 and the
+      chip is neutral, so teal is spent only on the primary button and `.chip-live`.
+      `web/lib/identity.ts` + 9 tests. Two latent bugs fixed on the way: `.btn-toggle` was
+      declared before `.btn` so its own size never applied, and `--color-lifted` is `#ffffff`
+      on the light theme — identical to `--color-raised` — so any hover or header painted with
+      it was invisible in the theme most judges will see. (6755cd1)
+- [ ] **WS-A — chrome, routes, FAQ.** Nav becomes `Live · Rounds · Evidence · FAQ`; a real
+      four-column footer carrying every link; `/faq` with 20 questions whose answers are LIFTED
+      from existing prose rather than rewritten; one type register everywhere; `/evidence` and
+      `/round` trimmed; `/board` → `/` redirect.
+- [ ] **WS-B — the instrument at `/`.** The live round becomes the front door, keeping exactly
+      one sentence of what-this-is above it. All five `BTN_*` constants deleted; one primary per
+      view, changing label through the round's states.
+- [ ] **WS-C — rounds as a market.** A promoted tile whose countdown is the biggest thing on
+      the page, a visible bid strip, a row-link contract that no longer lies, and an honest
+      "last settled" tile when nothing is open — which is what every exchange shows when the
+      market is quiet.
+- [ ] **WS-D — personification without invention.** A deterministic two-hue mark, real ENS when
+      it resolves, and roles read from chain fields (`house`, `you`, `winner`, `leading`,
+      `filled`, `maker`). `Identity.tsx`'s refusal of identicons STANDS: no generated names, no
+      faces, full hex always visible and copyable. A colour derived from the bytes is a
+      rendering of the address, not a claim about anyone.
+- [ ] **Integration:** build, `lint:page`, `npm test`, walk every route at 390px and 1280px in
+      both themes measuring `scrollWidth` vs `innerWidth`, count `.btn-primary` per view, then
+      delete `HowToBid.tsx` once nothing imports it.
+
+Revert target if tonight goes wrong: tag **`pre-frontend-restructure`**.
+
+### Measured today, and green
+
+`npm test`: 97 Solidity + 59 JS + provenance lint, all passing. `verify-run` against Base
+mainnet: **8 passed / 0 failed / 0 n/a** across 9 auctions — every check it can make now has
+something real to make it against. `crosscheck`: **135 field comparisons across 9 auctions, all
+agreeing**. Static export clean. All five deployed routes 200. Repo public. `main` level with
+`origin/main`.
+
+### Housekeeping, after the deadline
+
+- [ ] `.nowrap-token` is declared in `globals.css` and has zero call sites anywhere in `web/`.
+      Dead, or reserved for something unwritten.
+- [ ] `CHECKIN.txt` still says "6 passed, 1 failed, 1 n/a" and "two auctions". It is untracked
+      by design so it misrepresents nothing shipped, but it badly undersells the current state
+      to anyone who reads it while prepping the pitch.
+- [ ] `web/AGENTS.md` is the auto-generated `next dev` block, not project guidance, and
+      `web/CLAUDE.md` is one line pointing at it. The house frontend conventions now live in
+      `.claude/skills/glasshouse-frontend/SKILL.md` instead.
+
+---
+
 ## In progress
 
 - [x] **The keeper survives an interruption, and skips a round it cannot ship.**

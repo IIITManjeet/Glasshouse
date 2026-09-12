@@ -9,6 +9,7 @@ import { Providers } from "./providers";
 import { DemoBanner } from "@/components/DemoMode";
 import { StatusBar } from "@/components/StatusBar";
 import { Theme } from "@/components/Theme";
+import { Footer } from "@/components/Footer";
 
 /**
  * TWO faces now, not three. Newsreader is gone.
@@ -97,33 +98,37 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Theme>
           <div className="mx-auto max-w-6xl px-5 py-6">
             <header className="mb-8 flex flex-wrap items-baseline justify-between gap-4 border-b border-rule pb-4">
-              {/* A WORDMARK, NOT A BREADCRUMB. This was one run of 11px mono in which the
-                  product's name carried exactly the same weight as the opcode it is built
-                  on, so the site never quite said what it was called. The name leads now;
-                  the lineage stays, because "1inch SwapVM / opcode 0x2e" is worth claiming
-                  on every page, but it is secondary and now reads that way. */}
+              {/* A WORDMARK, AND NOW ONLY THAT.
+                  It used to carry `/ 1inch SwapVM / opcode 0x2e` beside it on every page.
+                  The lineage is worth claiming -- it is the whole novelty -- but not on the
+                  one line a visitor actually reads, where it competed with the product's own
+                  name for the same glance. It says it once now, in the footer, under a
+                  sentence that says what the thing does. */}
               <Link href="/" className="group flex items-baseline gap-2.5">
                 <span className="font-display text-base font-semibold tracking-[0.02em] text-ink group-hover:text-glass">
                   GLASSHOUSE
                 </span>
-                <span className="hidden font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint sm:inline">
-                  <span className="text-glass">/</span> 1inch SwapVM{" "}
-                  <span className="text-glass">/</span> opcode 0x2e
-                </span>
               </Link>
               {/* NavLink marks the page you are on (DESIGN.md F-6). Four identical links
                   gave a visitor arriving from a shared link no way to tell where they had
-                  landed, which is the cheapest orientation cue there is. */}
+                  landed, which is the cheapest orientation cue there is.
+
+                  FOUR ENTRIES, AND `Bidders` IS NOT ONE OF THEM. /account answers "what has
+                  this address done", which is a question you ask ABOUT something you are
+                  already looking at -- and every address on the site is already a link to
+                  its own profile. As a top-level destination it was a page you arrive at
+                  with an empty form and nothing to type into it. The footer keeps it as
+                  "Look up an address", which is what it is for.
+
+                  FAQ IS NEW AND IS NOT AN APPENDIX. Every instrument panel that needs to
+                  explain itself deep-links into /faq#anchor, so it has to be reachable from
+                  the nav for the same reason Evidence is: a reader who wants the mechanism
+                  rather than the numbers has somewhere to go that is not the essay. */}
               <nav className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[0.8125rem] font-medium text-ink-soft">
-                <NavLink href="/board">Board</NavLink>
+                <NavLink href="/">Live</NavLink>
                 <NavLink href="/rounds">Rounds</NavLink>
                 <NavLink href="/evidence">Evidence</NavLink>
-                {/* The record page had no entry in this nav at all: it was reachable only
-                    from a link inside StatusBar, whose job is provenance rather than
-                    navigation, sat beside the rehearsal toggle. That hid the one surface
-                    where the subgraph's own fields live -- provenance, and bids sealed
-                    versus opened -- behind a URL you had to already know. */}
-                <NavLink href="/account">Bidders</NavLink>
+                <NavLink href="/faq">FAQ</NavLink>
                 {/* AFTER the nav and visually quieter than it, because connecting is
                     optional here and the placement should say so. Reading this site needs
                     no wallet; only bidding does, and that rule is one of the better
@@ -144,23 +149,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 raises a banner, not just a chip. */}
             <DemoBanner />
             {children}
-            <footer className="mt-16 border-t border-rule pt-5 font-mono text-[0.72rem] leading-relaxed text-ink-faint">
-              <p>
-                Book{" "}
-                <a className="text-glass" href="https://basescan.org/address/0xc4ea91Fe700918220423ac307C6B1c59650FFbfe" target="_blank" rel="noopener">
-                  0xc4ea91Fe700918220423ac307C6B1c59650FFbfe
-                </a>
-              </p>
-              <p>
-                Router{" "}
-                <a className="text-glass" href="https://basescan.org/address/0x5c3baE054e8b4915a13726B397b1AeA864247DBf" target="_blank" rel="noopener">
-                  0x5c3baE054e8b4915a13726B397b1AeA864247DBf
-                </a>
-              </p>
-              <p className="mt-2">
-                Built on the official 1inch Aqua and SwapVM contracts, consumed as dependencies and not vendored.
-              </p>
-            </footer>
+            {/* One footer, on every route, and the only place on the site that states the
+                product in one sentence. It replaced three lines of mono that printed two
+                addresses in full and named a dependency -- true, and not one of the four
+                things a reader arriving cold needs. */}
+            <Footer />
           </div>
           </Theme>
         </Providers>

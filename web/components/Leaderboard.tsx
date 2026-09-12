@@ -2,6 +2,9 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useMemo } from "react";
+import { useAccount } from "wagmi";
+import { AddressLink, RoleChip } from "./Address";
+import { rolesOf } from "./Identity";
 import type { Auction, Source } from "@/lib/useAuctions";
 
 /**
@@ -28,14 +31,20 @@ import type { Auction, Source } from "@/lib/useAuctions";
  * this table with no explanation.
  */
 
-const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
-
 type Row = {
   bidder: string;
   entered: number;
   revealed: number;
   won: number;
   best: number | null;
+  /**
+   * This address bid in a round IT opened. Carried on the row because the leaderboard is
+   * the one view where a bidder is not shown beside a round, so the disclosure has nowhere
+   * else to live -- and the caption's promise that "the keeper bids too, and is disclosed
+   * rather than filtered out" was until now a sentence with nothing marking WHICH row it
+   * was about.
+   */
+  house: boolean;
 };
 
 /**
@@ -53,8 +62,11 @@ export function standings(auctions: Auction[]): Row[] {
     for (const b of a.bids) {
       if (!b.bidder) continue;
       const key = b.bidder.toLowerCase();
-      const row = by.get(key) ?? { bidder: b.bidder, entered: 0, revealed: 0, won: 0, best: null };
+      const row =
+        by.get(key) ?? { bidder: b.bidder, entered: 0, revealed: 0, won: 0, best: null, house: false };
       row.entered += 1;
+      // Read from the round's own `maker` field, never from a list of addresses we keep.
+      if (a.maker && a.maker.toLowerCase() === key) row.house = true;
       if (b.bps !== null && b.bps !== undefined) {
         row.revealed += 1;
         row.best = row.best === null ? b.bps : Math.max(row.best, b.bps);
@@ -83,6 +95,7 @@ export function Leaderboard({
   className?: string;
 }) {
   const reduced = useReducedMotion();
+  const { address: connected } = useAccount();
   const rows = useMemo(() => standings(auctions), [auctions]);
   const simulated = source === "sim";
   const settledCount = auctions.filter((a) => a.settled).length;
@@ -118,7 +131,7 @@ export function Leaderboard({
         </div>
       ) : (
         <div className="overflow-x-auto px-4 py-4">
-          <table className="w-full min-w-[34rem] border-collapse text-[0.84rem]">
+          <table className="w-full min-w-[40rem] border-collapse text-[0.84rem]">
             <thead>
               <tr className="border-b border-rule text-left font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">
                 <th className="w-8 py-2 pr-3 font-normal">#</th>
@@ -131,31 +144,47 @@ export function Leaderboard({
             </thead>
             <tbody>
               <AnimatePresence initial={false}>
-                {rows.map((r, i) => (
-                  <motion.tr
-                    key={r.bidder.toLowerCase()}
-                    // `layout` is what makes a rank change read as a rank change rather
-                    // than as the numbers silently swapping under a fixed order.
-                    layout={!reduced}
-                    initial={reduced ? false : { opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.28, ease: [0.22, 0.61, 0.36, 1] }}
-                    className={`border-b border-rule ${i === 0 && r.won > 0 ? "bg-glass-soft" : ""}`}
-                  >
-                    <td className="tnum py-2.5 pr-3 text-ink-faint">{i + 1}</td>
-                    <td className="tnum py-2.5 pr-4">{short(r.bidder)}</td>
-                    <td className="tnum py-2.5 pr-4 text-right">{r.entered}</td>
-                    <td className="tnum py-2.5 pr-4 text-right">
-                      {r.revealed}
-                      <span className="text-ink-faint"> of {r.entered}</span>
-                    </td>
-                    <td className={`tnum py-2.5 pr-4 text-right ${r.won > 0 ? "text-glass" : "text-ink-faint"}`}>
-                      {r.won}
-                    </td>
-                    <td className="tnum py-2.5 text-right">{r.best === null ? "—" : `${r.best} bps`}</td>
-                  </motion.tr>
-                ))}
+                {rows.map((r, i) => {
+                  // `house` is decided in standings() from each round's maker; `you` from
+                  // the connected wallet. Both go through rolesOf so this table, the bid
+                  // ladder and the receipt order the same two labels the same way.
+                  const roles = rolesOf({
+                    addr: r.bidder,
+                    you: connected,
+                    maker: r.house ? r.bidder : null,
+                    bidder: true,
+                  });
+                  return (
+                    <motion.tr
+                      key={r.bidder.toLowerCase()}
+                      // `layout` is what makes a rank change read as a rank change rather
+                      // than as the numbers silently swapping under a fixed order.
+                      layout={!reduced}
+                      initial={reduced ? false : { opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.28, ease: [0.22, 0.61, 0.36, 1] }}
+                      className={`border-b border-rule ${i === 0 && r.won > 0 ? "bg-glass-soft" : ""}`}
+                    >
+                      <td className="tnum py-2.5 pr-3 text-ink-faint">{i + 1}</td>
+                      <td className="py-2.5 pr-4">
+                        <AddressLink addr={r.bidder} role={roles[0]} />
+                        {roles.slice(1).map((role) => (
+                          <RoleChip key={role} role={role} />
+                        ))}
+                      </td>
+                      <td className="tnum py-2.5 pr-4 text-right">{r.entered}</td>
+                      <td className="tnum py-2.5 pr-4 text-right">
+                        {r.revealed}
+                        <span className="text-ink-faint"> of {r.entered}</span>
+                      </td>
+                      <td className={`tnum py-2.5 pr-4 text-right ${r.won > 0 ? "text-glass" : "text-ink-faint"}`}>
+                        {r.won}
+                      </td>
+                      <td className="tnum py-2.5 text-right">{r.best === null ? "—" : `${r.best} bps`}</td>
+                    </motion.tr>
+                  );
+                })}
               </AnimatePresence>
             </tbody>
           </table>
