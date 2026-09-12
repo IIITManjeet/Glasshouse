@@ -301,18 +301,60 @@ with real money, on a public chain.
   are very different claims.
 - **Messari conformance is not claimed.** Its generic schema wants non-null USD TVL and revenue
   fields an auction book does not have and that we would have to fabricate.
-- **A real asymmetry, and it is ours.** Bidders post bonds; the maker posts nothing. A maker
-  can open an auction against an order they never ship. The contract already refuses to mark a
+- **A real asymmetry, and it is ours** (see *Future work* (2)). Bidders post bonds; the maker
+  posts nothing. A maker can open an auction against an order they never ship. The contract already refuses to mark a
   winner forfeited without positive evidence someone else filled (`GlasshouseBook.sol:262-277`)
   precisely because it cannot distinguish a no-show from a misconfigured hook. A maker-side
   bond is the fix, and it is v2: the Book has no upgrade path by design, so it means a new
   deployment.
 
-## Where this goes next: invite-only playgrounds
+## Future work
 
-**Not built. Nothing below is deployed, and the site does not mention it.** It is here because
-it is the direction the architecture actually points, and because the shape of it is decided by
-constraints this repo already has rather than by preference.
+**Nothing in this section is built, and the site does not mention any of it.** It is written
+down because the shape of each item is already decided by constraints this repo has, not by
+preference — and because a project that knows what it deferred is easier to trust than one
+that presents everything it shipped as everything it intended.
+
+Collected here rather than left scattered, in the order we would do them.
+
+### 1. Invite-only playgrounds
+
+The headline item, and the one that most changes what Glasshouse is: private groups where you
+invite friends and run your own auctions. Full design below.
+
+### 2. A maker-side bond
+
+**The one real asymmetry in the mechanism, and it is ours.** Bidders post bonds; the maker
+posts nothing, so a maker can open an auction against an order they never ship. The contract
+already refuses to mark a winner forfeited without positive evidence that somebody else
+filled (`GlasshouseBook.sol:262-277`), precisely because it cannot tell a no-show from a
+misconfigured hook — so the hole is real and the contract is honest about it rather than
+papering over it.
+
+Playgrounds make this sharper rather than softer: a stranger's room opening auctions against
+orders that never ship is exactly the attack, so (2) is a prerequisite for letting anyone
+open a room, not an optional follow-up to it.
+
+### 3. `web/lib/bid.js` and `chain.js` to TypeScript
+
+1,400 lines of wallet and signing code on the path every bid takes, almost entirely
+untested — only `decodeAuction` and the poll's call budget are covered. It is the right
+migration and it was deliberately **not** done before submission: a large diff with no
+observable benefit to a reader, on the one flow that has to work live. Worth doing first in
+any serious continuation, because every item above it touches that code.
+
+### 4. Messari conformance, or a written refusal of it
+
+`subgraph/` follows Messari naming conventions but **conformance is not claimed**: the generic
+schema wants non-null USD TVL and revenue fields that an auction book does not have and that
+we would have to fabricate. Either the schema grows a way to say "not applicable", or this
+stays a documented divergence. What it must not become is invented numbers.
+
+---
+
+## Invite-only playgrounds, in detail
+
+The design, because it is settled by constraints rather than by taste.
 
 **The constraint that settles the design.** `GlasshouseBook` has no owner, no admin and no
 upgrade path, and its parameters are immutable after `open` (`GlasshouseBook.sol:17`). So a
@@ -376,6 +418,23 @@ with **bond 0 and no merkle gate** — public rooms only. That proves the indexi
 which is the hard part and the novel part, without touching the bond path or claiming a privacy
 property. Membership gating comes after, and a factory holding other people's bonds is new
 unaudited code that should not be rushed.
+
+### The order we would build it in
+
+Phases, not a wish list: each one is shippable on its own and each is useless without the one
+above it.
+
+| | | Why it is this size |
+|---|---|---|
+| **1** | `GlasshouseBookFactory` — deploys the **existing, unchanged** Book and emits `RoomCreated` | The Book is already written and already deployed. A factory that changes nothing about the auction is the cheapest possible way to get many of them. |
+| **2** | A `templates:` data source, so one subgraph indexes every room ever opened | The hard and novel part, and the reason to do this at all. `dataSource.create()` follows contracts that did not exist when the subgraph was deployed — which the board's own direct-chain fallback can never do, because it cannot read a contract it was not compiled knowing about. |
+| **3** | `/rooms`, a create flow, and a room-scoped board | Mostly plumbing: the board already reads a Book address, so this is routing rather than new mechanism. |
+| **4** | A v2 Book with merkle-gated `commit`, and invite links | The deployed Book has no gate and no upgrade path, so this is a new contract with new tests and a new deployment. Also where a maker-side bond has to land, since by then strangers are opening rooms. The one phase not to rush: new unaudited code holding other people's bonds. |
+| **5** | Extend `verify-run.mjs` and `cross-check-subgraph.mjs` to walk N Books | The proofs are the product. A room whose settlement nobody independently replays is not a Glasshouse room. |
+
+**Phases 1–3 are the honest first milestone**: public rooms, bond 0, no gate. That proves the
+indexing architecture without touching the bond path and without claiming a privacy property
+we cannot deliver.
 
 ## Why not an AVS / restaking?
 
