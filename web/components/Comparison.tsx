@@ -86,7 +86,7 @@ export function Comparison() {
       <div className="overflow-x-auto px-4 py-4">
         <table className="w-full min-w-[42rem] border-collapse text-[0.84rem]">
           <thead>
-            <tr className="border-b border-rule text-left font-mono text-[0.64rem] uppercase tracking-[0.12em] text-ink-faint">
+            <tr className="border-b border-rule text-left font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">
               <th className="py-2 pr-4 font-normal">Gate</th>
               <th className="py-2 pr-4 text-right font-normal">Winner values</th>
               <th className="py-2 pr-4 text-right font-normal">Maker gives up</th>

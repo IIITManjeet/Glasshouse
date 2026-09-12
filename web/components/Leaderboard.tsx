@@ -94,7 +94,7 @@ export function Leaderboard({
           Who has been bidding
         </span>
         <span
-          className={`border px-2 py-0.5 font-mono text-[0.64rem] uppercase tracking-[0.12em] ${
+          className={`border px-2 py-0.5 font-mono text-[0.6875rem] uppercase tracking-[0.12em] ${
             simulated ? "border-amber text-amber" : "border-glass text-glass"
           }`}
         >
@@ -120,7 +120,7 @@ export function Leaderboard({
         <div className="overflow-x-auto px-4 py-4">
           <table className="w-full min-w-[34rem] border-collapse text-[0.84rem]">
             <thead>
-              <tr className="border-b border-rule text-left font-mono text-[0.64rem] uppercase tracking-[0.12em] text-ink-faint">
+              <tr className="border-b border-rule text-left font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">
                 <th className="w-8 py-2 pr-3 font-normal">#</th>
                 <th className="py-2 pr-4 font-normal">bidder</th>
                 <th className="py-2 pr-4 text-right font-normal">rounds entered</th>

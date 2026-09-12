@@ -78,7 +78,7 @@ export function Verification() {
           <li key={c.name} className="flex gap-3 px-4 py-3">
             <span
               className={[
-                "mt-0.5 shrink-0 font-mono text-[0.66rem] uppercase tracking-[0.1em]",
+                "mt-0.5 shrink-0 font-mono text-[0.6875rem] uppercase tracking-[0.1em]",
                 c.ok === false ? "text-brick" : c.ok === null ? "text-ink-faint" : "text-glass",
               ].join(" ")}
               style={{ minWidth: "3.2rem" }}

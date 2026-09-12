@@ -77,7 +77,7 @@ export function PhaseTrack({ a, head }: { a: Auction; head: number }) {
               isVoid ? "opacity-60" : "",
             ].join(" ")}
           >
-            <div className="font-mono text-[0.66rem] uppercase tracking-[0.12em] text-ink-faint">{c.key}</div>
+            <div className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">{c.key}</div>
             <div className="tnum mt-1 text-[0.78rem] text-glass">{c.range}</div>
             {isActive && c.end ? (
               <div className="tnum mt-1 text-[0.78rem] text-glass">
@@ -137,7 +137,7 @@ export function BidCards({ a }: { a: Auction }) {
               {isHouse && (
                 <span
                   title="The keeper bids from the maker's own address, always first, and cannot read a sealed rival."
-                  className="border border-amber px-1.5 py-0.5 font-mono text-[0.58rem] uppercase tracking-[0.1em] text-amber"
+                  className="border border-amber px-1.5 py-0.5 font-mono text-[0.6875rem] uppercase tracking-[0.1em] text-amber"
                 >
                   house · the maker
                 </span>
@@ -213,7 +213,7 @@ export function Stats({ a, head }: { a: Auction; head: number }) {
     <div className="mt-4 flex flex-wrap gap-6">
       {items.map(([k, v]) => (
         <div key={k}>
-          <div className="font-mono text-[0.66rem] uppercase tracking-[0.12em] text-ink-faint">{k}</div>
+          <div className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">{k}</div>
           <div className="tnum mt-0.5 text-sm text-ink">{v}</div>
         </div>
       ))}

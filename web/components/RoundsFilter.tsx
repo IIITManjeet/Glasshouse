@@ -140,7 +140,7 @@ export function RoundsFilterTabs({
                   : "text-ink-soft hover:text-ink",
             ].join(" ")}
           >
-            {f.label} <span className="tnum ml-0.5 text-[0.68rem]">{n}</span>
+            {f.label} <span className="tnum ml-0.5 text-[0.6875rem]">{n}</span>
           </button>
         );
       })}

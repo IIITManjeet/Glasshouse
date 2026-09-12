@@ -62,7 +62,7 @@ export function ReservePanel({ auctions, source, head }: { auctions: Auction[]; 
           Next auction · reserve
         </span>
         <span
-          className={`border px-2 py-0.5 font-mono text-[0.64rem] uppercase tracking-[0.12em] ${
+          className={`border px-2 py-0.5 font-mono text-[0.6875rem] uppercase tracking-[0.12em] ${
             simulated ? "border-amber text-amber" : "border-glass text-glass"
           }`}
         >
@@ -73,13 +73,13 @@ export function ReservePanel({ auctions, source, head }: { auctions: Auction[]; 
 
       <div className="grid gap-x-8 gap-y-4 px-4 py-4 sm:grid-cols-3">
         <div>
-          <div className="font-mono text-[0.66rem] uppercase tracking-[0.12em] text-ink-faint">
+          <div className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">
             recommended reserve
           </div>
           <div className="tnum mt-1 text-2xl text-glass">{num(rec.bps)} bps</div>
         </div>
         <div>
-          <div className="font-mono text-[0.66rem] uppercase tracking-[0.12em] text-ink-faint">band</div>
+          <div className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">band</div>
           <div className="tnum mt-1 text-[0.9rem] text-ink">
             {num(rec.band[0])} – {num(rec.band[1])} bps
           </div>
@@ -90,14 +90,14 @@ export function ReservePanel({ auctions, source, head }: { auctions: Auction[]; 
           </div>
         </div>
         <div>
-          <div className="font-mono text-[0.66rem] uppercase tracking-[0.12em] text-ink-faint">reason</div>
+          <div className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">reason</div>
           <div className="mt-1 font-mono text-[0.8rem] text-ink">{rec.reason}</div>
           <div className="mt-1 text-[0.76rem] text-ink-faint">{REASONS[rec.reason] ?? ""}</div>
         </div>
       </div>
 
       <div className="border-t border-rule px-4 py-3 text-[0.8rem] text-ink-soft">
-        <span className="font-mono text-[0.66rem] uppercase tracking-[0.12em] text-ink-faint">window</span>{" "}
+        <span className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">window</span>{" "}
         <span className="tnum">
           {num(rec.n)} of K = 8 · {num(rec.strong)} contested · {num(rec.weak)} thin · {num(rec.empty)} with no
           reveal · {num(rec.unrevealed)} envelopes never opened
@@ -133,7 +133,7 @@ export function ReservePanel({ auctions, source, head }: { auctions: Auction[]; 
 
       <div className="border-t border-rule px-4 py-3">
         <div className="mb-2 flex items-center justify-between gap-3">
-          <span className="font-mono text-[0.66rem] uppercase tracking-[0.12em] text-ink-faint">
+          <span className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">
             open the next round
           </span>
           <button

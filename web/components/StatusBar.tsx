@@ -51,7 +51,7 @@ export function StatusBar() {
     <div
       className={[
         "mb-8 flex flex-wrap items-center gap-x-5 gap-y-2 border-y px-3 py-2",
-        "font-mono text-[0.66rem] tracking-[0.1em] uppercase",
+        "font-mono text-[0.6875rem] tracking-[0.1em] uppercase",
         demo ? "border-amber bg-amber-soft text-amber" : "border-rule bg-sunk text-ink-faint",
       ].join(" ")}
     >

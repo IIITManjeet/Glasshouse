@@ -85,7 +85,7 @@ export default function Home() {
             ] as const
           ).map(([label, value, note, tone]) => (
             <div key={label}>
-              <div className="font-mono text-[0.66rem] uppercase tracking-[0.12em] text-ink-faint">
+              <div className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">
                 {label}
               </div>
               <div className={`tnum mt-1.5 text-4xl sm:text-5xl ${tone}`}>{value}</div>
@@ -134,7 +134,7 @@ export default function Home() {
               <span className="flex flex-wrap items-center gap-x-4 gap-y-2">
                 <span
                   className={[
-                    "border px-2 py-0.5 font-mono text-[0.64rem] uppercase tracking-[0.12em]",
+                    "border px-2 py-0.5 font-mono text-[0.6875rem] uppercase tracking-[0.12em]",
                     phase === "commit" ? "border-rule bg-sunk text-ink-soft"
                       : phase === "reveal" ? "border-amber bg-amber-soft text-amber"
                         : phase === "exclusive" ? "border-glass bg-glass-soft text-glass"
@@ -181,7 +181,7 @@ export default function Home() {
 
       <div>
         <section className="border-t border-rule py-14 sm:py-16">
-          <p className="font-mono text-[0.68rem] uppercase tracking-[0.14em] text-glass">
+          <p className="font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-glass">
             End to end
           </p>
           <h2 className="mt-3 mb-8 max-w-2xl font-display text-2xl leading-snug font-semibold sm:text-3xl">
@@ -207,7 +207,7 @@ export default function Home() {
                   {title}
                 </div>
                 <p className="mt-2 text-sm text-ink-soft">{note}</p>
-                <div className="mt-4 font-mono text-[0.66rem] uppercase tracking-[0.12em] text-glass">
+                <div className="mt-4 font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-glass">
                   Open →
                 </div>
               </Link>

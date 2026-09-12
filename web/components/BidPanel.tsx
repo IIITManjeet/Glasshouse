@@ -124,7 +124,7 @@ const BTN_IDLE = "border-glass text-glass hover:bg-glass-soft";
 const BTN_URGENT = "border-brick bg-brick-soft text-brick hover:bg-brick hover:text-raised";
 const BTN_LAST = "border-brick bg-brick text-raised";
 const BTN_OFF = "cursor-not-allowed border-rule bg-sunk text-ink-faint";
-const LABEL = "font-mono text-[0.66rem] uppercase tracking-[0.12em] text-ink-faint";
+const LABEL = "font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint";
 
 /** Records live in localStorage, which React cannot subscribe to. This is the nudge. */
 const RECORDS_CHANGED = "glasshouse:records-changed";

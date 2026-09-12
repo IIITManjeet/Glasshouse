@@ -24,7 +24,7 @@ function PhaseChip({ a, head }: { a: Auction; head: number }) {
   return (
     <span
       className={[
-        "inline-block whitespace-nowrap border px-1.5 py-0.5 font-mono text-[0.66rem] uppercase tracking-[0.12em]",
+        "inline-block whitespace-nowrap border px-1.5 py-0.5 font-mono text-[0.6875rem] uppercase tracking-[0.12em]",
         live ? "border-glass bg-glass-soft text-glass" : "border-rule text-ink-faint",
       ].join(" ")}
     >
@@ -66,7 +66,7 @@ export function RoundsTable({ auctions, head }: { auctions: Auction[]; head: num
               <th
                 key={h}
                 scope="col"
-                className="whitespace-nowrap px-3 py-2 font-mono text-[0.66rem] font-normal uppercase tracking-[0.12em] text-ink-faint"
+                className="whitespace-nowrap px-3 py-2 font-mono text-[0.6875rem] font-normal uppercase tracking-[0.12em] text-ink-faint"
               >
                 {h}
               </th>

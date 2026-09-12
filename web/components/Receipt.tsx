@@ -85,7 +85,7 @@ function Copy({ text, label }: { text: string; label: string }) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="border-t border-rule py-2.5 first:border-t-0 sm:first:border-t">
-      <div className="font-mono text-[0.66rem] uppercase tracking-[0.12em] text-ink-faint">{label}</div>
+      <div className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">{label}</div>
       <div className="mt-1 text-[0.86rem] text-ink">{children}</div>
     </div>
   );
@@ -121,7 +121,7 @@ export function Receipt({ a, source }: { a: Auction; source: Source }) {
           Receipt · round {num(a.round)}
         </span>
         <span
-          className={`border px-2 py-0.5 font-mono text-[0.64rem] uppercase tracking-[0.12em] ${
+          className={`border px-2 py-0.5 font-mono text-[0.6875rem] uppercase tracking-[0.12em] ${
             simulated ? "border-amber text-amber" : "border-glass text-glass"
           }`}
         >
@@ -306,7 +306,7 @@ function CheckYourself({ a }: { a: Auction }) {
   const cmd = castCommands(a);
   return (
     <details className="border-t border-rule px-4 py-3">
-      <summary className="cursor-pointer font-mono text-[0.68rem] uppercase tracking-[0.12em] text-glass">
+      <summary className="cursor-pointer font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-glass">
         Check this yourself
       </summary>
       <p className="mt-2 max-w-2xl text-[0.8rem] text-ink-soft">
@@ -369,7 +369,7 @@ function ShareRound({
 
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-rule px-4 py-3">
-      <span className="font-mono text-[0.66rem] uppercase tracking-[0.12em] text-ink-faint">
+      <span className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">
         Bring a rival
       </span>
       <a

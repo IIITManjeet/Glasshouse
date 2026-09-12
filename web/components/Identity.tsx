@@ -97,7 +97,7 @@ export function IdentityCard({ address }: { address: string }) {
         ) : (
           // Not an identicon. A generated picture is a face this address never chose, and
           // on a page about provenance an invented identity is the wrong kind of decoration.
-          <span className="font-mono text-[0.66rem] uppercase tracking-[0.12em] text-ink-faint">
+          <span className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">
             {address.slice(2, 4)}
           </span>
         )}

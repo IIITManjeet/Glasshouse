@@ -151,7 +151,7 @@ export function Timeline({ maker, orderHash }: { maker: string; orderHash: strin
           because "who is still holding a bond" is a question the sequence answers only
           indirectly. */}
       <div className="border-t border-rule px-4 py-3">
-        <div className="font-mono text-[0.62rem] uppercase tracking-[0.12em] text-ink-faint">
+        <div className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">
           the ladder · {num(a.committedCount)} sealed, {num(a.revealedCount)} opened
         </div>
         <ul className="mt-2 space-y-1.5">
@@ -159,7 +159,7 @@ export function Timeline({ maker, orderHash }: { maker: string; orderHash: strin
             <li key={b.commitIdx} className="flex flex-wrap items-baseline gap-x-2 text-[0.82rem]">
               <span className="tnum text-ink-faint">#{b.commitIdx}</span>
               <AddressLink addr={b.bidder.id} />
-              <span className="font-mono text-[0.64rem] uppercase tracking-[0.1em] text-ink-faint">
+              <span className="font-mono text-[0.6875rem] uppercase tracking-[0.1em] text-ink-faint">
                 {PROVENANCE_CHIP[b.bidder.provenance]}
               </span>
               <span className={b.revealed ? "tnum text-ink" : "text-ink-faint"}>
@@ -210,7 +210,7 @@ function Row({ e, reserveBps }: { e: TimelineEvent; reserveBps: number }) {
       >
         {num(e.blockNumber)}
       </a>
-      <span className="font-mono text-[0.66rem] uppercase tracking-[0.12em] text-ink">
+      <span className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink">
         {KIND_LABEL[e.kind] ?? e.kind}
       </span>
       <span className="tnum text-ink-faint">{short(e.actor)}</span>

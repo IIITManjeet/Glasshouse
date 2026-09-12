@@ -163,7 +163,7 @@ export default function EvidencePage() {
         </p>
       </section>
 
-      <nav className="mb-12 flex flex-wrap gap-x-4 gap-y-1 border-y border-rule py-2 font-mono text-[0.68rem] uppercase tracking-[0.12em] text-ink-faint">
+      <nav className="mb-12 flex flex-wrap gap-x-4 gap-y-1 border-y border-rule py-2 font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">
         {SECTIONS.map(([id, label]) => (
           <a key={id} href={`#${id}`} className="hover:text-glass">
             {label}

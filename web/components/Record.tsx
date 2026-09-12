@@ -137,7 +137,7 @@ export function Record({ address }: { address: string }) {
       {/* The reliability line, first and largest, because it is the one that says something
           about the person rather than about their luck. */}
       <div className="border-b border-rule px-4 py-4">
-        <div className="font-mono text-[0.66rem] uppercase tracking-[0.12em] text-ink-faint">
+        <div className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">
           bids opened
         </div>
         <div className="tnum mt-1.5 text-2xl">
@@ -198,7 +198,7 @@ function Stat({
   const tone = value === 0 ? "text-ink-faint" : good ? "text-glass" : bad ? "text-brick" : "text-ink";
   return (
     <div className="bg-raised px-4 py-3">
-      <dt className="font-mono text-[0.62rem] uppercase tracking-[0.12em] text-ink-faint">{label}</dt>
+      <dt className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">{label}</dt>
       <dd className={`tnum mt-1 text-lg ${tone}`}>{num(value)}</dd>
       <dd className="mt-0.5 text-[0.74rem] text-ink-faint">{note}</dd>
     </div>

@@ -190,9 +190,9 @@ function PhaseChip({ phase, settled }: { phase: string; settled: boolean }) {
           : "bg-raised text-ink-faint border-rule";
   return (
     <span className="flex gap-2">
-      <span className={`border px-2 py-0.5 font-mono text-[0.66rem] uppercase tracking-[0.12em] ${tone}`}>{phase}</span>
+      <span className={`border px-2 py-0.5 font-mono text-[0.6875rem] uppercase tracking-[0.12em] ${tone}`}>{phase}</span>
       {settled && (
-        <span className="border border-glass bg-glass-soft px-2 py-0.5 font-mono text-[0.66rem] uppercase tracking-[0.12em] text-glass">
+        <span className="border border-glass bg-glass-soft px-2 py-0.5 font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-glass">
           settled
         </span>
       )}
