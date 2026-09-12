@@ -206,6 +206,19 @@ export function useAuctions(): Board {
     async function tick() {
       let latest: Auction[] = [];
       let latestHead = 0;
+
+      /** Show the checked-in snapshot, always labelled as one. True if there was one. */
+      const useSnapshot = () => {
+        const snap = (window as any).GLASSHOUSE_SNAPSHOT;
+        if (!snap) return false;
+        latest = snap.auctions as Auction[];
+        latestHead = snap.head;
+        setAuctions(latest);
+        setHead(latestHead);
+        setSource("snapshot");
+        return true;
+      };
+
       if (typeof document !== "undefined" && document.hidden) {
         timer.current = setTimeout(tick, 12_000);
         return;
@@ -225,20 +238,32 @@ export function useAuctions(): Board {
         } else {
           // No keeper round on chain yet. The snapshot is real history, labelled as such
           // -- never presented as live.
-          const snap = (window as any).GLASSHOUSE_SNAPSHOT;
-          if (snap) {
-            latest = snap.auctions as Auction[];
-            latestHead = snap.head;
-            setAuctions(latest);
-            setHead(latestHead);
-            setSource("snapshot");
-          } else {
-            setSource("none");
-          }
+          if (!useSnapshot()) setSource("none");
           setError(null);
         }
       } catch (e: any) {
-        if (!cancelled) setError(String(e?.message ?? e));
+        // A FAILED READ IS THE CASE THE SNAPSHOT EXISTS FOR, AND IT WAS THE ONE CASE THAT
+        // DID NOT USE IT.
+        //
+        // The fallback sat in the `else` branch above, which is reached only when
+        // `fromChain` RETURNS null -- meaning "the chain is fine and no round is open".
+        // When the read THROWS, which is what Base's public endpoint does under rate
+        // limiting, control came straight here and the page rendered a red error over an
+        // empty table while a complete snapshot of all eight auctions sat unused in
+        // `window.GLASSHOUSE_SNAPSHOT`. It even said "this build carries no fallback
+        // snapshot", which was false.
+        //
+        // Caught on the DEPLOYED site: capturing every page in quick succession tripped
+        // the endpoint's limit, which is exactly what a judge clicking through fast, or
+        // two people opening it at once, will do.
+        //
+        // The error is still reported -- it is real and the page should not hide it -- but
+        // it is no longer all there is. Labelled history beats a red box, and pretending
+        // the snapshot is live would be the one thing worse than either.
+        if (!cancelled) {
+          if (!useSnapshot()) setSource("none");
+          setError(String(e?.message ?? e));
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
