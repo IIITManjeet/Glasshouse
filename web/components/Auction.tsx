@@ -48,6 +48,68 @@ const PHASES = ["commit", "reveal", "exclusive", "open"] as const;
  * seconds as a secondary gloss: blocks are what the contract enforces, seconds are an
  * estimate at 2s each.
  */
+/**
+ * HOW LONG IS LEFT, AS THE BIGGEST THING ON THE PAGE.
+ *
+ * The number was already on the board -- "4 blocks · ~8s", set at 12px inside one of four
+ * equal columns, styled exactly like the three inert columns beside it. On a live auction
+ * the time remaining is not one fact among four; it is the fact that decides whether you
+ * act now or read on, and a venue that makes you hunt for it is not behaving like a venue.
+ *
+ * BLOCKS LEAD AND SECONDS FOLLOW, which is not a stylistic choice. The contract compares
+ * `block.number` against boundaries written when the round opened; it has no clock. Seconds
+ * are this page multiplying blocks by an assumed 2s and are wrong whenever Base is not
+ * producing at exactly that rate. Printing the estimate in the same weight as the enforced
+ * number would be the page quietly promoting its own guess.
+ *
+ * The bar underneath is the whole round, not the current phase: commit, reveal and
+ * exclusive in their real proportions, so the segment widths say how the windows compare.
+ * It carries no number that is not already stated in words above it.
+ */
+export function Countdown({ a, head }: { a: Auction; head: number }) {
+  const phase = livePhase(a, head);
+  if (phase === "open") return null;
+
+  const end = phase === "commit" ? a.commitEnd : phase === "reveal" ? a.revealEnd : a.exclusiveEnd;
+  const left = Math.max(0, end - head);
+
+  const total = Math.max(1, a.exclusiveEnd - a.openedAtBlock);
+  const spans = [
+    { key: "commit", w: (a.commitEnd - a.openedAtBlock) / total },
+    { key: "reveal", w: (a.revealEnd - a.commitEnd) / total },
+    { key: "exclusive", w: (a.exclusiveEnd - a.revealEnd) / total },
+  ];
+  const done = Math.min(1, Math.max(0, (head - a.openedAtBlock) / total));
+
+  const label =
+    phase === "commit"
+      ? "left to seal a bid"
+      : phase === "reveal"
+        ? "left to open your bid"
+        : "left in the winner's exclusive window";
+
+  return (
+    <div className="border border-rule bg-raised rounded-card px-4 py-3.5">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="tnum text-4xl leading-none font-medium text-glass sm:text-5xl">{left}</span>
+        <span className="text-sm text-ink">block{left === 1 ? "" : "s"} {label}</span>
+        <span className="tnum ml-auto text-[0.78rem] text-ink-faint">
+          ~{left * BLOCK_SECONDS}s at 2s blocks, an estimate — the contract counts blocks
+        </span>
+      </div>
+
+      <div className="mt-3 flex h-1.5 w-full gap-px overflow-hidden rounded-full bg-sunk" aria-hidden="true">
+        {spans.map((sp) => (
+          <div key={sp.key} className="h-full bg-rule" style={{ width: `${Math.max(0, sp.w) * 100}%` }} />
+        ))}
+      </div>
+      <div className="relative -mt-1.5 h-1.5" aria-hidden="true">
+        <div className="h-full rounded-full bg-glass/70" style={{ width: `${done * 100}%` }} />
+      </div>
+    </div>
+  );
+}
+
 export function PhaseTrack({ a, head }: { a: Auction; head: number }) {
   const active = livePhase(a, head);
   const cells = [

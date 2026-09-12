@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { livePhase, type Auction } from "@/lib/useAuctions";
 import { useBoard } from "@/components/BoardProvider";
-import { PhaseTrack, BidCards, Stats, ReplayCheck } from "@/components/Auction";
+import { PhaseTrack, BidCards, Stats, ReplayCheck, Countdown } from "@/components/Auction";
 import { WalletBar } from "@/components/WalletBar";
 import { BidPanel, RevealStrip } from "@/components/BidPanel";
 import { HowToBid } from "@/components/HowToBid";
@@ -71,9 +71,24 @@ export default function BoardPage() {
         />
       )}
 
+      {/* TWO DIFFERENT FACTS, TWO DIFFERENT VOICES.
+          A failed read with nothing to fall back on is a broken page and should look like
+          one. A failed read that the checked-in snapshot covered is a page showing history
+          instead of live data -- worth saying plainly, not worth a red bar. /rounds already
+          made this distinction after e7a7c46; the board still shouted either way, which
+          meant the loudest thing on screen was frequently the least important. */}
       {error && (
-        <p className="mb-4 border-l-2 border-brick bg-brick-soft px-3 py-2 text-sm text-ink-soft">
-          Could not reach the chain: {error}
+        <p
+          className={[
+            "mb-4 border-l-2 px-3 py-2 text-sm",
+            featured
+              ? "border-amber bg-amber-soft text-amber"
+              : "border-brick bg-brick-soft text-ink-soft",
+          ].join(" ")}
+        >
+          {featured
+            ? `The live chain read failed, so this is the last state read rather than the chain right now: ${error}`
+            : `Could not reach the chain: ${error}`}
         </p>
       )}
 
@@ -81,8 +96,9 @@ export default function BoardPage() {
         <div className="border border-rule bg-raised rounded-card shadow-card p-6">
           <p className="text-ink-soft">No round has been opened on this Book yet.</p>
           <p className="mt-2 text-sm text-ink-faint">
-            The keeper opens a fresh round every couple of minutes when it is running. Until
-            then there is nothing to watch, and this says so rather than showing a spinner.{" "}
+            Rounds are opened by a keeper. When it is running a fresh round arrives every
+            couple of minutes; when it is not, nothing arrives at all, and this page has no
+            way to tell which is true right now. It says so rather than showing a spinner.{" "}
             <button type="button" onClick={() => setDemo(true)} className="text-glass underline underline-offset-2">
               Watch a simulated round instead
             </button>
@@ -107,6 +123,9 @@ export default function BoardPage() {
             {!live && <span className="text-xs text-ink-faint">most recent — nothing is live right now</span>}
           </header>
 
+          {/* Above the track, not inside it: the track says what the windows ARE, this
+              says where you are in them. */}
+          <Countdown a={featured} head={head} />
           <PhaseTrack a={featured} head={head} />
           <BidCards a={featured} />
           <Stats a={featured} head={head} />

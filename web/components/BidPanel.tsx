@@ -911,8 +911,15 @@ export function BidPanel({ auction, head }: { auction: Auction | null; head: num
               : "This round is finished."}
         </p>
         <p className="mt-2 text-[0.78rem] leading-snug text-ink-faint">
-          The keeper opens a new round every couple of minutes. The next one takes bids for its
-          whole commit window.
+          {/* WAS AN UNCONDITIONAL PROMISE: "The keeper opens a new round every couple of
+              minutes." It is not a property of the system, it is a property of whether a
+              process happens to be running -- and it was not running for most of today,
+              so the panel told every visitor to expect something that was not coming.
+              Two other copies of this sentence already hedged with "when it is running";
+              this one did not. */}
+          A keeper opens the rounds. While it is running a new one arrives every couple of
+          minutes and takes bids for its whole commit window — but nothing here can tell you
+          whether it is running now, so this is what usually happens rather than a promise.
         </p>
       </Shell>
     );
