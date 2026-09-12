@@ -33,17 +33,85 @@ const asInt = (w) => Number(BigInt("0x" + w));
 const asAddr = (w) => "0x" + w.slice(24);
 const isZero = (w) => /^0+$/.test(w);
 
-/** Base's public endpoint rate limits (-32016). Reads are idempotent, so back off. */
+/**
+ * BACKING OFF WAS NOT ENOUGH, BECAUSE THE LIMIT IS NOT TRANSIENT.
+ *
+ * mainnet.base.org rate limits per IP (-32016), and this page reads it from the visitor's
+ * own browser. Waiting 400ms and asking the same endpoint again is the right move for a
+ * burst and useless against a budget that is already spent: the deployed board spent a
+ * whole afternoon serving "eth_call: over rate limit" and falling back to the snapshot,
+ * which is the correct behaviour and still means a visitor sees history instead of the
+ * chain.
+ *
+ * So it changes endpoint rather than only waiting. These are all public Base RPCs needing
+ * no key -- which matters, because `output: "export"` bakes every URL into the client
+ * bundle and a key here would be a published key.
+ *
+ * THE WORKING ONE IS REMEMBERED for the rest of the session, so a page that has already
+ * found a live endpoint does not re-walk the list on every poll. It resets to the head of
+ * the list on a fresh load, so a temporarily degraded endpoint is not avoided forever.
+ *
+ * AN EXPLICIT ?rpc= IS NEVER ROTATED AWAY FROM. That parameter points the board at a fork
+ * or at a private node on purpose, and silently answering from Base mainnet instead would
+ * be the single most dishonest thing this file could do -- the page would show real
+ * mainnet data under a chip saying it came from somewhere else.
+ */
+const DEFAULT_RPC = "https://mainnet.base.org";
+
+// TESTED AGAINST BOTH METHODS THIS APP ACTUALLY USES, which eliminated most candidates.
+// A Base endpoint that answers eth_call is easy to find; one that also answers eth_getLogs
+// over a ~140-block window is not, and a pool member that served only the first would be
+// worse than no pool at all -- rounds would load with their bids silently missing.
+//
+//   base-rpc.publicnode.com   eth_call ok, getLogs needs a paid token
+//   1rpc.io/base              eth_call ok, getLogs capped at 50 blocks
+//   base.llamarpc.com         TLS failure (525)
+//   base.drpc.org             getLogs refused on the free plan
+//   base.meowrpc.com          does not implement eth_getLogs
+//
+// Two survivors. Worth re-testing before a demo rather than trusted indefinitely: these
+// are free endpoints and their terms move.
+const POOL = [DEFAULT_RPC, "https://base.gateway.tenderly.co"];
+
+let preferred = 0;
+
+const isLimit = (msg) => /rate limit|-32016|429|too many|capacity|limit exceeded/i.test(msg);
+
 async function call(rpc, method, params, tries = 4) {
-  for (let attempt = 1; ; attempt++) {
-    try {
-      return await once(rpc, method, params);
-    } catch (e) {
-      const msg = String(e.message ?? e);
-      if (attempt >= tries || !/rate limit|-32016|429|too many/i.test(msg)) throw e;
-      await new Promise((r) => setTimeout(r, 400 * 2 ** (attempt - 1)));
+  // A caller-chosen endpoint is honoured exactly: retry it, never substitute it.
+  if (rpc !== DEFAULT_RPC) {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await once(rpc, method, params);
+      } catch (e) {
+        const msg = String(e.message ?? e);
+        if (attempt >= tries || !isLimit(msg)) throw e;
+        await new Promise((r) => setTimeout(r, 400 * 2 ** (attempt - 1)));
+      }
     }
   }
+
+  let lastError = null;
+  for (let hop = 0; hop < POOL.length; hop++) {
+    const idx = (preferred + hop) % POOL.length;
+    const url = POOL[idx];
+    try {
+      const out = await once(url, method, params);
+      preferred = idx; // stick with whatever answered
+      return out;
+    } catch (e) {
+      lastError = e;
+      const msg = String(e.message ?? e);
+      // A rate limit or a dead host means try the next one. Anything else is the CHAIN
+      // answering with a real error -- a reverted eth_call, a bad parameter -- and asking
+      // a different node the same malformed question would only waste time and return the
+      // same answer.
+      if (!isLimit(msg) && !/fetch|network|failed|timeout|abort/i.test(msg)) throw e;
+      // One short backoff before moving on, in case it was a burst rather than a budget.
+      if (hop === 0) await new Promise((r) => setTimeout(r, 350));
+    }
+  }
+  throw lastError ?? new Error(`${method}: every Base endpoint failed`);
 }
 
 async function once(rpc, method, params) {
@@ -247,8 +315,18 @@ export async function fromChain({ rpc, book, manifest, limit = 3 }) {
       a.bids = await bidsFor(rpc, book, r.orderHash, a.openedAtBlock, Math.min(head, a.exclusiveEnd + 5));
       a.revealedCount = a.bids.filter((b) => b.bps !== null).length;
     } catch {
+      // NULL, NOT ZERO. `revealedCount = 0` says "nobody opened a bid on this round",
+      // which is a claim about bidders; what actually happened is that the log scan
+      // failed, which is a claim about us. The rounds table already distinguishes the two
+      // -- it prints "not read, N committed" and excludes the row from bid-based filters
+      // when this is null -- and it was never reached, because the catch asserted the
+      // flattering version instead.
+      //
+      // It matters more now that reads can move between endpoints: a log scan is the
+      // likeliest call to fail, and the wrong answer here would accuse every bidder on
+      // the round of not showing up.
       a.bids = [];
-      a.revealedCount = 0;
+      a.revealedCount = null;
     }
     out.push(a);
   }
