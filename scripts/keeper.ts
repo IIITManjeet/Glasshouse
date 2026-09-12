@@ -270,44 +270,142 @@ async function main() {
     const spec = ROUNDS.rounds[state.nextRound];
     const order = { maker: MAKER, traits: BigInt(spec.traits), data: spec.data as `0x${string}` };
     const orderHash = spec.orderHash as `0x${string}`;
-    console.log(`\n  ROUND ${spec.round}  ${orderHash.slice(0, 18)}…`);
+    console.log("");
+    console.log(`  ROUND ${spec.round}  ${orderHash.slice(0, 18)}` + "\u2026");
 
-    // The salt is written down BEFORE the commit that depends on it.
-    const salt = toHex(randomBytes(32));
-    const bps = houseBid();
-    state.active = [{ round: spec.round, orderHash, salt, bps }];
-    saveState(state);
+    // WHAT ALREADY HAPPENED TO THIS ROUND, ASKED BEFORE ANYTHING IS SENT.
+    //
+    // `nextRound` only advances after settle AND dock, so any interruption -- Ctrl-C, a
+    // laptop sleeping, a dropped RPC -- leaves the cursor pointing at a round that is
+    // partly done. The loop used to restart such a round from `ship`, which Aqua rejects
+    // for a strategy it already holds, and the keeper was then stuck on that round
+    // forever. That is the "fork round generation is partly stuck" entry in TODO.md, and
+    // it is the reason a long mainnet run could not be left unattended.
+    //
+    // THE REVERT SELECTOR CANNOT BE USED TO DETECT THIS. 0x879f237b carries the router and
+    // the order hash and reads like a duplicate-strategy error, but a430add established it
+    // ALSO fires for a missing token allowance -- the two are indistinguishable from the
+    // error alone, and that ambiguity already cost this project an afternoon. So progress
+    // is recorded in the state file and confirmed against the Book, never inferred from a
+    // revert.
+    const onChain = (await rpc(
+      () => pub.readContract({ address: BOOK, abi: bookAbi, functionName: "auctions", args: [maker, orderHash] }),
+      "auction state",
+    )) as any;
+    const alreadyOpen = BigInt(onChain.commitEnd) !== 0n;
+    const resumed = (state.active ?? []).find(
+      (a: any) => String(a.orderHash).toLowerCase() === orderHash.toLowerCase(),
+    );
 
-    // --- ship + open -----------------------------------------------------------------
-    await send(
-      AQUA,
-      encodeFunctionData({ abi: aquaAbi, functionName: "ship", args: [ROUTER, encodeAbiParameters([orderTuple], [order]), [WETH, USDC], [BALANCE_WETH, BALANCE_USDC]] }),
-      GAS.ship, "ship",
-    );
-    const opened = await send(
-      BOOK,
-      encodeFunctionData({ abi: bookAbi, functionName: "open", args: [orderHash, ROUTER, WETH, COMMIT_BLOCKS, REVEAL_BLOCKS, EXCLUSIVE_BLOCKS, RESERVE_BPS, MAX_BPS, BOND] }),
-      GAS.open, "open",
-    );
-    const ev = parseEventLogs({ abi: bookAbi, eventName: "AuctionOpened", logs: opened.logs })[0] as any;
-    if (!ev) throw new Error("open() emitted no AuctionOpened");
-    const commitEnd = BigInt(ev.args.commitEnd);
-    const revealEnd = BigInt(ev.args.revealEnd);
-    console.log(`    open · commit to ${commitEnd}, reveal to ${revealEnd}`);
-    console.log(link(opened.transactionHash));
+    let salt: `0x${string}`;
+    let bps: number;
+    let commitEnd: bigint;
+    let revealEnd: bigint;
+
+    if (alreadyOpen) {
+      commitEnd = BigInt(onChain.commitEnd);
+      revealEnd = BigInt(onChain.revealEnd);
+      console.log(`    RESUMING a round already open on chain (commit to ${commitEnd}, reveal to ${revealEnd})`);
+
+      if (!resumed) {
+        // THE SALT IS GONE, so the house can neither commit nor reveal on this round.
+        // Saying so out loud matters: an unrevealed commit carries the withheld-reveal
+        // shape this mechanism exists to punish, and a keeper that quietly moved on would
+        // leave one on the board with no explanation. The round is still driven to settled
+        // and docked rather than left open forever.
+        console.error("    the salt for this round is not in the state file, so the house bid cannot be revealed.");
+        console.error("    driving it to settled and docked anyway rather than leaving it open.");
+        salt = ("0x" + "00".repeat(32)) as `0x${string}`;
+        bps = 0;
+      } else {
+        salt = resumed.salt;
+        bps = resumed.bps;
+      }
+    } else {
+      // The salt is written down BEFORE the commit that depends on it.
+      salt = toHex(randomBytes(32));
+      bps = houseBid();
+      state.active = [{ round: spec.round, orderHash, salt, bps, shipped: false }];
+      saveState(state);
+
+      // --- ship + open ---------------------------------------------------------------
+      if (!resumed?.shipped) {
+        try {
+          await send(
+            AQUA,
+            encodeFunctionData({ abi: aquaAbi, functionName: "ship", args: [ROUTER, encodeAbiParameters([orderTuple], [order]), [WETH, USDC], [BALANCE_WETH, BALANCE_USDC]] }),
+            GAS.ship, "ship",
+          );
+        } catch (e: any) {
+          // SKIP THE ROUND, DO NOT RETRY IT. Whatever the cause -- a strategy Aqua already
+          // holds from a run whose state file is gone, or anything else -- retrying is
+          // exactly what turned one bad round into a permanently stuck keeper. There are
+          // 300 rounds in the table and losing one costs nothing.
+          console.error(`    ship failed for round ${spec.round}: ${String(e.message ?? e).slice(0, 120)}`);
+          console.error("    SKIPPING this round. A strategy Aqua already holds can never be re-shipped.");
+          state.nextRound = spec.round + 1;
+          state.active = [];
+          saveState(state);
+          continue;
+        }
+        // Recorded BEFORE open, so an interruption in between is recoverable: the next run
+        // reads `shipped` and goes straight to open instead of re-shipping.
+        state.active = [{ round: spec.round, orderHash, salt, bps, shipped: true }];
+        saveState(state);
+      }
+
+      const opened = await send(
+        BOOK,
+        encodeFunctionData({ abi: bookAbi, functionName: "open", args: [orderHash, ROUTER, WETH, COMMIT_BLOCKS, REVEAL_BLOCKS, EXCLUSIVE_BLOCKS, RESERVE_BPS, MAX_BPS, BOND] }),
+        GAS.open, "open",
+      );
+      const ev = parseEventLogs({ abi: bookAbi, eventName: "AuctionOpened", logs: opened.logs })[0] as any;
+      if (!ev) throw new Error("open() emitted no AuctionOpened");
+      commitEnd = BigInt(ev.args.commitEnd);
+      revealEnd = BigInt(ev.args.revealEnd);
+      console.log(`    open · commit to ${commitEnd}, reveal to ${revealEnd}`);
+      console.log(link(opened.transactionHash));
+    }
 
     // --- the house bid, first commit of the round ------------------------------------
-    const commitment = await rpc(
-      () => pub.readContract({ address: BOOK, abi: bookAbi, functionName: "commitmentFor", args: [maker, bps, salt], blockNumber: opened.blockNumber }),
-      "commitmentFor",
-    );
-    const c = await send(BOOK, encodeFunctionData({ abi: bookAbi, functionName: "commit", args: [maker, orderHash, commitment] }), GAS.commit, "house commit");
-    console.log(`    house bid sealed (commitIdx 0)`);
-    console.log(link(c.transactionHash));
+    //
+    // Skipped when this round already carries our commit, which is the normal state of a
+    // resume. `commitment` reads zero for a bidder the Book has never seen on this round.
+    const existingBid = (await rpc(
+      () => pub.readContract({ address: BOOK, abi: bookAbi, functionName: "bids", args: [maker, orderHash, maker] }),
+      "existing house bid",
+    )) as any;
+    // `let`, NOT `const`. These describe what is sealed on chain RIGHT NOW, and the commit
+    // below changes that. Read once into a const, the reveal step further down still saw
+    // the pre-commit value, decided nothing of ours was sealed, skipped the reveal, and
+    // let the round settle with NO WINNER -- every round, silently, on a keeper whose
+    // whole job is to keep a live bid on the board. Caught by running a fresh round after
+    // the resume path worked, which is the case that looked least likely to break.
+    let hasCommitted = BigInt(existingBid.commitment) !== 0n;
+    const hasRevealed = Boolean(existingBid.revealed);
+
+    if (hasCommitted) {
+      console.log(`    house bid already committed${hasRevealed ? " and revealed" : ""}, not re-sending`);
+    } else if ((await rpc(() => pub.getBlockNumber(), "head before commit")) > commitEnd) {
+      console.error("    the commit window closed before the house could bid on this round.");
+    } else {
+      const commitment = await rpc(
+        () => pub.readContract({ address: BOOK, abi: bookAbi, functionName: "commitmentFor", args: [maker, bps, salt] }),
+        "commitmentFor",
+      );
+      const c = await send(BOOK, encodeFunctionData({ abi: bookAbi, functionName: "commit", args: [maker, orderHash, commitment] }), GAS.commit, "house commit");
+      hasCommitted = true;
+      console.log("    house bid sealed (commitIdx 0)");
+      console.log(link(c.transactionHash));
+    }
 
     // --- reveal ----------------------------------------------------------------------
     const atReveal = await waitForBlock(pub, commitEnd + 1n, `round ${spec.round} commit to close`);
-    if (atReveal > revealEnd) {
+    if (hasRevealed) {
+      console.log("    house bid was already revealed before this run, nothing to send");
+    } else if (!hasCommitted) {
+      console.log("    no house bid sealed on this round, so there is nothing to reveal");
+    } else if (atReveal > revealEnd) {
       console.error(`    MISSED the reveal window for round ${spec.round}. Moving on.`);
     } else {
       const r = await send(BOOK, encodeFunctionData({ abi: bookAbi, functionName: "reveal", args: [maker, orderHash, bps, salt] }), GAS.reveal, "house reveal");
@@ -317,10 +415,19 @@ async function main() {
 
     // --- settle, then dock so the declared depth does not accumulate ------------------
     await waitForBlock(pub, revealEnd + EXCLUSIVE_BLOCKS + 1n, `round ${spec.round} exclusive to elapse`);
-    const s = await send(BOOK, encodeFunctionData({ abi: bookAbi, functionName: "settle", args: [maker, orderHash] }), GAS.settle, "settle");
-    const settled = parseEventLogs({ abi: bookAbi, eventName: "AuctionSettled", logs: s.logs })[0] as any;
-    console.log(`    settled · winner ${settled?.args.winner ?? "?"} at ${settled?.args.clearingBps ?? "?"} bps`);
-    console.log(link(s.transactionHash));
+    // A resumed round may already be settled, and settle() reverts on a second call.
+    const beforeSettle = (await rpc(
+      () => pub.readContract({ address: BOOK, abi: bookAbi, functionName: "auctions", args: [maker, orderHash] }),
+      "auction state before settle",
+    )) as any;
+    if (beforeSettle.settled) {
+      console.log("    already settled before this run, not re-settling");
+    } else {
+      const s = await send(BOOK, encodeFunctionData({ abi: bookAbi, functionName: "settle", args: [maker, orderHash] }), GAS.settle, "settle");
+      const settled = parseEventLogs({ abi: bookAbi, eventName: "AuctionSettled", logs: s.logs })[0] as any;
+      console.log(`    settled · winner ${settled?.args.winner ?? "?"} at ${settled?.args.clearingBps ?? "?"} bps`);
+      console.log(link(s.transactionHash));
+    }
 
     // Docking returns the strategy's declared balance to zero. Without it every past
     // round stays fillable forever at the base price, and the depth this maker advertises
