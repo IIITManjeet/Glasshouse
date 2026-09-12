@@ -19,6 +19,18 @@ const num = (n?: number | null) =>
  * and the live board MUST derive "what phase is this" the same way against the same head,
  * or the two views of one auction could disagree about something neither actually stores.
  */
+/** Which columns carry a quantity. Drives both the header and the cell alignment, so
+ *  the two cannot drift apart -- they were two separate literals before this. */
+const COLUMNS = [
+  { key: "round", numeric: true },
+  { key: "opened", numeric: true },
+  { key: "phase", numeric: false },
+  { key: "reveals", numeric: true },
+  { key: "clearing", numeric: true },
+  { key: "winner", numeric: false },
+  { key: "filled", numeric: false },
+] as const;
+
 function PhaseChip({ a, head }: { a: Auction; head: number }) {
   const p = livePhase(a, head);
   const live = p !== "open"; // "open" is the quiescent end state; the other three are in flight
@@ -61,15 +73,25 @@ export function RoundsTable({ auctions, head }: { auctions: Auction[]; head: num
   return (
     <div className="overflow-x-auto border border-rule">
       <table className="w-full min-w-[62rem] border-collapse text-left text-sm">
-        <thead>
-          <tr className="border-b border-rule bg-sunk">
-            {["round", "opened", "phase", "reveals", "clearing", "winner", "filled"].map((h) => (
+        <thead className="sticky top-0 z-10">
+          <tr className="border-b border-rule bg-lifted">
+            {/* RIGHT-ALIGN THE NUMBERS. This is the single cheapest thing that makes a
+                table read as a market rather than as a spreadsheet somebody exported: a
+                column of figures whose digits do not line up cannot be scanned, only read
+                one row at a time. `tnum` already gives tabular figures, so right-aligning
+                actually lines the places up rather than approximately so. Words stay left;
+                mixing the two is what the alignment is FOR -- the eye can tell a quantity
+                from a label before reading either. */}
+            {COLUMNS.map(({ key, numeric }) => (
               <th
-                key={h}
+                key={key}
                 scope="col"
-                className="whitespace-nowrap px-3 py-2 font-mono text-[0.6875rem] font-normal uppercase tracking-[0.12em] text-ink-faint"
+                className={[
+                  "whitespace-nowrap px-3 py-2.5 font-mono text-[0.6875rem] font-normal uppercase tracking-[0.12em] text-ink-faint",
+                  numeric ? "text-right" : "text-left",
+                ].join(" ")}
               >
-                {h}
+                {key}
               </th>
             ))}
           </tr>
@@ -108,19 +130,24 @@ export function RoundsTable({ auctions, head }: { auctions: Auction[]; head: num
                     that cleared at the runner-up's price, has no round number: it is the
                     live-fill order, built above the manifest so it can never collide with
                     a keeper round. */}
-                <td className="tnum px-3 py-2 text-ink">
+                <td className="tnum px-3 py-2 text-right text-ink">
                   <Link
                     href={`/r/${a.orderHash}`}
                     className="text-glass underline decoration-rule underline-offset-2 hover:decoration-glass"
                   >
-                    {a.round ?? "open"}
+                    {/* The hash, not the word "open". An auction with no manifest index
+                        showed "open" here, one column from a phase chip also reading
+                        OPEN -- two unrelated meanings wearing the same word in the same
+                        row. The short hash is what /r/ is keyed by and what the chain
+                        calls it. */}
+                    {a.round ?? `${String(a.orderHash).slice(0, 6)}…`}
                   </Link>
                 </td>
-                <td className="tnum whitespace-nowrap px-3 py-2 text-ink-soft">{num(a.openedAtBlock)}</td>
+                <td className="tnum whitespace-nowrap px-3 py-2 text-right text-ink-soft">{num(a.openedAtBlock)}</td>
                 <td className="px-3 py-2">
                   <PhaseChip a={a} head={head} />
                 </td>
-                <td className="tnum px-3 py-2 text-ink-soft">
+                <td className="tnum px-3 py-2 text-right text-ink-soft">
                   <span className="whitespace-nowrap">
                     {revealsRead ? `${a.revealedCount} of ${a.committedCount}` : `not read, ${a.committedCount} committed`}
                   </span>
@@ -130,7 +157,7 @@ export function RoundsTable({ auctions, head }: { auctions: Auction[]; head: num
                     </span>
                   ) : null}
                 </td>
-                <td className="tnum px-3 py-2 text-ink">
+                <td className="tnum px-3 py-2 text-right text-ink">
                   {a.clearingBps === null ? (
                     <span className="text-ink-faint">—</span>
                   ) : (
