@@ -380,12 +380,44 @@ th,
    abstract image that merely RESEMBLED a chart is the thing this project forbids. A real
    chart is not decoration. */
 
+/* THE ONE THING ON THIS SITE THAT MOVES ON ITS OWN.
+
+   Everything else that animated was decoration and is gone. This is not: a venue has to
+   say whether it is currently reading the chain, and "live" is a state a static page
+   cannot express. It is the smallest possible carrier of that -- a 6px dot beside the
+   source name, breathing.
+
+   It is also NOT the only carrier, which is the rule that lets it exist at all. The word
+   beside it already says BASE MAINNET or SNAPSHOT IN REPO, and the source chip and the
+   caption below say it again. Delete the dot and the page loses nothing it was relying on
+   the dot to tell you -- which is the test every animation here has to pass. */
+@keyframes live-pulse {
+  0%,
+  100% { opacity: 1; transform: scale(1); }
+  50%  { opacity: 0.45; transform: scale(0.82); }
+}
+
+.live-dot {
+  display: inline-block;
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 9999px;
+  background: currentColor;
+  animation: live-pulse 2.4s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+  /* Parked at 0.01ms this would stop on whatever frame it reached, possibly the 45% one,
+     leaving a dot that reads as half-rendered. Stop it at full instead. */
+  .live-dot {
+    animation: none !important;
+    opacity: 1;
   }
 }
 

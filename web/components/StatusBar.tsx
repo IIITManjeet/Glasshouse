@@ -51,11 +51,25 @@ export function StatusBar() {
     <div
       className={[
         "mb-8 flex flex-wrap items-center gap-x-5 gap-y-2 border-y px-3 py-2",
-        "font-mono text-[0.6875rem] tracking-[0.1em] uppercase",
+        // Sans for the words, mono kept below for the block number. The whole strip was
+        // mono-uppercase, which made a label and a value look like the same kind of thing
+        // -- on the one line whose job is to say which of them came from a chain.
+        "text-[0.75rem] tracking-[0.06em] uppercase",
         demo ? "border-amber bg-amber-soft text-amber" : "border-rule bg-sunk text-ink-faint",
       ].join(" ")}
     >
-      <span className={demo ? "" : source === "chain" && !isFork ? "text-glass" : "text-amber"}>
+      <span
+        className={[
+          "flex items-center gap-1.5 font-medium",
+          demo ? "" : source === "chain" && !isFork ? "text-glass" : "text-amber",
+        ].join(" ")}
+      >
+        {/* Only for a live mainnet read. A snapshot and the rehearsal are both real states
+            and neither is live, so neither gets the dot -- a pulse beside "SNAPSHOT IN
+            REPO" would say the opposite of what the words beside it say. */}
+        {!demo && source === "chain" && !isFork ? (
+          <span className="live-dot" aria-hidden="true" />
+        ) : null}
         {where}
       </span>
 

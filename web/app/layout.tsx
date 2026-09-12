@@ -96,13 +96,24 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Theme>
           <div className="mx-auto max-w-6xl px-5 py-6">
             <header className="mb-8 flex flex-wrap items-baseline justify-between gap-4 border-b border-rule pb-4">
-              <Link href="/" className="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-ink-faint hover:text-glass">
-                Glasshouse <span className="text-glass">/</span> 1inch SwapVM <span className="text-glass">/</span> opcode 0x2e
+              {/* A WORDMARK, NOT A BREADCRUMB. This was one run of 11px mono in which the
+                  product's name carried exactly the same weight as the opcode it is built
+                  on, so the site never quite said what it was called. The name leads now;
+                  the lineage stays, because "1inch SwapVM / opcode 0x2e" is worth claiming
+                  on every page, but it is secondary and now reads that way. */}
+              <Link href="/" className="group flex items-baseline gap-2.5">
+                <span className="font-display text-base font-semibold tracking-[0.02em] text-ink group-hover:text-glass">
+                  GLASSHOUSE
+                </span>
+                <span className="hidden font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint sm:inline">
+                  <span className="text-glass">/</span> 1inch SwapVM{" "}
+                  <span className="text-glass">/</span> opcode 0x2e
+                </span>
               </Link>
               {/* NavLink marks the page you are on (DESIGN.md F-6). Four identical links
                   gave a visitor arriving from a shared link no way to tell where they had
                   landed, which is the cheapest orientation cue there is. */}
-              <nav className="flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[0.7rem] uppercase tracking-[0.12em] text-ink-faint">
+              <nav className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[0.8125rem] font-medium text-ink-soft">
                 <NavLink href="/board">Board</NavLink>
                 <NavLink href="/rounds">Rounds</NavLink>
                 <NavLink href="/evidence">Evidence</NavLink>
