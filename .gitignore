@@ -71,3 +71,14 @@ audio.md
 broll/
 WALKTHROUGH.md
 *.mp4
+
+# Local tooling state, not part of the project.
+# matchstick's compiled test binaries and version stamp, rebuilt by `graph test`.
+subgraph/tests/.bin/
+subgraph/tests/.latest.json
+# Written and rewritten by `next dev` on every start; Next.js boilerplate, not our instructions.
+# (.claude/skills/ and .mcp.json stay tracked: the ETHGlobal AI rules require the prompts, and
+# the Subgraph MCP skill is part of The Graph integration.)
+web/AGENTS.md
+web/CLAUDE.md
+.claude/settings.local.json
