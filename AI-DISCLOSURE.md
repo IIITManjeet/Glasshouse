@@ -62,7 +62,7 @@ developer.
 | `README.md`, `DESIGN.md`, `DECISIONS.md`, `CHANGELOG.md`, `DEPLOY.md`, `TODO.md`, `docs/**` | Written with AI assistance. `docs/design/HLD.md` and `LLD.md` were written by AI agents reading the source, and each ends with a section stating what could not be verified. |
 | `DECISIONS.md` — "In your words" sections | Reserved for the developer's own words, and not written by AI. |
 | `.claude/skills/**` | Instructions written for the AI agents. Included as planning artifacts — see below. |
-| Demo video | **Narration: the developer's own voice. No text-to-speech, no AI voiceover.** The developer recorded the screen capture and the voice memos. The AI assembled them into the final edit, captured still screens of the site, designed the title and end cards, and cleaned up audio noise and levels with ffmpeg. |
+| Demo video | **Narration: the developer's own voice. No text-to-speech, no AI voiceover.** The developer recorded the screen capture and the voice memos. The AI assembled them into the final edit, captured still screens of the site, designed the title and end cards and a card of the fill transaction's token transfers (read from its on-chain receipt, because the block explorer's page could not be captured), and cleaned up audio noise and levels with ffmpeg. |
 
 ---
 
