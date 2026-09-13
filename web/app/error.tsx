@@ -49,17 +49,18 @@ export default function Error({
         {error.digest ? `\n\ndigest: ${error.digest}` : ""}
       </pre>
 
+      {/* THE PRIMITIVES, NOT TWO HAND-COMPOSED BORDERED BOXES.
+          These were `border border-glass bg-glass-soft px-4 py-2 font-mono text-[0.8rem]`
+          and `border border-rule px-4 py-2 font-mono ...` -- the exact recipe DESIGN.md
+          F-3 records ("a chip that looked identical to a button"), improvised on the one
+          route a visitor reaches when everything else has already failed, and at a size
+          that matches no control anywhere else on the site. `Try again` is this view's one
+          primary: it is the only thing that can fix what the reader is looking at. */}
       <div className="mt-6 flex flex-wrap gap-3">
-        <button
-          onClick={reset}
-          className="border border-glass bg-glass-soft px-4 py-2 font-mono text-[0.8rem] text-glass hover:bg-glass hover:text-raised"
-        >
+        <button type="button" onClick={reset} className="btn btn-primary">
           Try again
         </button>
-        <a
-          href="/"
-          className="border border-rule px-4 py-2 font-mono text-[0.8rem] text-ink-soft hover:border-glass hover:text-glass"
-        >
+        <a href="/" className="btn btn-secondary">
           Back to the board
         </a>
       </div>

@@ -170,6 +170,25 @@ export default function RoundsPage() {
                 snapshot rather than the chain: {error}
               </p>
             ) : null}
+            {/* NOTHING LOADED IS A SENTENCE, NOT SIX TABS READING ZERO.
+                With no rounds in hand this drew `All 0 · Live 0 · Settled 0 · Had a winner
+                0 · Nobody opened 0 · Filled 0`, then "Showing 0 of 0", then "No round
+                matches 'All' in the 0 rounds this build can see" -- every figure correct
+                and the page saying nothing, which is precisely the `/account` wall of zeros
+                TODO.md records and the account page already fixed. Worse here, because
+                "Nobody opened 0" is an accusation-shaped tab drawn over an empty read.
+                The branch above owns the two LOUD versions of this (a chain read that
+                failed, and a read still in flight); this is the quiet one -- the read
+                returned and there was nothing in it. */}
+            {auctions.length === 0 ? (
+              <p className="card text-sm leading-relaxed text-ink-soft">
+                No round has been read yet. The chain read returned without finding a round
+                on this Book, and this build carries no fallback snapshot to show instead —
+                so there is nothing to filter and nothing to count. That is a statement about
+                what this page has loaded, not a claim that the Book is empty.
+              </p>
+            ) : (
+              <>
             <RoundsFilterTabs
               auctions={auctions}
               head={head}
@@ -226,6 +245,8 @@ export default function RoundsPage() {
                   .
                 </p>
               </div>
+            )}
+              </>
             )}
           </div>
           </>

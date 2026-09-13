@@ -92,11 +92,44 @@ export function Settlement({ a, head, source }: { a: Auction; head: number; sour
   //
   // Every other panel there already switched on `source`; this one was added without it.
   const simulated = source === "sim";
-  const bids = [...(a.bids ?? [])].sort((x, y) => x.commitIdx - y.commitIdx);
+
+  // A FAILED LOG SCAN IS NOT AN EMPTY ROUND, AND THIS FIGURE USED TO COLLAPSE THEM.
+  //
+  // `a.bids` is null when the eth_getLogs scan for this round failed -- chain.js and
+  // lib/pinned.ts both set it to null rather than [] for exactly that reason, and
+  // `Auction.bids` says in as many words: "null when the log scan failed. Never render
+  // this as an empty list." `[...(a.bids ?? [])]` did render it as an empty list, and the
+  // `length === 0` guard below then returned null -- so on /round an unreadable round drew
+  // NOTHING, indistinguishable from a round nobody entered. BidCards on / has said the
+  // right thing about this case all along; this figure is the surface that did not.
+  //
+  // It is drawn as a sentence rather than as an empty chart because there is nothing to
+  // plot: the commitments are real (they came from the auctions() call, which DID answer)
+  // and which of them were opened is the part that is missing.
+  if (a.bids == null) {
+    return (
+      <p className="rounded-card border border-amber bg-amber-soft px-4 py-3 text-sm leading-relaxed text-ink-soft">
+        The bids for this round could not be read, so there is no chart to draw. The Book
+        reports{" "}
+        <span className="tnum text-ink">{a.committedCount}</span> sealed commitment
+        {a.committedCount === 1 ? "" : "s"} on it — the log scan that says which of them were
+        opened is what failed, and that is a statement about this read, not about the
+        bidders. Reload, or read the round&rsquo;s logs on Basescan.
+      </p>
+    );
+  }
+
+  const bids = [...a.bids].sort((x, y) => x.commitIdx - y.commitIdx);
   if (bids.length === 0) return null;
 
   const phase = livePhase(a, head);
   const revealClosed = phase === "exclusive" || phase === "open";
+  // A BOND IS ONLY FORFEIT IF THERE WAS ONE. Every keeper round and every round opened
+  // from this site runs at bond 0 (OpenRound.tsx, and the footer's own disclosure), so
+  // "bond forfeit" on the column label was a loss this page had invented: the Receipt
+  // beside it correctly prints "bonds 0 · none escrowed on this round" for the same round.
+  // What a bidder who never opened their envelope actually loses at bond 0 is the bid.
+  const bonded = (a.bond ?? "0") !== "0";
 
   // The scale runs from the reserve to the max the maker allowed. Both are the contract's
   // own numbers, so the axis is not a presentation choice -- it is the range a bid was
@@ -203,7 +236,8 @@ export function Settlement({ a, head, source }: { a: Auction; head: number; sour
             const revealed = b.bps !== null && b.bps !== undefined;
             const isWinner = winner !== null && b.bidder?.toLowerCase() === winner;
             // Sealed after the window shut is not "still sealed" -- it is a bid that can
-            // never be read now, and its bond is forfeit. Different fact, different colour.
+            // never be read now, and it is out of the auction. Different fact, different
+            // colour. Whether a BOND went with it depends on the round: see `bonded` above.
             const forfeited = !revealed && revealClosed;
             const top = revealed ? y(b.bps as number) : PAD.top;
             const colH = PAD.top + plotH - top;
@@ -273,7 +307,9 @@ export function Settlement({ a, head, source }: { a: Auction; head: number; sour
                   }
                 >
                   {forfeited
-                    ? "never revealed · bond forfeit"
+                    ? bonded
+                      ? "never revealed · bond forfeit"
+                      : "never revealed · bid void"
                     : revealed
                       ? isWinner
                         ? "wins"

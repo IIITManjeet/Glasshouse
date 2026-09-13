@@ -160,10 +160,32 @@ function RoundView() {
   // this change does not touch.
   const keeperRound = findRound(auctions, h, n);
 
-  // Only when the board has missed AND the URL carries a maker. Keeper links carry no `?m=`
-  // at all, so this costs those pages nothing -- no extra eth_call, no second poll.
-  const wantPinned = !keeperRound && !!h && HASH_RE.test(h) && isAddress(m);
-  const pinned = usePinnedAuction(wantPinned ? m : null, wantPinned ? h : null);
+  // Only when the board has missed. Keeper links carry no `?m=` at all, so none of this
+  // costs a page that already worked anything -- no extra eth_call, no second poll.
+  //
+  // WHOSE AUCTION, WHEN THE URL DOES NOT SAY. `?m=` only ever appears on a link to a round
+  // somebody opened from a browser. Every other round link on this site is `/r/<hash>`
+  // alone, because the maker was implied by the manifest -- and the board's poll reads only
+  // the SIX most recent manifest rounds (`useAuctions.ts`, `limit: 6`, and BoardProvider
+  // records why that number has to stay small). So a keeper round that has scrolled out of
+  // that window, and the live-fill order -- which is built above the manifest entirely, and
+  // is the one auction on this Book that cleared at the RUNNER-UP's price -- both rendered
+  // "this build has not loaded a round with that identifier" on their own permanent URL.
+  // True, and a dead end on the round the README leads with.
+  //
+  // The manifest names the keeper's maker, and it is already loaded (`beforeInteractive`).
+  // Using it as the fallback half of the key turns that dead end into the same direct
+  // contract read a `?m=` link gets. An explicit, well-formed `?m=` still wins.
+  const manifest = readManifest();
+  const makerAsked = isAddress(m) ? m : null;
+  const fallbackMaker = isAddress(manifest?.maker) ? (manifest as Manifest).maker : null;
+  const makerForPin = makerAsked ?? fallbackMaker;
+  // `?m=` was supplied and is not an address. Different from `?m=` being absent, and the
+  // page has to say which -- telling somebody to add the parameter they already added is
+  // the "grid of zeros" mistake in one sentence.
+  const makerMalformed = m !== null && m !== "" && !isAddress(m);
+  const wantPinned = !keeperRound && !!h && HASH_RE.test(h) && !!makerForPin;
+  const pinned = usePinnedAuction(wantPinned ? makerForPin : null, wantPinned ? h : null);
 
   const a = keeperRound ?? pinned.auction;
   const headNow = keeperRound ? head : pinned.head || head;
@@ -203,6 +225,24 @@ function RoundView() {
             If a round was just opened, the transaction may not be in a block yet — reload in a
             few seconds.
           </p>
+          {/* WHICH MAKER WAS ASKED ABOUT, because the answer is only about that one. An
+              auction is keyed `key(maker, orderHash)`: the same hash under a different
+              maker is a different auction, and "no such auction" without naming the maker
+              reads as a claim about the hash. When the URL carried no maker this page
+              supplied the keeper's from the manifest, and it has to say so rather than let
+              a visitor think their own round was checked. */}
+          <p className="tnum mt-2 text-[0.78rem] break-all text-ink-faint">
+            maker asked about: {makerForPin}
+            {!makerAsked
+              ? " — the keeper's, from public/data/rounds.js, because the URL did not name a usable one"
+              : null}
+          </p>
+          {makerMalformed ? (
+            <p className="mt-2 text-[0.8125rem] text-amber">
+              The <code className="font-mono">?m=</code> in this URL is not a well-formed
+              address, so it was not used. A maker is 0x followed by 40 hex characters.
+            </p>
+          ) : null}
           <Link href="/rounds" className="mt-3 inline-block text-sm text-glass underline underline-offset-2">
             Every round so far →
           </Link>
@@ -295,6 +335,12 @@ function RoundView() {
           carries one: <code className="font-mono">/r/&lt;hash&gt;/?m=&lt;maker&gt;</code>. With both
           halves of the key this page reads the auction straight from the Book.
         </p>
+        {makerMalformed ? (
+          <p className="mt-2 text-[0.8125rem] text-amber">
+            The <code className="font-mono">?m=</code> in this URL is not a well-formed address,
+            so it was not used. A maker is 0x followed by 40 hex characters.
+          </p>
+        ) : null}
         <Link href="/rounds" className="mt-3 inline-block text-sm text-glass underline underline-offset-2">
           Every round so far →
         </Link>
@@ -303,7 +349,9 @@ function RoundView() {
   }
 
   const phase = livePhase(a, headNow);
-  const orderKnown = orderKnownFor(a, readManifest());
+  // The same manifest object the key fallback above read, not a second call: one read, one
+  // answer, so "whose round is this" and "did we ship an order for it" cannot disagree.
+  const orderKnown = orderKnownFor(a, manifest);
   const bonded = (a.bond ?? "0") !== "0";
   const canBid = phase === "commit" || phase === "reveal";
 

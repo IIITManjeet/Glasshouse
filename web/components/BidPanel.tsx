@@ -1022,7 +1022,16 @@ export function BidPanel({
             Nothing was taken from your wallet beyond gas. The bid does not count and the round
             cleared without it. <FaqLink to="reveal">why reveal matters</FaqLink>
           </p>
-          <p className="mt-2 text-[0.78rem] text-ink-faint">Bid again in the round now open.</p>
+          {/* NOT "bid again in the round now open". Nothing here knows that one is: this
+              branch fires on a round whose reveal window has closed, and the board may hold
+              no open round at all — which is exactly the state it is usually in. A sentence
+              that sends somebody to look for a round that is not there is the same
+              overstatement as a promise that "the keeper opens a new round every couple of
+              minutes", which this file already deleted one panel down. */}
+          <p className="mt-2 text-[0.78rem] text-ink-faint">
+            Nothing is lost but this bid. The next round this Book opens takes bids the same
+            way.
+          </p>
         </Shell>
       );
     }

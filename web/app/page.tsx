@@ -336,8 +336,21 @@ export default function Home() {
                               mark={false}
                             />
                           ) : (
+                            // THREE STATES, NOT TWO, and the third is the one this cell
+                            // used to get wrong. `revealedCount == null` is "we could not
+                            // read it". A count of zero on a round whose reveal window is
+                            // still ahead of it is "not yet" -- nobody CAN have opened a
+                            // bid. Printing "no reveals" there made an accusation about
+                            // bidders out of a round that had not reached its reveal
+                            // window, and RoundsTable on /rounds already said "not yet"
+                            // for the same row, so the two views disagreed about one
+                            // round. The predicate is RoundsTable's, unchanged.
                             <span className="text-ink-faint">
-                              {a.revealedCount == null ? "not read" : "no reveals"}
+                              {a.revealedCount == null
+                                ? "not read"
+                                : a.settled || head > a.revealEnd
+                                  ? "no reveals"
+                                  : "not yet"}
                             </span>
                           )}
                         </td>
@@ -361,8 +374,9 @@ export default function Home() {
                   <code className="font-mono">web/lib/chain.js</code>. Phase is computed here
                   against that block. <strong className="font-medium">Winner</strong> is the highest
                   revealed bid: it reads &ldquo;leading&rdquo; until the round settles, because a
-                  later reveal can still displace it, and &ldquo;not read&rdquo; when the log scan
-                  for that round failed — which is not the same as no reveals.
+                  later reveal can still displace it, &ldquo;not yet&rdquo; while the reveal
+                  window is still ahead of the round, and &ldquo;not read&rdquo; when the log
+                  scan for that round failed — which is not the same as no reveals.
                 </>
               )}
             </figcaption>
