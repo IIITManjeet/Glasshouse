@@ -5,13 +5,13 @@
 // never a live check: the block it was taken at is in the payload, and the panel that
 // renders it prints that block rather than the chain head.
 window.GLASSHOUSE_VERIFICATION = {
-  "generatedAt": "2026-09-12T09:59:39.603Z",
+  "generatedAt": "2026-09-13T08:25:36.493Z",
   "rpc": "https://mainnet.base.org",
   "book": "0xc4ea91Fe700918220423ac307C6B1c59650FFbfe",
   "fromBlock": "50965408",
-  "head": "51208894",
-  "auctions": 9,
-  "logs": 39,
+  "head": "51249268",
+  "auctions": 11,
+  "logs": 44,
   "passed": 8,
   "failed": 0,
   "notApplicable": 0,
@@ -19,22 +19,22 @@ window.GLASSHOUSE_VERIFICATION = {
     {
       "name": "LIFECYCLE",
       "ok": true,
-      "detail": "8 of 9 auction(s) ran open -> commit -> reveal -> settle. Totals: 9 opened, 11 commits, 9 reveals, 1 fills, 8 settlements."
+      "detail": "9 of 11 auction(s) ran open -> commit -> reveal -> settle. Totals: 11 opened, 12 commits, 10 reveals, 1 fills, 9 settlements."
     },
     {
       "name": "REPLAY",
       "ok": true,
-      "detail": "8 settlement(s) re-derived from the raw reveals match what settle() emitted, winner and clearing price both. e.g. 50 bps to 0xeebf737f…"
+      "detail": "9 settlement(s) re-derived from the raw reveals match what settle() emitted, winner and clearing price both. e.g. 50 bps to 0xeebf737f…"
     },
     {
       "name": "PRICE_SET_BY",
       "ok": true,
-      "detail": "1 of 8 settled auction(s) cleared at the RUNNER-UP's bid, which is the second-price claim actually happening. 7 cleared at the reserve. reserve 50 / second 0 -> 50; reserve 50 / second 250 -> 250; reserve 50 / second 0 -> 50"
+      "detail": "1 of 9 settled auction(s) cleared at the RUNNER-UP's bid, which is the second-price claim actually happening. 8 cleared at the reserve. reserve 50 / second 0 -> 50; reserve 50 / second 250 -> 250; reserve 50 / second 0 -> 50"
     },
     {
       "name": "SITE_DERIVATION",
       "ok": true,
-      "detail": "web/lib/reserve-window.ts agrees with this replay on competition class, thinness and winner margin over 9 row(s) past their reveal window, and its clearing price matches the value settle() EMITTED on 8 settled round(s). 0 row(s) dropped as unreadable."
+      "detail": "web/lib/reserve-window.ts agrees with this replay on competition class, thinness and winner margin over 11 row(s) past their reveal window, and its clearing price matches the value settle() EMITTED on 9 settled round(s). 0 row(s) dropped as unreadable."
     },
     {
       "name": "TRANSLITERATION",
@@ -44,17 +44,17 @@ window.GLASSHOUSE_VERIFICATION = {
     {
       "name": "PHASE",
       "ok": true,
-      "detail": "every settled auction reads as phase \"open\" at block 51208894, which is what settle() requires (n > exclusiveEnd) -- near-tautological, and kept only to catch a boundary regression in web/lib/phase.ts. 0x00000000… open, 0x50d52b02… open, 0x58296d32… open"
+      "detail": "every settled auction reads as phase \"open\" at block 51249268, which is what settle() requires (n > exclusiveEnd) -- near-tautological, and kept only to catch a boundary regression in web/lib/phase.ts. 0x00000000… open, 0x50d52b02… open, 0x58296d32… open"
     },
     {
       "name": "RESERVE_RULE",
       "ok": true,
-      "detail": "recommendReserve() over 9 settled row(s): 57 bps, band 50-65, reason THIN_COMPETITION. A heuristic splitting a known-safe floor from a known-unsafe ceiling, not an optimal reserve."
+      "detail": "recommendReserve() over 11 settled row(s): 57 bps, band 50-65, reason THIN_COMPETITION. A heuristic splitting a known-safe floor from a known-unsafe ceiling, not an optimal reserve."
     },
     {
       "name": "BONDS",
       "ok": true,
-      "detail": "bond dispositions never exceed commitments. 0x00000000… 2 committed / 0 revealed / 0 returned / 0 forfeited; 0x50d52b02… 1 committed / 1 revealed / 0 returned / 0 forfeited; 0x58296d32… 2 committed / 2 revealed / 0 returned / 0 forfeited; 0xb26ff03a… 1 committed / 1 revealed / 0 returned / 0 forfeited; 0x2ac0306b… 1 committed / 1 revealed / 0 returned / 0 forfeited; 0x32b17463… 1 committed / 1 revealed / 0 returned / 0 forfeited; 0x8c97446a… 1 committed / 1 revealed / 0 returned / 0 forfeited; 0xfccf8b6f… 1 committed / 1 revealed / 0 returned / 0 forfeited; 0xa6887719… 1 committed / 1 revealed / 1 returned / 0 forfeited"
+      "detail": "bond dispositions never exceed commitments. 0x00000000… 2 committed / 0 revealed / 0 returned / 0 forfeited; 0x50d52b02… 1 committed / 1 revealed / 0 returned / 0 forfeited; 0x58296d32… 2 committed / 2 revealed / 0 returned / 0 forfeited; 0xb26ff03a… 1 committed / 1 revealed / 0 returned / 0 forfeited; 0x2ac0306b… 1 committed / 1 revealed / 0 returned / 0 forfeited; 0x32b17463… 1 committed / 1 revealed / 0 returned / 0 forfeited; 0x8c97446a… 1 committed / 1 revealed / 0 returned / 0 forfeited; 0xfccf8b6f… 1 committed / 1 revealed / 0 returned / 0 forfeited; 0xa6887719… 1 committed / 1 revealed / 1 returned / 0 forfeited; 0x267d8496… 1 committed / 1 revealed / 0 returned / 0 forfeited; 0x494a8487… 0 committed / 0 revealed / 0 returned / 0 forfeited"
     }
   ]
 };
