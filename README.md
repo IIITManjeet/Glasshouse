@@ -207,6 +207,22 @@ specified and tested but **not demonstrated live**.
 
 The keeper is a script you run. It is not a hosted service, and it is not running right now.
 
+**Practice rounds** exist because that last sentence used to be the end of the story. `open()`
+is `external` with no access control and keys the auction by `key(msg.sender, orderHash)`
+(`GlasshouseBook.sol:118`), so a round was never something this deployment granted anybody —
+whoever pays the gas becomes its maker — and nothing on the site used it: every round this Book
+has seen was opened from a terminal, which is a strange property for a product whose front door
+is supposed to be the instrument. The button on `/` opens one from the visitor's own wallet
+against 32 random bytes, with the `humanDemo` windows and bond 0. It is a real auction —
+real sealed commits, a real reveal window, real second-price clearing, a real receipt — and it
+**cannot be filled**: `openRound` calls `open()` and nothing else, so no SwapVM order was ever
+shipped for that hash and there is nothing behind the right the winner wins. The page says so
+in three places rather than one, and says *no order this site knows of* rather than *no order
+exists*, because the Book is handed a hash and cannot see orders. A practice round appears in
+no manifest, so the board cannot enumerate it and `/rounds` will never list it; it is reachable
+only by its own URL, `/r/<hash>/?m=<maker>`, which carries both halves of the mapping key and
+is the link the round page hands you to send to someone.
+
 ## What is proven, and what is not
 
 **Verified by `forge test` — 97 tests, 9 suites, 0 failures.** Plus `npm run test:js`, 50
@@ -302,7 +318,7 @@ with real money, on a public chain.
   are very different claims.
 - **Messari conformance is not claimed.** Its generic schema wants non-null USD TVL and revenue
   fields an auction book does not have and that we would have to fabricate.
-- **A real asymmetry, and it is ours** (see *Future work* (2)). Bidders post bonds; the maker
+- **A real asymmetry, and it is ours** (see *Future work* (3)). Bidders post bonds; the maker
   posts nothing. A maker can open an auction against an order they never ship. The contract already refuses to mark a
   winner forfeited without positive evidence someone else filled (`GlasshouseBook.sol:262-277`)
   precisely because it cannot distinguish a no-show from a misconfigured hook. A maker-side
@@ -323,7 +339,41 @@ Collected here rather than left scattered, in the order we would do them.
 The headline item, and the one that most changes what Glasshouse is: private groups where you
 invite friends and run your own auctions. Full design below.
 
-### 2. A maker-side bond
+### 2. Rounds that open themselves
+
+**No contract on any EVM chain runs by itself.** There is no on-chain timer and no scheduler:
+a contract is inert code that executes only when somebody sends it a transaction. So "the
+contract should keep the board live" is not a thing that can be built, anywhere, by anyone —
+the only real question is *who sends that transaction, and why they bother*.
+
+Glasshouse already has the first half of the answer. `open()` has no access control
+(`GlasshouseBook.sol:118`) and an auction is keyed `(msg.sender, orderHash)`, so **any wallet
+can open its own round** — and the site does exactly that from the browser. Nobody has to run
+anything for an auction to exist. What remains is that a *fillable* round needs a maker who
+has shipped a real SwapVM order to Aqua, and that is not a gap to be closed by automation: it
+is what a maker is. In production the maker is whoever has an order they want filled. Our
+keeper is standing in for one because this is a demonstration with no real order flow.
+
+Two designs close the rest, both needing a new Book because this one has no upgrade path:
+
+**Settlement opens the next round.** `settle()` opens round N+1 in the same transaction that
+closes round N. The board then never goes quiet as long as anyone is settling, and the cost
+falls on somebody who was already paying gas. It is the cheapest self-perpetuating design
+there is, and its failure mode is benign: if nobody settles, nothing opens, which is exactly
+what an idle venue should look like.
+
+**An incentivised opener.** `openNext()` callable by anyone, paying a small tip out of the
+maker's surplus. Third parties then compete to keep the board live because it pays them to,
+which is the same shape as a liquidation keeper and for the same reason — you do not ask
+people to run your infrastructure for free.
+
+The third option needs no contract change at all and is worth naming for honesty: a scheduled
+executor (Chainlink Automation, Gelato, a cron on a box) calling `open()` on a timer. It is
+still off-chain execution; it has just moved off a laptop and onto infrastructure. That is a
+real improvement in reliability and none at all in decentralisation, and it should not be
+described as the latter.
+
+### 3. A maker-side bond
 
 **The one real asymmetry in the mechanism, and it is ours.** Bidders post bonds; the maker
 posts nothing, so a maker can open an auction against an order they never ship. The contract
@@ -333,10 +383,10 @@ misconfigured hook — so the hole is real and the contract is honest about it r
 papering over it.
 
 Playgrounds make this sharper rather than softer: a stranger's room opening auctions against
-orders that never ship is exactly the attack, so (2) is a prerequisite for letting anyone
+orders that never ship is exactly the attack, so this is a prerequisite for letting anyone
 open a room, not an optional follow-up to it.
 
-### 3. `web/lib/bid.js` and `chain.js` to TypeScript
+### 4. `web/lib/bid.js` and `chain.js` to TypeScript
 
 1,400 lines of wallet and signing code on the path every bid takes, almost entirely
 untested — only `decodeAuction` and the poll's call budget are covered. It is the right
@@ -344,7 +394,7 @@ migration and it was deliberately **not** done before submission: a large diff w
 observable benefit to a reader, on the one flow that has to work live. Worth doing first in
 any serious continuation, because every item above it touches that code.
 
-### 4. Messari conformance, or a written refusal of it
+### 5. Messari conformance, or a written refusal of it
 
 `subgraph/` follows Messari naming conventions but **conformance is not claimed**: the generic
 schema wants non-null USD TVL and revenue fields that an auction book does not have and that
