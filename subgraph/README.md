@@ -239,8 +239,10 @@ All four consumers now work: the page on Studio, the advisor and the skill on th
 The only operational catch left is startup order — a session that began before
 `GRAPH_API_KEY` was set cannot see it, because an MCP server reads its environment once.
 
-⚠️ **A nearly empty index is the expected state, not a fault.** The Book emitted nothing at
-all until 2026-09-08, and as of 2026-09-11 the whole of recorded history is:
+⚠️ **A thin index is the expected state, not a fault — but the snapshot below is a
+baseline, not the current count.** The Book emitted nothing at all until 2026-09-08, and as
+of 2026-09-11 — before the keeper had run against mainnet — the whole of recorded history
+was:
 
 ```
 cumulativeAuctionCount  1     cumulativeRevealCount  0
@@ -251,10 +253,17 @@ cumulativeCommitCount   2     cumulativeFillCount    0
 That one auction is `parameterSet: ADVOCATED` on 30/30 windows with a placeholder
 `orderHash` of `0x00…01a07d2dfab2`, so it is a manual open from `DEPLOY.md` section 6 and
 **not** the keeper's: the keeper hardcodes the `humanDemo` 60/60/15 windows and draws real
-order hashes from `config/rounds.json`, none of which appear on chain. The keeper has never
-run against Base mainnet.
+order hashes from `config/rounds.json`. At the time this baseline was taken, none of those
+hashes had appeared on chain and the keeper had never run against Base mainnet.
 
-Both of that auction's commits went **unrevealed** and its reveal window closed on 2026-09-07,
-so the only reliability record the index holds is two bidders at `bidsRevealed 0` of
-`bidsCommitted 1`. That is a real result and the page prints it rather than hiding it, but it
-is worth knowing before showing the account record to anyone.
+**That has since changed.** The keeper has run repeatedly against Base mainnet since
+2026-09-12 — a bonded round, a second-price fill, and many ordinary rounds besides (see
+`CHANGELOG.md`'s [0.9.0] entry and `TODO.md`). The index is no longer limited to the one
+manually-opened auction above. Deliberately not restated as a new fixed number here: the
+keeper keeps adding rounds, so any count typed into this file goes stale the moment it is
+read. For the current figures, query the endpoint below directly, or read `/evidence` on
+the deployed site, which names the block its snapshot was taken at.
+
+The single unrevealed manual auction described above remains a real, permanent part of the
+index's history — two bidders at `bidsRevealed 0` of `bidsCommitted 1` — and the page prints
+it rather than hiding it.

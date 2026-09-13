@@ -10,98 +10,6 @@ each one is in [`run.md`](./docs/archive/run.md).
 
 ## [Unreleased]
 
-### Added
-- **The keeper's first mainnet round.** 2026-09-12, round 0 of `config/rounds.json`, one
-  round only: approve, ship, open, commit, reveal, settle, dock, for 0.0000028 ETH of Base
-  gas. Everything the project previously called "end to end" was demonstrated on an anvil
-  fork of Base; this is the same lifecycle on the chain itself.
-
-  `scripts/verify-run.mjs` moves from **3 passed / 2 failed / 3 n/a** to **6 / 1 / 1**.
-  `REPLAY` is the one worth having: the settlement re-derived from the raw reveals matches
-  what `settle()` emitted, winner and clearing price both, without importing the contract's
-  rule, the subgraph's copy of it, or the page's. It had never run against mainnet.
-  `PRICE_SET_BY` moves n/a → **FAIL**, which is the honest direction — there is now a
-  settled auction with a winner, so the check can *run*, and it reports that the house was
-  the only bidder and cleared at the reserve. That is a different claim from "nothing to run
-  on" and the verifier should stop making the second one.
-
-  The AssemblyScript mapping also ran on a real settlement for the first time and reports
-  `settlementMatchesDerivation: true`, so three independent implementations of the clearing
-  rule now agree on real data rather than on a fork.
-- `scripts/wrap-weth.ts` — wraps the ETH that backs the keeper's declared depth, through the
-  Hardhat keystore, so the mainnet deployer key is never pasted into a `cast --interactive`.
-  `get-usdc.ts` wraps too, but wraps in order to swap the WETH away again and refuses below a
-  0.002 ETH floor; both wrong for this.
-- `test/js/chain-call-budget.test.js` — asserts how many RPC calls one poll of the board is
-  allowed to cost, not just what it returns. First coverage of `web/lib/chain.js` beyond
-  `decodeAuction`.
-
-- **A bonded round, and the last n/a becomes a pass.** Round 6 on Base, 2026-09-12,
-  opened with a 0.00001 WETH bond and carried through commit, reveal, settle and
-  `claimBond`. `scripts/verify-run.mjs` now reports **8 passed, 0 failed, 0 not
-  applicable** — every check it knows how to make has something real to make it against.
-  `BONDS` had read "n/a" for the life of the project, because `claimBond`, `claimForfeit`
-  and `claimUnrevealed` had never executed on any chain.
-
-  The bond returns. It is pulled from the bidder at commit and reclaimed after settle, so
-  the round costs gas only and the maker's WETH is unchanged to the wei — checked on a
-  fork first and again on mainnet. `bond = 0` stays the default for ordinary rounds,
-  because the cost falls on BIDDERS and a demo that charges strangers to look at it is a
-  demo nobody enters.
-- **The second-price claim, on Base mainnet.** Order `0x58296d32…`, 2026-09-12, via
-  `scripts/run-live-fill.ts`. Two bidders committed sealed; the winner revealed 400 bps and
-  the rival 250; the auction cleared at **250 — the rival's bid, not the winner's** — and the
-  winner filled inside the exclusive window for 0.00001 WETH in, 24,096 USDC out, the exact
-  amounts `test/fork/LiveFillPreflight.t.sol` predicted. `fillPhase: EXCLUSIVE`,
-  `fillByWinner: true`.
-
-  `scripts/verify-run.mjs` now reads **7 passed / 0 failed / 1 n/a**. `PRICE_SET_BY` passes
-  and reports both settled rounds rather than only the flattering one: "1 of 2 settled
-  auctions cleared at the RUNNER-UP's bid, 1 cleared at the reserve." The subgraph agrees
-  independently, with `settlementMatchesDerivation: true` on both.
-
-  The one check still n/a is `BONDS`: every round so far runs with `bond = 0`, so
-  `claimBond` / `claimForfeit` / `claimUnrevealed` remain unexercised, and the verifier says
-  so rather than counting them as passing.
-- `scripts/cross-check-subgraph.mjs` (`npm run crosscheck`) — diffs the published index
-  against an independent replay of the Book's logs, field by field. 45 comparisons across 3
-  auctions, all agreeing. Until now the only guard on `subgraph/src/book.ts` drifting from
-  the rule was verify-run's `TRANSLITERATION` check, which is a regex over two source files
-  and says so; two files can express one rule in text and still disagree on data.
-
-  The derivation is imported from `verify-run.mjs` rather than rewritten, since a fourth
-  copy of the clearing rule would turn this into a test of whether two copies of one mistake
-  match. That file now exports `readLogs` and `rebuild`, and guards its CLI behind an
-  `import.meta.url` check so importing them does not run the entire scan as a side effect.
-- `scripts/sweep-bidders.mjs` — returns the ephemeral bidders' unspent gas to the maker.
-  `run-live-fill.ts` had always called those keys "sweepable if this run dies", but nothing
-  could sweep them, so the word was an assertion rather than a capability. It matters on a
-  successful run too: the bidders are deliberately over-funded so neither can run dry between
-  commit and reveal, and 0.000296 ETH was left behind after the first live fill — more than
-  the maker had remaining.
-
-### Fixed
-- **The live fill checked one leg of the depth it declares.** `ship` declares
-  `[WETH, USDC] = [0.0008, 2.0]` to Aqua, and only the USDC side was checked for balance or
-  approved. The maker held 0.0005 WETH, so the run would have funded two ephemeral bidders and
-  only then reverted inside `ship` — the exact waste the order-virginity check twenty lines
-  above exists to prevent, reached from the side it does not cover, and the same omission as
-  the keeper's USDC-only approval fixed earlier. Both legs are now checked before anything is
-  spent; the refusal prints the command that fixes it, so `wrap-weth.ts` gained a
-  `WRAP_TARGET_WETH` override rather than a second hard-coded copy of a number that lives in
-  `run-live-fill.ts`.
-- **The deployed `/evidence` page was rate limited within an hour of mainnet having a round.**
-  `newestOpenedRound` in `web/lib/chain.js` memoises the newest opened round so a poll costs
-  one or two `eth_call`s instead of binary-searching all 300 — but the memo was guarded by
-  `cursor > 0`, and the remembered cursor for a chain holding exactly one auction is `0`. The
-  fast path never engaged, every poll paid the full ~10-call search, and `writeCursor(0)`
-  stored a value that failed the same guard on the next tick, so the memo could never warm
-  up. Ten calls every 12 s, from every visitor's IP, against Base's public endpoint.
-
-  It was dormant for as long as mainnet was empty, because an unopened round 0 returns early
-  after ONE call — the code was cheapest exactly while it was untested, and became expensive
-  at the moment the thing it guards started working. Ten calls per poll before, three after.
-
 ### Planned
 - `web/lib/bid.js` and `web/lib/chain.js` to TypeScript. `bid.js` is 1,400 lines of wallet
   and signing code with no test coverage and deserves its own pass.
@@ -109,7 +17,9 @@ each one is in [`run.md`](./docs/archive/run.md).
   It is the last thing keeping two palettes, two font strategies and two provenance
   conventions alive at once.
 - The keeper running continuously, so a visitor always finds a round accepting bids. It has
-  run one round and stopped.
+  run repeatedly since — capped batches, run deliberately rather than left unattended — but
+  never as a standing process; see `TODO.md` for the state-file race that keeps two
+  processes from safely sharing one network today.
 - The reserve panel reading the index rather than re-deriving. `web/lib/reserve-window.ts`
   is still a transliteration of `subgraph/src/helpers.ts`; the subgraph is published now, so
   the condition its header made deletion conditional on has arrived.
@@ -121,6 +31,108 @@ each one is in [`run.md`](./docs/archive/run.md).
 - The 300 ms reveal animation from the design decision. Deliberately unbuilt for now: the
   chart renders a state from data rather than a transition between states, so animating it
   means tracking a previous render purely to have something to animate from.
+
+## [0.9.0] - 2026-09-13
+
+The ETHOnline 2026 submission build. Everything since v0.7.0: the front end rebuilt around
+one shared visual contract, every step of a round's lifecycle reachable from the browser
+rather than from a terminal on one laptop, five defects an audit of roughly forty reachable
+states found and fixed, and the mainnet evidence kept current with the chain instead of a
+day behind it. **Stays 0.x on purpose:** the contracts are unaudited, the index is thin,
+orders are dust-sized, and the bond on ordinary rounds is 0.
+
+### Added
+- **The instrument is the front door.** The live auction moves to `/`; the old landing page
+  is gone. `/board` now 301s, so every link anyone already shared still resolves. (07066a3)
+- **The FAQ and a real footer.** `/faq` carries twenty questions, each answer lifted — not
+  rewritten — from existing prose, with a `// Lifted:` comment naming the file and lines it
+  came from. A four-column footer now carries every link the site had scattered through it.
+  (07066a3)
+- **The card/button system.** `.card` / `.card-head` / `.card-foot`, `.row-link`,
+  `.addr-mark`, `.prose-measure`, `.btn-danger-solid`. Primary actions are a 44px sans 600
+  button and the chip is neutral, so the accent colour is spent only on the primary button
+  and `.chip-live`. One spacing scale, icons that name the act, and a favicon that is
+  actually visible at 16px — the first two attempts were not. (6755cd1, fdccd2b)
+- **Rounds as a market.** `/rounds` is a promoted tile whose block countdown is the biggest
+  thing on the page, a bid strip of one cell per commitment (hatched while sealed, solid
+  once revealed), and — when nothing is open — the same tile becomes the last print, which
+  is what every exchange shows when the market is quiet rather than an empty table.
+- **Address identity, without invention.** A deterministic two-hue mark per address, real
+  ENS where it resolves, and roles read from chain fields (`house`, `you`, `winner`,
+  `leading`, `filled`, `maker`). No generated names, no faces; full hex stays visible and
+  copyable everywhere.
+- **A round can be opened, bid in, revealed and settled from the browser, by anyone.**
+  `GlasshouseBook.open()` has no access control and keys each auction by
+  `(msg.sender, orderHash)`, so a round was never something the deployment granted — only
+  something the site had never used. `openRound()` and `settleRound()` are wired in; a
+  browser-opened round is pinned to its `(hash, maker)` pair and reachable at
+  `/r/<hash>/?m=<maker>` without touching the binary-search poll every other page depends
+  on. Such a round has no SwapVM order behind it and can never be filled, and the round page
+  says so plainly — "no order this site knows of" — rather than implying a fill that cannot
+  happen. (333e945)
+- A dedicated-RPC option for the deployed site (`NEXT_PUBLIC_RPC_URL`), documented in
+  `DEPLOY.md` alongside which of the site's three consumers may see which key. (b90a5e4)
+- `.claude/skills/glasshouse-frontend` — the house frontend conventions written down where
+  an agent will read them, every command checked against `package.json`. (654bb8b)
+- A **Future work** section collecting four deferred items — the maker-side bond, the
+  TypeScript migration, the Messari-metrics divergence, and invite-only playgrounds — in one
+  place with the constraint that settles each one, instead of scattered across four
+  documents. (6948cd1, aeecf97)
+
+### Fixed
+- **Five edge cases from an audit of roughly forty reachable states**, driven in a real
+  browser rather than reasoned about: `/r/<hash>` without `?m=` was a dead end for any round
+  outside the board's six-round window — including the live-fill order the README leads
+  with; `/round` rendered nothing at all when the log scan failed, collapsing "could not
+  read the bids" into "nobody bid"; the settlement chart accused bidders of forfeiting bonds
+  that were never escrowed on ordinary bond-0 rounds; `/rounds` with nothing loaded drew six
+  filter tabs all reading 0, one of them phrased as an accusation; and the void-bid panel
+  told a visitor to "bid again in the round now open" when usually none is. (44560c8)
+- **The 24,096 USDC base-units overstatement.** The live-fill amount was being read, and in
+  places spoken, as 24,096 USDC — a millionfold overstatement, since USDC has six decimals
+  and the real amount is 0.024096 USDC. Every occurrence of the figure now carries the "base
+  units" qualifier and the human amount beside it. (4d3a57b)
+- The deployed `/evidence` page was rate limited within an hour of mainnet having its first
+  round: `newestOpenedRound` in `web/lib/chain.js` memoised the newest opened round behind a
+  `cursor > 0` guard, and the remembered cursor for a chain holding exactly one auction is
+  `0` — so the fast path never engaged and every poll paid the full ~10-call search, from
+  every visitor's IP. Guard is now `>= 0`; `test/js/chain-call-budget.test.js` asserts the
+  *price* of a poll (10 calls before, 3 after), not just its answer. (102beed)
+- The live fill checked only the USDC leg of the depth `ship` declares to Aqua; the WETH leg
+  went unchecked, so a run could fund two ephemeral bidders and only then revert inside
+  `ship`. Both legs are now checked before anything is spent. (5d7cd62)
+- `/evidence` refreshed to the chain as it actually stands rather than a snapshot from the
+  morning before; `verify-run` re-emitted and the cold-fallback snapshot regenerated to
+  match. (3f03cb6)
+
+### Recorded
+- **No contract runs by itself.** No EVM contract executes unprompted, so "the contract
+  keeps the board live" was never a buildable claim. `open()` having no access control
+  closes half of that gap; the other half — a maker with a real order shipped to Aqua — is
+  not automatable, and is recorded as such along with the two designs (`settle()` opening
+  round N+1 itself; an incentivised `openNext()`) that would close the rest. (e8591d3)
+- **Our own demonstration bidders render as strangers on our own site.** The ephemeral
+  bidders `run-live-fill.ts` funds are not in `TEAM_ADDRESSES`
+  (`subgraph/src/provenance.ts:19`), so they resolve to `UNKNOWN` on the contested round
+  that carries this project's headline claim, with no chip distinguishing them from a real
+  stranger. Nothing is concealed — the funding transactions are on chain — but the asymmetry
+  is real and not fixable before the deadline, since `provenance.ts` is subgraph mapping
+  code. Left open in `TODO.md`, with the interim: say it out loud. (92eab08)
+- **The mainnet keeper round, a bonded round, and the second-price claim, all on Base.** The
+  keeper's first mainnet round; a bonded round (`bond > 0`) carried through commit, reveal,
+  settle and `claimBond`, taking `scripts/verify-run.mjs` to **8 passed, 0 failed, 0 not
+  applicable** — every check it knows how to make now has something real to make it
+  against; and a second-price fill on order `0x58296d32…`, where the winner's 400 bps lost
+  to the rival's 250 and the auction cleared at the **rival's** bid, filled inside the
+  exclusive window for 0.00001 WETH in against 24,096 USDC base units out (0.024096 USDC).
+  `scripts/cross-check-subgraph.mjs` (`npm run crosscheck`) diffs the published index
+  against an independent replay of the Book's own logs, field by field, and
+  `scripts/sweep-bidders.mjs` returns the ephemeral bidders' unspent gas to the maker.
+- **The demo.** A 2–4 minute, human-narrated recording of the mechanism, from the two
+  existing SwapVM opcodes through the measured three-way comparison to the real mainnet
+  fill. Kept out of version control — `Glasshouse-ETHOnline-2026-demo.mp4` is gitignored,
+  because a binary that size in git history is permanent weight for every future clone; it
+  belongs on the submission platform, not in the source.
 
 ## [0.7.0] - 2026-09-12
 
@@ -467,7 +479,8 @@ invariant the design rests on is demonstrated rather than argued.
 - Fills record through `IMakerHooks.postTransferIn`, which `swap()` calls and `quote()`
   does not - the instruction itself cannot emit, since `LOG` reverts under `STATICCALL`.
 
-[Unreleased]: https://github.com/IIITManjeet/Glasshouse/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/IIITManjeet/Glasshouse/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/IIITManjeet/Glasshouse/releases/tag/v0.9.0
 [0.7.0]: https://github.com/IIITManjeet/Glasshouse/releases/tag/v0.7.0
 [0.6.0]: https://github.com/IIITManjeet/Glasshouse/releases/tag/v0.6.0
 [0.5.0]: https://github.com/IIITManjeet/Glasshouse/releases/tag/v0.5.0

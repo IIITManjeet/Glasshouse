@@ -37,3 +37,11 @@ gives you a view that a later file already changed.
 happened, including the prize-track research that a hackathon plan contains. It is kept
 unedited because editing it would contradict both its own maintenance rule and the reason
 it exists.
+
+## Other archived material
+
+- **`TODO-history-2026-09.md`** — the working checklist through submission, kept verbatim
+  (personal to-dos and all) once its content was either done or superseded. `../../TODO.md`
+  keeps only what is still genuinely open; this is the session-by-session record behind it —
+  the frontend restructure, the keeper's mainnet runs, the bonded round, the second-price
+  claim, and every defect found and fixed along the way.

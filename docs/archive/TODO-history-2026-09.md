@@ -1,0 +1,400 @@
+# TODO
+
+Working checklist. Kept in the repo rather than in someone's head, because things were
+being dropped between sessions.
+
+Convention: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked, with what on.
+Findings referenced as F-n live in `DESIGN.md`.
+
+---
+
+## SUBMISSION — 2026-09-13, 12:00 ET. Everything below is dated 2026-09-12 evening.
+
+Path chosen: **Finalist + Partner Prizes** (so Round 1 async screening, then live judging Mon
+14th if it passes: 4 min demo + 3 min Q&A). Partner prizes to select, max 3: **The Graph,
+1inch, Uniswap**. Rules read from `ethglobal.com/events/ethonline2026/info/details` and the
+prizes page; organiser email treated as authoritative where the two differ.
+
+### Only you can do these — they are outside the repo
+
+- [ ] **Submit the Uniswap Developer Feedback Form.** The $5K Best Stack Contribution track
+      requires "a completed submission" to their external form. `FEEDBACK.md` existing in the
+      repo does NOT satisfy it — grep for `feedback form|forms.gle|typeform` returns nothing,
+      so this has almost certainly never been done. Paste from `FEEDBACK.md`; the struct
+      incompatibility between `SwapRouter` and `SwapRouter02` is the substantive finding.
+- [ ] **Confirm every team member is staked and marked a confirmed hacker** on the Hacker
+      Dashboard. Not checkable from the repo. Unstaked members cannot be on the team.
+- [ ] **Fill in the dashboard submission form** — repo URL, description, the three partner
+      prizes, the video link, and the Finalist-vs-Partner-only choice. It can be edited up to
+      the deadline, so put placeholders in early and hit Submit again after each edit.
+- [ ] **Record the demo video.** Hard gate: 2–4 minutes (anything outside is AUTO-REJECTED,
+      and do not speed footage up to fit), minimum 720p, real spoken human narration, **no
+      music**, no text-to-speech or AI voiceover, not recorded on a phone, intro under ~20 s,
+      and if slides appear, max 4 bullets each. Two Graph tracks require a video of their own.
+- [ ] **Export `GRAPH_API_KEY` in whichever shell you record from.** `npm run crosscheck` dies
+      without it, and running it on camera is one of the strongest things we can show.
+
+      **It cannot go in a dotenv file.** Nothing in this repo loads one for the scripts -- no
+      `dotenv`, no `loadEnv` anywhere -- so `cross-check-subgraph.mjs:91` and
+      `reserve-advisor.mjs` read `process.env.GRAPH_API_KEY` raw and `.mcp.json` interpolates
+      `${GRAPH_API_KEY}` from the environment. A key written into `.env.local` would sit there
+      inert while the scripts kept failing. `export` it, or `setx` it to persist to new shells.
+
+      **And it must never reach Vercel.** The site is `output: "export"`, so any env var it
+      reads is inlined into a public chunk, and a Gateway URL carries its key in the path
+      (`web/lib/subgraph.ts:21`). The frontend reads the keyless Studio endpoint on purpose.
+      `web/.env.local` correctly holds `NEXT_PUBLIC_SUBGRAPH_URL` and nothing else.
+- [ ] **Run a capped keeper batch shortly before recording** so a visitor finds a round taking
+      bids: `KEEPER_MAX_ROUNDS=5`. Measured cost ~0.0000022 ETH/round against a balance good
+      for ~240 rounds. Deliberately not left running unattended — the risk to manage is
+      arriving at judging with the money already spent.
+
+### Fix before recording
+
+- [ ] **The video script narrates fork numbers.** `DECISIONS.md:224` beat 3 says "0.01 WETH in,
+      38.986354 USDC out" — that is the anvil fork. The mainnet fill is order `0x58296d32…`,
+      **0.00001 WETH in, 24,096 USDC base units out (0.024096 USDC)**, cleared at the runner-up's 250 bps
+      (`README.md:245-250`). The script predates the mainnet run. The 1inch track explicitly
+      wants on-chain token execution shown in the demo, so this beat has to be re-cut to the
+      real order — and it is a stronger beat, not a weaker one.
+- [ ] **The production URL is nowhere in `README.md` or `DEPLOY.md`.** It is
+      `https://glasshouse-ashy.vercel.app`, found only in `DESIGN.md` and
+      `scripts/shoot-screens.mjs`. A judge should not have to grep for the deployed site.
+- [ ] **After the keeper batch:** `node scripts/verify-run.mjs --emit`, then
+      `npm --prefix web run build`, then redeploy, so `/evidence` shows the newest round rather
+      than block 51,208,894. Then re-check `/`, `/rounds`, `/evidence`, `/account`, `/faq`.
+- [ ] **Give `/rounds` a pause before you point a camera at it.** F-11: its chain read takes
+      ~2.3 s and an early capture looks exactly like a broken table.
+- [ ] `DECISIONS.md` has several blank `[ ] In your words` lines (around :31, :41, :74, :108,
+      :145, :157). That file's stated purpose is to be the source the video is narrated from
+      and the evidence of human direction, so the blanks are worth filling in your own voice.
+
+### Frontend restructure — the owner's six complaints, in flight tonight
+
+Diagnosis: the site was an essay wearing a venue's palette. `/evidence` alone is ~1,600 words;
+`.btn-primary` had ONE call site in the entire app (the wallet button) while the two buttons
+the product exists for were drawn in `BidPanel`'s own outline constants; there was no `.card`
+primitive at all, so fifteen-odd hand-composed card recipes made clickable tiles and inert
+figures byte-identical; and `RoundsTable` lit up a whole row on hover while only one cell was a
+link. Architecture decided by Fable, recorded in this session.
+
+- [x] **Step 0 — the shared contract.** `.card`/`.card-head`/`.card-foot`, `.row-link`,
+      `.addr-mark`, `.prose-measure`, `.btn-danger-solid`; primary is now 44px sans 600 and the
+      chip is neutral, so teal is spent only on the primary button and `.chip-live`.
+      `web/lib/identity.ts` + 9 tests. Two latent bugs fixed on the way: `.btn-toggle` was
+      declared before `.btn` so its own size never applied, and `--color-lifted` is `#ffffff`
+      on the light theme — identical to `--color-raised` — so any hover or header painted with
+      it was invisible in the theme most judges will see. (6755cd1)
+- [x] **WS-A — chrome, routes, FAQ.** Nav becomes `Live · Rounds · Evidence · FAQ`; a real
+      four-column footer carrying every link; `/faq` with 20 questions whose answers are LIFTED
+      from existing prose rather than rewritten; one type register everywhere; `/evidence` and
+      `/round` trimmed; `/board` → `/` redirect.
+- [x] **WS-B — the instrument at `/`.** The live round becomes the front door, keeping exactly
+      one sentence of what-this-is above it. All five `BTN_*` constants deleted; one primary per
+      view, changing label through the round's states.
+- [x] **WS-C — rounds as a market.** A promoted tile whose countdown is the biggest thing on
+      the page, a visible bid strip, a row-link contract that no longer lies, and an honest
+      "last settled" tile when nothing is open — which is what every exchange shows when the
+      market is quiet.
+- [x] **WS-D — personification without invention.** A deterministic two-hue mark, real ENS when
+      it resolves, and roles read from chain fields (`house`, `you`, `winner`, `leading`,
+      `filled`, `maker`). `Identity.tsx`'s refusal of identicons STANDS: no generated names, no
+      faces, full hex always visible and copyable. A colour derived from the bytes is a
+      rendering of the address, not a claim about anyone.
+- [x] **Integration done** (07066a3, b90a5e4). Build, `lint:page` PASS, 59 JS tests green,
+      `HowToBid.tsx` and `.tape .panel-id` deleted with zero call sites. Five defects found
+      while integrating, none of them in the plan:
+
+      - `/r/<hash>` had NEVER worked. A Vercel rewrite changes which file the edge serves and
+        does not change the browser's location, so the client saw an empty query string and
+        every round link on the site rendered "No round in the URL". This is F-10 exactly, the
+        fix `/profile/<addr>` already had; `round/page.tsx` predated it. Measured in headless
+        Chrome against production, not inferred.
+      - The round page could not say a read had FAILED — `error` was the one `useBoard()` field
+        it did not destructure, so a rate-limited RPC left it loading forever.
+      - The profile look-up box was a no-op on every profile: seeded with the address already
+        on screen, so "Look up" reloaded the page you were on.
+      - The connected address appeared TWICE, and only the lower one reached a profile.
+        WalletChip's own comment had warned this would happen. The menu moved to the masthead
+        and gained the profile link; the old chip called `disconnect()` on click.
+      - Deleting `.tape h1` broke `/evidence`'s heading — it was the one h1 with no size
+        utility, so Tailwind's `font-size: inherit` rendered it at 14px. Fixed in the markup,
+        which is where it should always have lived.
+
+- [ ] **Still worth doing if there is time** (from the spacing review; none are defects):
+      collapse vertical rhythm to `2/3/4/6/8/12/16` — sixteen distinct steps are in use and
+      section→section is a different value on every route; move `/rounds`'s one primary out of
+      `.card-foot`, where a 44px filled button sits inside a 13px caption strip; and move the
+      wallet bar on `/` into the bid-panel column so "who am I" sits above "place a bid"
+      instead of reading as masthead furniture between the headline and the countdown.
+
+- [ ] **Optional, and it removes the last demo risk:** set `NEXT_PUBLIC_RPC_URL` on Vercel to a
+      dedicated Base endpoint. Unset, every visitor reads the public endpoint from their own IP
+      and can be rate limited. Note it is public (static export) and that setting it disables
+      the fallback pool — see DEPLOY.md.
+
+Revert target if tonight goes wrong: tag **`pre-frontend-restructure`**.
+
+### Measured today, and green
+
+`npm test`: 97 Solidity + 59 JS + provenance lint, all passing. `verify-run` against Base
+mainnet: **8 passed / 0 failed / 0 n/a** across 9 auctions — every check it can make now has
+something real to make it against. `crosscheck`: **135 field comparisons across 9 auctions, all
+agreeing**. Static export clean. All five deployed routes 200. Repo public. `main` level with
+`origin/main`.
+
+### Disclosure gap: demonstration bidders render as strangers
+
+- [ ] **`TEAM_ADDRESSES` has one entry and the ephemeral bidders are not in it.**
+      `subgraph/src/provenance.ts:19` lists only the maker, `0xeebf…ecdf`. The bidders that
+      `scripts/run-live-fill.ts` generates and funds -- `0x1d59A25a…` (winner, 400 bps) and
+      `0x3b699D49…` (rival, 250) in `.ephemeral-bidders.json` -- resolve to `UNKNOWN`, which
+      `components/Record.tsx:39-43` correctly calls "the value nearly every real visitor
+      gets". So on the contested round that carries this project's headline claim, two wallets
+      we funded from the maker minutes earlier are rendered exactly like two strangers who
+      wandered in.
+
+      Nothing about this is hidden -- the funding transactions are on chain and the docs say
+      plainly that the script generates its own bidders -- but the site has a mechanism whose
+      entire job is saying "this participant is ours", and it is not being fed. The house bid
+      gets a `house` chip on every card; these get nothing. That asymmetry is the defect.
+
+      **Not fixable before the deadline**: `provenance.ts` is subgraph mapping code, so adding
+      two addresses means republishing and waiting for a reindex. Until then the disclosure is
+      spoken rather than rendered -- if a demonstration round is shown on camera, SAY the
+      bidders are ours. The mechanism does not care who bids, which is the point, and a
+      disclosed demonstration is worth more than an undisclosed one that a judge can unpick
+      from the funding transactions.
+
+      After the deadline: add both addresses to `TEAM_ADDRESSES`, republish, and they carry a
+      `TEAM` chip like the maker does.
+
+### Housekeeping, after the deadline
+
+- [ ] `.nowrap-token` is declared in `globals.css` and has zero call sites anywhere in `web/`.
+      Dead, or reserved for something unwritten.
+- [ ] `CHECKIN.txt` still says "6 passed, 1 failed, 1 n/a" and "two auctions". It is untracked
+      by design so it misrepresents nothing shipped, but it badly undersells the current state
+      to anyone who reads it while prepping the pitch.
+- [ ] `web/AGENTS.md` is the auto-generated `next dev` block, not project guidance, and
+      `web/CLAUDE.md` is one line pointing at it. The house frontend conventions now live in
+      `.claude/skills/glasshouse-frontend/SKILL.md` instead.
+
+---
+
+## In progress
+
+- [x] **The keeper survives an interruption, and skips a round it cannot ship.**
+  Was: `nextRound` only advances after settle AND dock, so any interruption left the cursor
+  on a partly-done round and the next run restarted it from `ship` -- which Aqua rejects for
+  a strategy it already holds, permanently stranding the keeper on that round. Harmless on a
+  fork; not harmless now that the mainnet balance is good for ~240 rounds and the run is
+  meant to be left alone.
+
+  Progress is recorded in the state file (`shipped`, written between ship and open) and
+  confirmed against the Book, never inferred from the revert -- `0x879f237b` reads like a
+  duplicate-strategy error but also fires for a missing allowance, so the selector cannot
+  tell you which. Each step now asks what is already true: open skipped when `commitEnd` is
+  set, commit when the Book holds ours, reveal when already revealed, settle when settled.
+  A ship that fails for any reason SKIPS the round and advances, because retrying is what
+  turned one bad round into a dead keeper.
+
+  Verified on a fork both ways, after a regression the first version introduced: a round
+  killed between commit and reveal resumes and reveals at the bps its state file recorded;
+  a fresh round still seals, reveals and settles with a real winner. That regression --
+  `hasCommitted` read into a const before the commit was sent, so every FRESH round settled
+  at 0 bps with no winner -- was caught only by testing the path that looked least likely
+  to break.
+
+## Frontend — open
+
+- [x] **F-5 the type rule — RESOLVED BY DELETING THE RULE.** `.tape` set the mono family as
+      the BODY face on /board and /evidence, which is what the readability research objects
+      to at paragraph length, and the open question was how much of it to reverse. The
+      answer turned out to be all of it: `.tape` is density only now — radii, size, leading
+      — with no colour and no font-family, so there is one register across the site and the
+      question stops existing rather than getting a narrower answer. Newsreader went with
+      it; two faces was the clearest signal of the two-register problem. (c46eeca)
+
+- [x] **F-9 withdrawn** — the floating circle is the Next.js dev indicator, injected by
+  `next dev` and absent from production. Verified against the deployed site and the built
+  chunks. Second finding withdrawn for the same reason as F-8.
+- [x] **F-7 withdrawn** — the CTA panel populates; the capture was taken mid-transition.
+- [x] **The control system is complete.** Every label and control in the app now uses a
+      primitive — a grep for the old ad-hoc class lists returns nothing. `.chip` gained
+      `chip-live` / `chip-warn` tints so `SourceChip` keeps its semantic colour (mainnet vs
+      fork/sim/snapshot) without a border; `.btn-toggle` drives its pressed look from
+      `aria-pressed`, so the visible and announced states cannot drift.
+      Two over-corrections caught by looking at the result: `refresh` was too quiet as
+      tertiary when it is the only control on the page, and the rehearsal toggle lost the
+      status bar's uppercase. Both fixed.
+- [x] **Imagery: two atmospheric backgrounds, and no illustration.** The art direction was
+      wrong twice (the NAME, then the WORD) and `art-prompts/README.md` records both. Round
+      three is abstract only: light through glass, nameless, carrying no information —
+      `web/public/art/hero-field.webp` behind the landing headline, fading out before the
+      settlement chart, and `social-card.jpg` behind the Open Graph card. Both were cropped
+      to remove Gemini's sparkle watermark, and both went from ~6.4 MB to under 12 KB.
+      `Atmosphere.tsx` and its drifting envelopes were deleted in the same pass (1582c52).
+
+## Frontend — done
+
+- [x] **"Where do I start?" had no answer.** The board could say what phase a round was in
+      and never how a person takes part — most visibly when nothing is live and the panel
+      correctly says there is nothing to bid on, leaving a visitor with no idea what they
+      would have done. `components/HowToBid.tsx` is the missing half: four steps from the
+      bidder's side, present whether or not a round is open, with a pointer to it from the
+      page lede so it is not something you find only by scrolling past the whole instrument.
+- [x] **The account page was a wall of zeros.** An address the indexer had seen but that had
+      never bid rendered "0 of 0 sealed" above six tiles of 0 — every figure correct and the
+      panel saying nothing, which reads as a page that failed to load rather than an account
+      with no history. It now leads with a sentence and draws the tiles only when there is
+      something in them.
+
+- [x] F-0 `/profile/<addr>` 404 on localhost — dev-parity rewrite in `next.config.mjs`
+- [x] F-1 record page had no nav entry — `Bidders` added
+- [x] F-2 every address left the site — `components/Address.tsx`, in-app record first
+- [x] F-3 chip vs button — `.chip` / `.btn` primitives in `globals.css`
+- [x] F-4 no CTA hierarchy — `.btn-primary/secondary/tertiary/danger`, one primary per view
+- [x] F-6 nav never marked the current page — `components/NavLink.tsx`, with `aria-current`
+- [x] F-8 **withdrawn** — the 390px "clipping" was a headless-Chrome cropping artefact
+- [x] Wallet not connecting — detection rewritten to ask connectors, not `window.ethereum`
+- [x] Screenshot rig on CDP with real device emulation + overflow measurement
+- [x] **Rounds page filter tabs** -- `components/RoundsFilter.tsx`, six filters with live
+      counts, zero-count tabs disabled rather than hidden, `role="tablist"`. Rounds whose
+      bids could not be READ are excluded from bid-based filters and named separately rather
+      than being counted as having none, because "we could not read it" is not "nobody bid".
+- [x] **The deployed /evidence page was rate limited the moment mainnet had a round.**
+      Reported from the live site within an hour of the first keeper round settling. Cause
+      in `web/lib/chain.js`: `newestOpenedRound` memoises the newest opened round so a poll
+      confirms it in one or two `eth_call`s instead of binary-searching all 300, but the
+      memo was guarded by `cursor > 0` -- and the remembered cursor for a chain holding
+      exactly ONE auction is 0. The fast path never engaged, every poll paid the full
+      ~10-call search, and `writeCursor(0)` stored a value that failed the same guard on the
+      next tick, so the memo could never warm up. 10 calls per poll, every 12 s while a
+      round is live, from every visitor's IP against Base's public endpoint.
+
+      It was dormant for as long as mainnet was empty, because an unopened round 0 returns
+      early after ONE call — so the code was cheapest precisely while it was untested, and
+      became expensive at the moment the thing it guards started working. Fix is `>= 0`.
+
+      `test/js/chain-call-budget.test.js` asserts the PRICE of a poll, not just its answer:
+      10 calls before, 3 after. Its third case — "still finds the newest round when many are
+      open" — passes under BOTH guards, which is the point. Correctness was never broken, so
+      no correctness test could have caught this, and `chain.js` had no coverage at all.
+
+## Backend — open
+
+- [x] **The keeper now approves BOTH legs to Aqua.** Was USDC only (`scripts/keeper.ts:191` checks and
+  approves only the USDC allowance). `ship` declares depth in BOTH tokens, so with a zero
+  WETH allowance the very first round reverts — custom error `0x879f237b` carrying the router
+  and the order hash, which reads like a duplicate-strategy error and is not one. Found on the
+  fork, where the live-fill run had consumed the maker's WETH allowance; it would bite on
+  mainnet exactly once, on the first keeper round, unless the maker happens to have approved
+  WETH beforehand. Fix: approve both tokens in the same pre-flight block that already does USDC.
+
+- [x] **The keeper has run against Base mainnet.** 2026-09-12, round 0, one round only.
+  The two things that gated it are gone: `scripts/wrap-weth.ts` wraps through the Hardhat
+  keystore (so the deployer key never leaves it for a `cast --interactive` paste), and
+  0.0005 WETH now backs the 0.0004 of declared depth. The whole round -- approve, ship,
+  open, commit, reveal, settle, dock -- cost 0.0000028 ETH.
+
+  `verify-run` went from **3 passed / 2 failed / 3 n/a** to **6 passed / 1 failed / 1 n/a**:
+
+  - `LIFECYCLE` and `REPLAY` flipped to pass. REPLAY is the one that matters -- the
+    settlement re-derived from the raw reveals matches what `settle()` emitted, winner and
+    clearing price both, without importing the contract's rule, the subgraph's copy of it,
+    or the page's. It had never run against mainnet before.
+  - `PHASE` went n/a -> pass, and `SITE_DERIVATION` now checks its clearing price against
+    a real settled round instead of against zero of them.
+  - `PRICE_SET_BY` went n/a -> **FAIL**, which is the honest move rather than a regression:
+    there is now a settled auction with a winner, so the check can run, and it reports that
+    the winner cleared at the reserve because the house was the only bidder. "Ran, and the
+    second-price arm was not exercised" is a different claim from "nothing to run on", and
+    the verifier is right to stop saying the second one.
+
+  Snapshot regenerated and committed, so `/evidence` shows this rather than the old 3/2/3.
+
+- [x] **A second bidder revealed above the reserve on mainnet, and the winner filled.**
+  2026-09-12, order `0x58296d32…` via `scripts/run-live-fill.ts`. Winner 400 bps, rival 250,
+  cleared at **250 — the rival's bid**. Filled inside the exclusive window: 0.00001 WETH in,
+  24,096 USDC base units out (0.024096 USDC), exactly what the preflight predicted. `fillPhase: EXCLUSIVE`,
+  `fillByWinner: true`.
+
+  `verify-run` is now **7 passed / 0 failed / 1 n/a**. `PRICE_SET_BY` passes and names both
+  outcomes rather than only the good one: "1 of 2 settled auctions cleared at the RUNNER-UP's
+  bid, 1 cleared at the reserve". The subgraph agrees independently —
+  `settlementMatchesDerivation: true`, `competition: CONTESTED`, `thin: false`.
+
+  No second wallet was needed: `run-live-fill.ts` generates and funds ephemeral bidders
+  itself. That had been mis-scoped in this list as blocked on funding a second account.
+- [x] **The subgraph is cross-checked against an independent replay, by script.**
+  `scripts/cross-check-subgraph.mjs` (`npm run crosscheck`). It re-derives every auction
+  from the Book's raw logs, asks the deployed subgraph about the same ones, and diffs them
+  field by field: **45 comparisons across 3 auctions, all agreeing**, plus the mapping's own
+  `settlementMatchesDerivation` asserted true on every settled round.
+
+  The derivation is IMPORTED from `verify-run.mjs`, not rewritten — that file's whole value
+  is that its replay imports none of the three implementations, and re-typing the top-2 walk
+  would have made this a test of whether two copies of one mistake match. `readLogs` and
+  `rebuild` are exported for it, and the CLI is now guarded by an `import.meta.url` check so
+  importing them does not run the whole scan as a side effect.
+
+  Verified non-vacuous: injecting an off-by-one into the replay side makes it report the
+  disagreement on all three auctions with both values, and exit 1.
+
+  This does NOT replace `TRANSLITERATION`, and does not fully retire it either: both sides
+  here read the same chain, so this catches a mapping that computes the wrong thing, not a
+  chain that emitted the wrong thing. The latter is `verify-run`'s `REPLAY`.
+- [ ] ~~`web/lib/bid.js` and `chain.js` to TypeScript~~ — **recommend NOT doing this before
+      submission.** 1,400 lines of wallet and signing code, nearly all of it untested (only
+      `decodeAuction` and the poll's call budget are covered), on the path every bid takes. A type migration there is a large diff with no observable benefit to a
+      judge and a real chance of breaking the one flow that must work live. It is the right
+      thing to do the week after, not the day before.
+
+- [x] **A bonded round ran on Base mainnet, and BONDS is no longer n/a.** Round 6,
+  2026-09-12, opened with a 0.00001 WETH bond: committed, revealed against, settled and
+  reclaimed. `verify-run` now reports **8 passed / 0 failed / 0 n/a** — every check it can
+  make has something real to make it against.
+
+  The bond's spender is the BOOK, not Aqua, which needed its own allowance; and the claim
+  path is `claimBond` rather than `claimForfeit`, because `settle()` only sets
+  `winnerForfeited` when someone ELSE filled and a keeper round never fills. Both were
+  established by reading the contract and proved on a fork before mainnet — the maker's
+  WETH was byte-identical before and after, and it is again on mainnet.
+
+  `bond = 0` remains the default for ordinary rounds: the Book pulls a bond from the
+  BIDDER at commit, and a demo that charges strangers to look at it is a demo nobody
+  enters. `KEEPER_BOND_WEI` opens a bonded round deliberately.
+
+- [~] **Run the keeper so a visitor finds a round accepting bids.** Six mainnet rounds so
+  far (0-5). Measured cost is 0.0000022/round, and the balance after the ephemeral-bidder
+  sweep is 0.000534 ETH -- about 240 rounds, or 18 hours back to back.
+
+  Deliberately NOT left running unattended before the demo. The board only needs a live
+  round while someone is watching, and 2 rounds of demo cost ~1% of the balance, so the
+  risk worth managing is arriving at judging with the money already spent -- not running
+  out mid-round, which the gas floor now handles by stopping cleanly between rounds.
+  Run a capped batch (`KEEPER_MAX_ROUNDS=5`) shortly before showing it.
+
+## Backend — done
+
+- [x] `npm test` red where `forge test` was green — `fsPermissions` in `hardhat.config.ts`
+- [x] `npm test` hid two suites behind `&&` — `scripts/run-checks.mjs` runs all three
+- [x] Snapshot generator broken by a tightened RPC log cap — both scans renegotiate the cap
+- [x] Fork rehearsal could consume the round it was rehearsing — `DRY_RUN` keeps its own cursor
+- [x] `scripts/verify-run.mjs` — independent replay, three outcome states, contract tie-break
+- [x] Full fork end-to-end: keeper round, then a two-bidder live fill clearing at the
+      runner-up's 250 bps, through the official Aqua inside the exclusive window
+
+## Housekeeping
+
+- [x] Committed and pushed as `4726856` on 2026-09-11.
+- [x] Background anvil and dev server stopped.
+
+> **The fork is gone, and with it the only settled rounds that existed.** Four keeper rounds
+> and the two-bidder live fill that cleared at the runner-up's 250 bps lived only in that
+> anvil process. To demo a populated receipt or the rounds filters against real data again,
+> restart the fork and re-run: `anvil --fork-url https://mainnet.base.org --chain-id 8453
+> --block-time 1`, then the keeper with `DRY_RUN=1`, then `run-live-fill.ts`. Budget about
+> ten minutes. A fresh fork also clears the shipped-strategy collisions that stalled round
+> generation, so this is the fix for that too.

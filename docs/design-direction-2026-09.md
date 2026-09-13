@@ -4,6 +4,12 @@
 `web/app/globals.css` at commit `e35dac5`, after reading DESIGN.md from "# Art direction"
 to the end.
 
+**Since superseded in one respect, kept unedited otherwise:** this document predates the
+2026-09-13 frontend restructure. `/board` below is the route as it existed when this was
+written; it has since become `/`, with `/board` left as a redirect. Auction counts named
+below (e.g. "8 auctions") are what the chain held at the time of writing, not a current
+figure — the keeper has run many rounds since; see `/evidence` for the current state.
+
 **The brief, verbatim:** "make the theme images website look alike something more of a
 bidding system on crypto or eth whatever we are doing... complete revamp or polishing of our
 theme color palettes and representation cause it is what that will all after matters."

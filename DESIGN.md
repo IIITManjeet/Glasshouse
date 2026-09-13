@@ -99,7 +99,7 @@ screenshot's virtual-time budget catching `<Swap>` mid-transition. Confirm by lo
 
 ---
 
-## F-6 🔴 The navigation never says which page you are on
+## F-6 🟢 The navigation never says which page you are on
 
 **Symptom.** `Board / Rounds / Evidence / Bidders` render identically on every page. On
 `/board`, "Board" is not marked. There is no active state, no underline, no colour change.
@@ -110,6 +110,10 @@ screenshot's virtual-time budget catching `<Swap>` mid-transition. Confirm by lo
 **Why it matters.** It is the cheapest orientation cue there is, and its absence is felt
 most by exactly the person this site is for: someone who arrived from a link, does not know
 the structure, and is deciding where to go next.
+
+**Fixed.** `components/NavLink.tsx`, with `aria-current` so the current page is announced
+and an underline so it does not rest on colour alone (4726856). The nav itself has since
+become `Live · Rounds · Evidence · FAQ`, and `/board` now redirects to `/`.
 
 ---
 
