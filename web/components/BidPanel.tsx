@@ -626,7 +626,19 @@ function EnterSecret({ maker, orderHash, bidder, bounds }: { maker: string; orde
  * a commit that misses costs nothing but the chance to bid. Missing a REVEAL costs the bid,
  * which is why nothing like this appears in RevealButton.
  */
-function BidForm({ auction, st, head, headUnknown }: { auction: Auction; st: Derived; head: number; headUnknown: boolean }) {
+function BidForm({
+  auction,
+  st,
+  head,
+  headUnknown,
+  orderKnown = true,
+}: {
+  auction: Auction;
+  st: Derived;
+  head: number;
+  headUnknown: boolean;
+  orderKnown?: boolean;
+}) {
   const { address, isConnected, chainId } = useAccount();
   const me = address?.toLowerCase() ?? null;
   const [raw, setRaw] = useState("");
@@ -750,6 +762,16 @@ function BidForm({ auction, st, head, headUnknown }: { auction: Auction; st: Der
 
   return (
     <div className="mt-3">
+      {/* ABOVE THE INPUT, NOT BELOW THE BUTTON. A round with no order behind it takes real
+          sealed bids, clears at a real second price and produces a real receipt -- and the
+          winner's prize is the right to fill an order that does not exist. That is worth
+          knowing before a number is typed, not after a signature. */}
+      {!orderKnown ? (
+        <p className="mb-3 border-l-2 border-amber bg-amber-soft px-3 py-2 text-[0.78rem] leading-snug text-ink-soft">
+          Practice round: your bid is real and sealed; whoever wins has won the right to fill
+          nothing.
+        </p>
+      ) : null}
       <label className="block">
         <span className={LABEL}>bid, bps</span>
         <input
@@ -872,7 +894,19 @@ function ConnectPrimary() {
  * (auction, record, on-chain row, head) into a state, and re-deriving any of it here would
  * be a second opinion about a deadline that forfeits money when it is wrong.
  */
-export function BidPanel({ auction, head }: { auction: Auction | null; head: number }) {
+export function BidPanel({
+  auction,
+  head,
+  // DEFAULT TRUE, SO NOTHING THAT ALREADY MOUNTS THIS CHANGES. `/` shows the keeper's
+  // rounds, every one of which was opened against an order that was shipped, and the only
+  // caller that passes `false` is the round page reading a round somebody opened from a
+  // browser. A default of `false` would have put a practice-round warning on the front door.
+  orderKnown = true,
+}: {
+  auction: Auction | null;
+  head: number;
+  orderKnown?: boolean;
+}) {
   const mounted = useMounted();
   const tick = useRecordTick();
   const { address, isConnected } = useAccount();
@@ -1086,7 +1120,7 @@ export function BidPanel({ auction, head }: { auction: Auction | null; head: num
 
   return (
     <Shell round={auction.round}>
-      <BidForm auction={auction} st={st} head={head} headUnknown={headUnknown} />
+      <BidForm auction={auction} st={st} head={head} headUnknown={headUnknown} orderKnown={orderKnown} />
     </Shell>
   );
 }

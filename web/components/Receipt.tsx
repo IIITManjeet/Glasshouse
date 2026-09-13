@@ -70,7 +70,20 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-export function Receipt({ a, source }: { a: Auction; source: Source }) {
+export function Receipt({
+  a,
+  source,
+  // DEFAULT TRUE, WHICH KEEPS `/` AND `/evidence` EXACTLY AS THEY ARE. Those two show the
+  // keeper's rounds, opened against orders that were shipped to Aqua; the only caller that
+  // passes `false` is the round page, for a round somebody opened from a browser. The
+  // predicate itself lives there, computed once from `a.filled` and the site's manifest --
+  // see `orderKnownFor` in app/round/page.tsx for what false does and does not claim.
+  orderKnown = true,
+}: {
+  a: Auction;
+  source: Source;
+  orderKnown?: boolean;
+}) {
   // The reader's own wallet, for the one role that is about them. Called before the early
   // return below, because a hook cannot be conditional.
   const { address: connected } = useAccount();
@@ -205,8 +218,14 @@ export function Receipt({ a, source }: { a: Auction; source: Source }) {
           ) : (
             <>
               <span className="tnum text-glass">{overReserve > 0 ? "+" : ""}{num(overReserve)} bps</span>
+              {/* THE ARITHMETIC STAYS EVEN WHEN THERE WAS NO ORDER. It is a real difference
+                  of two figures the chain holds -- what the auction cleared at, against the
+                  reserve that would have applied uncontested -- and deleting it would hide
+                  the one number that shows the mechanism worked. What is added is the other
+                  half of the truth: the improvement was won over nothing. */}
               <span className="ml-2 text-ink-faint">
                 {num(clearing)} cleared − {num(a.reserveBps)} reserve
+                {orderKnown ? "" : " · on nothing — there was no order to fill"}
               </span>
             </>
           )}
@@ -225,8 +244,15 @@ export function Receipt({ a, source }: { a: Auction; source: Source }) {
                   : "NOT the winner — check the phase this landed in"}
               </span>
             </>
-          ) : (
+          ) : orderKnown ? (
             <span className="text-ink-faint">no fill reported to the Book</span>
+          ) : (
+            // NOT "no fill reported" -- that sentence implies a fill was possible and did
+            // not happen. On a round with no order behind it, no fill was ever available to
+            // report, and the winner's prize was the right to fill nothing.
+            <span className="text-ink-faint">
+              no fill possible — no order was shipped for this hash
+            </span>
           )}
         </Field>
         <Field label="what the winner kept">

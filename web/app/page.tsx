@@ -7,6 +7,7 @@ import { pageBand } from "@/components/PageBand";
 import { PhaseTrack, BidCards, Stats, ReplayCheck, Countdown } from "@/components/Auction";
 import { WalletBar } from "@/components/WalletBar";
 import { BidPanel, RevealStrip } from "@/components/BidPanel";
+import { OpenRound } from "@/components/OpenRound";
 import { SettlementReel } from "@/components/SettlementReel";
 import { AddressLink } from "@/components/Address";
 import { Loading, Swap } from "@/components/Loading";
@@ -126,10 +127,22 @@ export default function Home() {
           ) : (
             <>
               <p className="text-ink-soft">No round has been opened on this Book yet.</p>
+              {/* THIS SENTENCE USED TO END THE STORY, AND IT STOPPED BEING TRUE.
+                  It read: "Rounds are opened by a keeper, and this page has no way to tell
+                  whether one is running right now." Both halves were correct and together
+                  they told a visitor there was nothing to do but wait for a process they
+                  cannot see. `GlasshouseBook.open()` has no access control, so that was
+                  never the whole truth -- and from the moment the button below exists it is
+                  simply false. The keeper's rounds are still the only FILLABLE ones, which
+                  is the distinction that survives and is stated rather than buried. */}
               <p className="mt-2 text-sm text-ink-faint">
-                Rounds are opened by a keeper, and this page has no way to tell whether one is
-                running right now. It says so rather than showing a spinner.
+                A round can be opened from this page, by you, from your own wallet — the Book
+                takes an <code className="font-mono">open()</code> from anyone who pays the
+                gas. The keeper opens the rounds that have a real order behind them and can be
+                filled; this page has no way to tell whether one is running right now, so it
+                says so rather than showing a spinner.
               </p>
+              <OpenRound variant="primary" className="mt-4" />
             </>
           )}
           <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -230,7 +243,14 @@ export default function Home() {
                     </div>
                   </div>
                 ) : (
-                  <BidPanel auction={featured} head={head} />
+                  <>
+                    <BidPanel auction={featured} head={head} />
+                    {/* SECONDARY, AND BELOW THE PANEL. The bid panel's own control is this
+                        view's one `.btn-primary` -- the act the page exists for is bidding
+                        in the round that is already running, not starting a second one. A
+                        filled button here would make neither of them primary. */}
+                    <OpenRound className="mt-4" />
+                  </>
                 )}
               </div>
             </div>

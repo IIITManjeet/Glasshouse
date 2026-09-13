@@ -217,7 +217,9 @@ In order, before claiming frontend work is done — commands copied verbatim fro
 ```
 npm --prefix web run build        # static export -> web/out/  (next.config.mjs: output: "export")
 node scripts/lint-provenance.mjs  # fails the build if a figure has no source/caption, or a contrast pair regresses
-npm --prefix web run lint         # next lint
+# (there is no `web run lint`. Next 16.3.4 removed `next lint`, the script resolved
+# `web/lint` as a directory and errored, nothing called it, and `web/` has no eslint
+# config or dependency -- so it was deleted rather than left as a command that cannot run.)
 npm test                          # scripts/run-checks.mjs: test:solidity + test:js + lint:page, all three run and report even if one fails
 ```
 

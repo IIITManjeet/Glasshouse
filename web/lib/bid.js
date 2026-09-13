@@ -67,6 +67,8 @@ const SEL_REVEAL = "0x71574f83"; // reveal(address,bytes32,uint24,bytes32)
 const SEL_COMMITMENT_FOR = "0x9f863a14"; // commitmentFor(address,uint24,bytes32)
 const SEL_AUCTIONS = "0xee5bcb62"; // auctions(address,bytes32)
 const SEL_BIDS = "0xa078ed70"; // bids(address,bytes32,address)
+const SEL_OPEN = "0xf38d9bb0"; // open(bytes32,address,address,uint40,uint40,uint40,uint24,uint24,uint128)
+const SEL_SETTLE = "0x1b16802c"; // settle(address,bytes32)
 
 // Reveal is the one call with a deadline, so it is sent with an explicit gas limit rather
 // than waiting on the wallet's eth_estimateGas round trip -- and, more to the point, so
@@ -74,6 +76,11 @@ const SEL_BIDS = "0xa078ed70"; // bids(address,bytes32,address)
 // packed slots and emits one event; measured worst case is well under 150k. Unused gas is
 // refunded, so overshooting costs nothing.
 const REVEAL_GAS = "0x3d090"; // 250,000
+// EXPLICIT LIMITS, for the same reason REVEAL_GAS is explicit: an estimate against a
+// contract whose cost depends on how many bids it walks is a guess a wallet makes badly,
+// and an underestimate is a reverted transaction the visitor has already paid for.
+const OPEN_GAS = "0x30d40"; // 200,000 -- one storage-heavy write of the Auction struct
+const SETTLE_GAS = "0x1d4c0"; // 120,000 -- a top-2 walk over the revealed bids
 
 const MAX_UINT24 = 16777215;
 
@@ -686,6 +693,226 @@ function requireBps(bps) {
  *                          to refuse, because an unstored salt is an unrevealable bid.
  *   skipPreflight        - send without simulating
  */
+/**
+ * The Book's own addresses on Base, for a round opened from the browser.
+ *
+ * `cfg.book` is configurable because tests and forks need it. These two are not: the
+ * router is the deployment this Book was opened against and WETH is canonical on Base.
+ * A caller may still override both through `openRound`'s arguments.
+ */
+export const ROUTER = "0x5c3baE054e8b4915a13726B397b1AeA864247DBf";
+export const WETH = "0x4200000000000000000000000000000000000006";
+
+/**
+ * `humanDemo` from config/auction.json, and the reason it is the default here rather than
+ * the `advocated` 30/30/15: a person opening a round from a browser is going to bid in it
+ * from that same browser, with a wallet prompt between each step. 60 blocks is two minutes
+ * at Base's 2s blocks, which is the difference between a window a human can use and one
+ * they watch close while a wallet is still asking them to confirm.
+ */
+export const OPEN_DEFAULTS = Object.freeze({
+  commitBlocks: 60,
+  revealBlocks: 60,
+  exclusiveBlocks: 15,
+  reserveBps: 50,
+  maxBps: 500,
+  bond: 0,
+});
+
+const padNum = (n) => pad32(BigInt(n).toString(16));
+
+/**
+ * OPEN A ROUND, FROM THE BROWSER, AS YOURSELF.
+ *
+ * WHY THIS CAN EXIST AT ALL, which is the part worth reading. `GlasshouseBook.open()` is
+ * `external` with no access control (`GlasshouseBook.sol:118`), and an auction is keyed
+ * `key(msg.sender, orderHash)`. So a round is not something the deployment grants you --
+ * anyone who can pay gas can open their own, and they become its maker. That was always
+ * true; nothing on the site used it. Every trigger point that made this board live ran
+ * from a terminal, which is a strange property for a product whose front door is supposed
+ * to be the instrument.
+ *
+ * THE ORDER HASH IS RANDOM BY DEFAULT, AND THAT IS A DISCLOSURE RATHER THAN A SHORTCUT.
+ * The keeper's rounds are opened against hashes from `config/rounds.json` for orders it has
+ * actually shipped to Aqua, so a winner can fill them. A round opened from a browser has no
+ * shipped order behind it: there is no SwapVM program for that hash, so the auction is real
+ * -- real commits, real reveals, real second-price settlement -- and **no fill is possible**.
+ * A random 32 bytes cannot be mistaken for a manifest round by anyone reading the chain, and
+ * it cannot collide with one. Reusing a manifest hash under a different maker would be legal
+ * (different key) and would imply an order that does not exist, which is the wrong trade on
+ * a site that fails its own build when a figure lacks a source.
+ *
+ * Callers MUST render that limitation wherever such a round appears. `unfillable: true` is
+ * returned for exactly that purpose.
+ *
+ * WHAT IT DOES NOT DO: ship an order, approve a token, or touch Aqua. Those are the
+ * keeper's remaining steps and they need a funded maker. This is `open()` and nothing else,
+ * which is why it is forty lines and not four hundred.
+ */
+export async function openRound(args = {}, options = {}) {
+  const {
+    orderHash = randomSalt(),
+    router = ROUTER,
+    tokenIn = WETH,
+    commitBlocks = OPEN_DEFAULTS.commitBlocks,
+    revealBlocks = OPEN_DEFAULTS.revealBlocks,
+    exclusiveBlocks = OPEN_DEFAULTS.exclusiveBlocks,
+    reserveBps = OPEN_DEFAULTS.reserveBps,
+    maxBps = OPEN_DEFAULTS.maxBps,
+    bond = OPEN_DEFAULTS.bond,
+  } = args;
+
+  const h = requireBytes32(orderHash, "orderHash");
+  const r = requireAddress(router, "router");
+  const t = requireAddress(tokenIn, "tokenIn");
+
+  // The contract's own requires, checked here so the failure is a sentence rather than a
+  // reverted transaction the visitor has already paid for. GlasshouseBook.sol:134-135.
+  for (const [name, v] of [
+    ["commitBlocks", commitBlocks],
+    ["revealBlocks", revealBlocks],
+    ["exclusiveBlocks", exclusiveBlocks],
+  ]) {
+    if (!Number.isInteger(v) || v <= 0) {
+      fail("BAD_ARGUMENT", `${name} must be a positive whole number of blocks, got ${v}`);
+    }
+  }
+  if (!Number.isInteger(reserveBps) || !Number.isInteger(maxBps) || reserveBps > maxBps || maxBps >= 10000) {
+    fail(
+      "BAD_ARGUMENT",
+      `The round needs reserve <= max < 10000 bps. Got reserve ${reserveBps}, max ${maxBps}.`,
+    );
+  }
+
+  // THE MAKER IS WHOEVER IS CONNECTED. Not a parameter: `open()` keys the auction by
+  // msg.sender, so passing a maker would let a caller believe they had opened a round for
+  // somebody else. The chain-id guard is the same one every write in this file goes
+  // through -- bid.js re-reads eth_chainId at the moment it writes rather than trusting a
+  // wallet's switch to have taken effect.
+  const account = await requireConnectedOnBase();
+
+  // ALREADY OPEN IS A SENTENCE, NOT A REVERT. `AlreadyOpened()` fires on a second open for
+  // the same (maker, orderHash) -- unreachable with a random hash, reachable the moment a
+  // caller passes one, and the check costs one eth_call.
+  const existing = await readAuction(account, h).catch(() => null);
+  if (existing && existing.commitEnd) {
+    fail(
+      "ALREADY_OPENED",
+      "This wallet has already opened a round against that order hash. Nothing was sent.",
+      { maker: account, orderHash: h },
+    );
+  }
+
+  const data =
+    SEL_OPEN +
+    pad32(h) +
+    pad32(r) +
+    pad32(t) +
+    padNum(commitBlocks) +
+    padNum(revealBlocks) +
+    padNum(exclusiveBlocks) +
+    padNum(reserveBps) +
+    padNum(maxBps) +
+    padNum(bond);
+
+  if (!options.skipPreflight) {
+    const revert = await preflight({ from: account, to: cfg.book, data }, 4000);
+    if (revert) fail("PREFLIGHT_REVERT", revert.sentence, { revert });
+  }
+
+  let txHash;
+  try {
+    txHash = await request("eth_sendTransaction", [
+      { from: account, to: cfg.book, data, gas: options.gas || OPEN_GAS },
+    ]);
+  } catch (e) {
+    const c = classifyRevert(e);
+    fail(c.kind === "user-rejected" ? "USER_REJECTED" : "SEND_FAILED", c.sentence, { cause: e });
+  }
+
+  return {
+    txHash,
+    maker: account,
+    orderHash: h,
+    reserveBps,
+    maxBps,
+    commitBlocks,
+    revealBlocks,
+    exclusiveBlocks,
+    // ALWAYS TRUE, and deliberately not conditional. This function calls `open()` and
+    // nothing else -- it never ships a SwapVM program to Aqua -- so no round it opens can
+    // be filled, whether the hash was generated here or handed in. An earlier version made
+    // this depend on whether the caller supplied a hash, which would have reported
+    // `unfillable: false` for a round that was every bit as unfillable, on the strength of
+    // an argument the caller chose. The caller renders this; it must not be flattering.
+    unfillable: true,
+    // True when the hash was generated here rather than supplied, which is the thing worth
+    // showing a visitor ("your round" vs "a hash you chose"). It is NOT a fillability claim.
+    generatedHash: args.orderHash === undefined,
+  };
+}
+
+/**
+ * SETTLE A ROUND, FROM THE BROWSER, AS ANYONE.
+ *
+ * WHY THIS IS NOT OPTIONAL. Without it a round can be STARTED from the site and never
+ * FINISHED from it: `Receipt` renders nothing until `a.settled` (components/Receipt.tsx),
+ * so a visitor who opened a round, took bids and watched them revealed would reach the end
+ * of the mechanism and find the one step that produces the receipt still living in a
+ * script. "You can run a round from the website" would be false at exactly the moment it
+ * mattered most.
+ *
+ * `settle()` is permissionless like `open()` -- it reads the revealed bids, applies the
+ * top-2 rule and writes the outcome, and it does not care who pays the gas. So the button
+ * is offered to whoever is looking at the round once its exclusive window has elapsed,
+ * which in practice is the maker or one of the bidders, and correctness does not depend on
+ * which.
+ *
+ * THE MAKER IS A PARAMETER HERE AND NOT IN `openRound`, and the asymmetry is the point:
+ * `open()` keys the auction by `msg.sender`, so the maker IS the caller and accepting one
+ * as an argument would invite a caller to think they could open a round on someone else's
+ * behalf. `settle()` takes the maker as an argument because it settles somebody else's
+ * auction by design.
+ */
+export async function settleRound({ maker, orderHash }, options = {}) {
+  const m = requireAddress(maker, "maker");
+  const h = requireBytes32(orderHash, "orderHash");
+
+  const account = await requireConnectedOnBase();
+
+  // A SENTENCE RATHER THAN A REVERT, for the two states a visitor will actually hit: a
+  // round already settled by somebody else a moment earlier, and a window that has not
+  // elapsed yet. Both cost one eth_call to rule out and both are otherwise a wallet
+  // prompt followed by a failure the visitor paid for.
+  const auction = options.auction || (await readAuction(m, h).catch(() => null));
+  if (auction && auction.settled) {
+    fail(
+      "ALREADY_SETTLED",
+      "This round has already been settled -- the receipt below is the outcome. Nothing was sent.",
+      { maker: m, orderHash: h },
+    );
+  }
+
+  const data = SEL_SETTLE + pad32(m) + pad32(h);
+
+  if (!options.skipPreflight) {
+    const revert = await preflight({ from: account, to: cfg.book, data }, 4000);
+    if (revert) fail("PREFLIGHT_REVERT", revert.sentence, { revert });
+  }
+
+  let txHash;
+  try {
+    txHash = await request("eth_sendTransaction", [
+      { from: account, to: cfg.book, data, gas: options.gas || SETTLE_GAS },
+    ]);
+  } catch (e) {
+    const c = classifyRevert(e);
+    fail(c.kind === "user-rejected" ? "USER_REJECTED" : "SEND_FAILED", c.sentence, { cause: e });
+  }
+
+  return { txHash, maker: m, orderHash: h, settledBy: account };
+}
+
 export async function placeBid({ maker, orderHash, bps }, options = {}) {
   const m = requireAddress(maker, "maker");
   const h = requireBytes32(orderHash, "orderHash");
