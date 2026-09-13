@@ -50,8 +50,13 @@ const WETH = "0x4200000000000000000000000000000000000006" as const;
 const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as const;
 
 // config/auction.json, "humanDemo": longer windows because people sign with a wallet.
-const COMMIT_BLOCKS = 60n;
-const REVEAL_BLOCKS = 60n;
+//
+// Overridable for unattended runs. Two minutes to commit suits a demo someone is watching,
+// but a visitor who arrives at a random moment usually lands between rounds and leaves. A
+// longer commit window keeps a round biddable most of the time; a longer reveal window
+// gives someone who stepped away time to come back. The Book accepts any positive window.
+const COMMIT_BLOCKS = BigInt(process.env.KEEPER_COMMIT_BLOCKS ?? 60);
+const REVEAL_BLOCKS = BigInt(process.env.KEEPER_REVEAL_BLOCKS ?? 60);
 const EXCLUSIVE_BLOCKS = 15n;
 const RESERVE_BPS = 50;
 const MAX_BPS = 500;
@@ -201,7 +206,7 @@ async function main() {
   console.log("  ------------------------------------------------------------");
   console.log(`  maker      ${maker}`);
   console.log(`  balance    ${formatEther(eth)} ETH, ${formatUnits(usdc, 6)} USDC`);
-  console.log(`  windows    commit ${COMMIT_BLOCKS} / reveal ${REVEAL_BLOCKS} / exclusive ${EXCLUSIVE_BLOCKS} blocks (humanDemo)`);
+  console.log(`  windows    commit ${COMMIT_BLOCKS} / reveal ${REVEAL_BLOCKS} / exclusive ${EXCLUSIVE_BLOCKS} blocks${process.env.KEEPER_COMMIT_BLOCKS || process.env.KEEPER_REVEAL_BLOCKS ? " (overridden)" : " (humanDemo)"}`);
   console.log(`  house bid  ${HOUSE_MIN_BPS}-${HOUSE_MAX_BPS} bps, always commitIdx 0, disclosed on the page`);
   console.log(`  rounds     ${ROUNDS.rounds.length} precomputed`);
   console.log("  ------------------------------------------------------------\n");
