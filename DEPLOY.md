@@ -28,7 +28,7 @@ chunk anyone can download:
 | | |
 |---|---|
 | `NEXT_PUBLIC_SUBGRAPH_URL` | The **Studio** query URL. Never the Gateway one: a Gateway URL carries its API key in the path, and this value ships to the browser (`web/lib/subgraph.ts`). Currently set. |
-| `NEXT_PUBLIC_RPC_URL` | A dedicated Base endpoint, to move off the public one before a demo. Unset, every visitor reads `https://mainnet.base.org` from their own IP and can be rate limited (-32016 / 429). Setting it also disables the two-member fallback pool in `web/lib/chain.js`, because a caller-chosen endpoint is honoured exactly rather than substituted -- which is what keeps the source chip honest. Only use a key that is domain-allowlisted or expendable. |
+| `NEXT_PUBLIC_RPC_URL` | A dedicated Base endpoint, to move off the public one before a demo. Unset, every visitor reads `https://mainnet.base.org` from their own IP and can be rate limited (-32016 / 429). Setting it also disables the two-member fallback pool in `web/lib/chain.ts`, because a caller-chosen endpoint is honoured exactly rather than substituted -- which is what keeps the source chip honest. Only use a key that is domain-allowlisted or expendable. |
 
 `GRAPH_API_KEY` belongs in **neither**. It is a Gateway key for `scripts/cross-check-subgraph.mjs`,
 `scripts/reserve-advisor.mjs` and the MCP server in `.mcp.json`, and nothing in this repo loads a
@@ -191,7 +191,7 @@ every ~20 minutes and stretches the table over about five days.
 
 **Check `.keeper-state.json` before a mainnet run.** It is gitignored and records
 `nextRound`, so a file left behind by a fork rehearsal makes the keeper skip ahead. That
-matters more than it sounds: `newestOpenedRound()` in `web/lib/chain.js` tests round 0 and
+matters more than it sounds: `newestOpenedRound()` in `web/lib/chain.ts` tests round 0 and
 gives up if it is not open, so a keeper starting at round 4 leaves the board showing the
 cold snapshot **permanently** while burning real rounds. Delete the file to start at 0.
 

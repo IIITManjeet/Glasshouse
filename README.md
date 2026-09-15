@@ -450,12 +450,14 @@ somebody else filled, so the hole is real and the contract is honest about it. P
 this sharper: a stranger's room opening auctions against orders that never ship is exactly the
 attack, so this is a prerequisite for letting anyone open a room.
 
-### 4. `web/lib/bid.js` and `chain.js` to TypeScript
+### 4. ~~`web/lib/bid.js` and `chain.js` to TypeScript~~ — done after submission
 
-The wallet and signing code on the path every bid takes, largely untested — only
-`decodeAuction` and the poll's call budget are covered. Deliberately **not** done before
-submission: a large diff with no observable benefit to a reader, on the one flow that has to work
-live. Worth doing first in any serious continuation, because every item above touches that code.
+Deliberately **not** done before submission: a large diff with no observable benefit to a reader,
+on the one flow that has to work live. Done since as a pure refactor: [`web/lib/bid.ts`](./web/lib/bid.ts)
+and [`web/lib/chain.ts`](./web/lib/chain.ts), covered by `test/js/bid.test.js` and
+`test/js/chain.test.js`, which check every calldata, return value and revert against the compiled
+ABI and the commitment against `GlasshouseBook.commitmentFor`. The same tests pass against the
+JavaScript they replaced.
 
 ### 5. Messari conformance, or a written refusal of it
 

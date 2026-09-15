@@ -10,9 +10,20 @@ each one is in [`run.md`](./docs/archive/run.md).
 
 ## [Unreleased]
 
+### Changed
+- `web/lib/bid.js` and `web/lib/chain.js` are now `bid.ts` and `chain.ts`. No behaviour
+  change: same exports, same RPC calls, same sentences. The components that imported them
+  lost the blocks of casts that restated every signature by hand.
+
+### Added
+- `test/js/bid.test.js` and `test/js/chain.test.js`: the wallet, signing and chain-reading
+  code against a fake wallet and node, with every expected calldata, return value, event
+  topic and revert encoded by viem from the compiled ABI, and the commitment checked
+  against `GlasshouseBook.commitmentFor`'s `keccak256(abi.encodePacked(bidder, bps, salt))`.
+  The same bid tests pass against the pre-migration `bid.js`. One is marked todo: the
+  `ERC20InsufficientAllowance` sentence swaps the allowance and the amount needed.
+
 ### Planned
-- `web/lib/bid.js` and `web/lib/chain.js` to TypeScript. `bid.js` is 1,400 lines of wallet
-  and signing code with no test coverage and deserves its own pass.
 - `site/index.html` as a real route rather than a hand-written file synced into `public/`.
   It is the last thing keeping two palettes, two font strategies and two provenance
   conventions alive at once.
