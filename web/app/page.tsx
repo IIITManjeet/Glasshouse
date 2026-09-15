@@ -66,12 +66,10 @@ export default function Home() {
       {/* THE ONE LINE. Sans, and the largest type on the page after the countdown -- which
           outranks it on purpose: the sentence is what this is, the countdown is what is
           happening, and on a live venue the second one is why you are still reading. */}
-      <h1 className="max-w-3xl text-[1.5rem] leading-[1.25] font-semibold text-ink sm:text-[1.875rem]">
+      <h1 className="max-w-3xl text-[1.5rem] leading-[1.25] font-semibold text-ink sm:text-[1.875rem] mb-8">
         The right to fill an order, sold by sealed bid. The winner pays the runner-up&rsquo;s
         price.
       </h1>
-
-      <WalletBar className="mt-8 mb-4" />
 
       {loading && !featured && (
         <Loading
@@ -212,6 +210,14 @@ export default function Home() {
               </article>
 
               <div className="order-1 lg:order-2">
+                {/* "WHO AM I" ABOVE "PLACE A BID", not masthead furniture above the whole
+                    page. WalletBar used to sit under the h1, at the top of every state this
+                    page can be in, including the two that hold no bid panel at all -- and
+                    WalletChip in the masthead already carries identity on every route (see
+                    that component's own header comment). What is left here is contextual to
+                    bidding -- connect, or switch to Base -- so it moves to sit directly over
+                    the panel it is for. */}
+                <WalletBar className="mb-4" />
                 {/* Bidding is cut out entirely during the rehearsal: a commitment is
                     hash(bps, salt, ORDER HASH), and a synthetic hash names no auction in the
                     Book, so it would bind to nothing and could never be revealed. A disabled
