@@ -143,8 +143,7 @@ html {
    and full addresses still break, which is the case the global was for. */
 th,
 .tnum,
-.chip,
-.nowrap-token {
+.chip {
   overflow-wrap: normal;
 }
 
