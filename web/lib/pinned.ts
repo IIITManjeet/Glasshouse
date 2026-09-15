@@ -1,10 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-// Plain ESM, shared with the Node tests. `allowJs` infers both files, so there is no
-// declaration file for either -- a .d.ts would be a second place for the shape to drift.
-import { readAuction as readAuctionJs } from "./bid.js";
-import { bidsFor as bidsForJs, chainHead as chainHeadJs } from "./chain.js";
+import { readAuction } from "./bid";
+import { bidsFor, chainHead } from "./chain";
 import { livePhase } from "./useAuctions";
 import type { Auction, Bid } from "./useAuctions";
 
@@ -32,7 +30,7 @@ import type { Auction, Bid } from "./useAuctions";
 
 const BOOK = "0xc4ea91Fe700918220423ac307C6B1c59650FFbfe";
 
-// The commit window the log scan is bounded by. Identical to `chain.js`'s own constant and
+// The commit window the log scan is bounded by. Identical to `chain.ts`'s own constant and
 // used for the same reason: if it is wrong the scan is merely wider or narrower, never
 // incorrect. `open()` stores `commitEnd = block.number + commitBlocks`, so `commitEnd - 60`
 // is the opening block for the 60-block window `OPEN_DEFAULTS` uses, and a lower bound that
@@ -47,38 +45,6 @@ const HASH_RE = /^0x[0-9a-fA-F]{64}$/;
 export function isAddress(v: string | null | undefined): boolean {
   return typeof v === "string" && ADDR_RE.test(v);
 }
-
-// --- the typed surface of the two ESM modules ----------------------------------------
-// Asserted, not re-declared: every signature is read off the exported function it names.
-
-/** What `bid.js:readAuction` returns -- `chain.js`'s decoder plus `tokenIn` and `bond`. */
-type RawAuction = {
-  commitEnd: number;
-  revealEnd: number;
-  exclusiveEnd: number;
-  reserveBps: number;
-  maxBps: number;
-  bond: string;
-  bestBidder: string | null;
-  bestBps: number;
-  secondBps: number;
-  committedCount: number;
-  filledBy: string | null;
-  filled: boolean;
-  settled: boolean;
-  winnerForfeited: boolean;
-  tokenIn: string;
-};
-
-const readAuction = readAuctionJs as (maker: string, orderHash: string) => Promise<RawAuction | null>;
-const bidsFor = bidsForJs as (
-  rpc: string,
-  book: string,
-  orderHash: string,
-  fromBlock: number,
-  toBlock: number,
-) => Promise<Bid[]>;
-const chainHead = chainHeadJs as (rpc: string) => Promise<number | null>;
 
 /**
  * The same endpoint the board reads, chosen the same way and in the same order: `?rpc=`

@@ -3,10 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAccount, useChainId, useConnect, useDisconnect, useSwitchChain, type Connector } from "wagmi";
 import { base } from "wagmi/chains";
-// Plain ESM, deliberately untyped: bid.js is the same file the static page and the Node
-// tests load, and adding a .d.ts would create a second place for the shape to drift.
-// `allowJs` lets TypeScript infer it, so no suppression is needed or wanted here.
-import { explainRevert } from "@/lib/bid.js";
+import { explainRevert } from "@/lib/bid";
 import { Wallet } from "./Icon";
 
 const short = (a?: string | null) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "—");
@@ -43,7 +40,7 @@ const BTN_IDLE = "btn-secondary";
 // buys is that the slot does not move.
 const BTN_DISABLED = "btn btn-secondary";
 // Switching chains is a correction, not a danger: nothing is lost by being on the wrong
-// chain, bid.js refuses to write off Base, and the brick outline here read as an error the
+// chain, bid.ts refuses to write off Base, and the brick outline here read as an error the
 // visitor had caused. The sentence beside it already says which chain is which.
 const BTN_WARN = "btn-secondary";
 
@@ -63,12 +60,12 @@ const BTN_WARN = "btn-secondary";
  *    what it already authorises for this origin) and never opens a prompt, which is why it
  *    is left alone; what would be wrong is calling `connect()` from an effect.
  *
- * 3. EVERY FAILURE IS A SENTENCE. Wallet errors go through bid.js's `explainRevert`, which
+ * 3. EVERY FAILURE IS A SENTENCE. Wallet errors go through bid.ts's `explainRevert`, which
  *    is the same decoder the bidding panel uses, so a 4001 or a -32002 reaches the screen
  *    as something a person can act on and never as a code or the bare word "error".
  *
  * On the chain switch: wagmi's `switchChain` is used here because this is the wallet
- * surface, but nothing about correctness rests on it. bid.js re-reads `eth_chainId` at the
+ * surface, but nothing about correctness rests on it. bid.ts re-reads `eth_chainId` at the
  * moment it is about to write and refuses to send off Base (`requireConnectedOnBase`), so a
  * wallet that resolves `wallet_switchEthereumChain` before the switch has actually taken
  * effect -- several do -- cannot cause a transaction to land on the wrong chain.
@@ -183,7 +180,7 @@ export function WalletBar({ className = "" }: { className?: string }) {
 
   const chainId = walletChainId ?? (isConnected ? configChainId : undefined);
   // Only claimed when the wallet has actually told us a chain. If it has not, no claim is
-  // made here -- bid.js will refuse the write with its own sentence, which is the honest
+  // made here -- bid.ts will refuse the write with its own sentence, which is the honest
   // place for that judgement.
   const wrongChain = isConnected && chainId !== undefined && chainId !== base.id;
 

@@ -1,6 +1,6 @@
 // Reading the Glasshouse subgraph over plain HTTP GraphQL.
 //
-// WHY THIS EXISTS WHEN chain.js ALREADY READS THE BOOK. The chain reader answers "what is
+// WHY THIS EXISTS WHEN chain.ts ALREADY READS THE BOOK. The chain reader answers "what is
 // happening right now" and is the correct source for a live phase -- an indexer is a block
 // or two behind, and the board counts down in blocks. What it cannot answer is history:
 // it reads a WINDOW of recent rounds, one eth_call each, so a bidder's full record is

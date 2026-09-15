@@ -95,7 +95,7 @@ export function Settlement({ a, head, source }: { a: Auction; head: number; sour
 
   // A FAILED LOG SCAN IS NOT AN EMPTY ROUND, AND THIS FIGURE USED TO COLLAPSE THEM.
   //
-  // `a.bids` is null when the eth_getLogs scan for this round failed -- chain.js and
+  // `a.bids` is null when the eth_getLogs scan for this round failed -- chain.ts and
   // lib/pinned.ts both set it to null rather than [] for exactly that reason, and
   // `Auction.bids` says in as many words: "null when the log scan failed. Never render
   // this as an empty list." `[...(a.bids ?? [])]` did render it as an empty list, and the

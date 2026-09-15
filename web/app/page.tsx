@@ -371,7 +371,7 @@ export default function Home() {
                 <>
                   the <code className="font-mono">GlasshouseBook</code> contract on Base, read at
                   block <span className="tnum">{num(head)}</span> by{" "}
-                  <code className="font-mono">web/lib/chain.js</code>. Phase is computed here
+                  <code className="font-mono">web/lib/chain.ts</code>. Phase is computed here
                   against that block. <strong className="font-medium">Winner</strong> is the highest
                   revealed bid: it reads &ldquo;leading&rdquo; until the round settles, because a
                   later reveal can still displace it, &ldquo;not yet&rdquo; while the reveal

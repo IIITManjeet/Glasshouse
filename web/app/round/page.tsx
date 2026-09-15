@@ -18,9 +18,7 @@ import { livePhase } from "@/lib/useAuctions";
 import type { Auction, Source } from "@/lib/useAuctions";
 import { canSettle } from "@/lib/phase";
 import { usePinnedAuction, isAddress } from "@/lib/pinned";
-// Plain ESM, deliberately untyped: bid.js is the same file the static page and the Node
-// tests load, and a .d.ts would be a second place for the shape to drift.
-import { settleRound as settleRoundJs, explainRevert as explainRevertJs } from "@/lib/bid.js";
+import { settleRound, explainRevert } from "@/lib/bid";
 
 /**
  * ONE ROUND, ON ITS OWN URL.
@@ -61,11 +59,6 @@ import { settleRound as settleRoundJs, explainRevert as explainRevertJs } from "
  */
 const HASH_RE = /^0x[0-9a-fA-F]{64}$/;
 
-const settleRound = settleRoundJs as (
-  args: { maker: string; orderHash: string },
-  options?: Record<string, unknown>,
-) => Promise<{ txHash: string; maker: string; orderHash: string; settledBy: string }>;
-const explainRevert = explainRevertJs as (e: unknown) => string;
 
 function findRound(auctions: Auction[], h: string | null, n: string | null): Auction | undefined {
   if (h && HASH_RE.test(h)) {

@@ -9,7 +9,7 @@
 // difference goes to the maker.
 //
 // That is a demonstration problem, not a truth problem, and the fix is a demonstration --
-// never a fake. This module produces the same Auction shape as web/lib/chain.js and
+// never a fake. This module produces the same Auction shape as web/lib/chain.ts and
 // site/data/snapshot.js, so the same components render it, and it is labelled `sim`
 // everywhere it surfaces: a source chip in amber, a banner that cannot be dismissed, and a
 // caption on every figure. DESIGN.md section 2 is the project's rule -- every number says

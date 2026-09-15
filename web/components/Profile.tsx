@@ -33,7 +33,7 @@ export type Provenance = "TEAM" | "INVITED" | "UNKNOWN";
 
 /**
  * `useAuctions()`'s `Auction`/`Bid` types (lib/useAuctions.ts) carry no provenance field --
- * chain.js and the checked-in snapshot both return bare addresses, because provenance is a
+ * chain.ts and the checked-in snapshot both return bare addresses, because provenance is a
  * subgraph-computed field (subgraph/src/provenance.ts, checked against a constant list)
  * that GlasshouseBook itself never stores. This intersection type says the field MAY be
  * present without asserting it always is, so a bid object from a future provenance-aware
