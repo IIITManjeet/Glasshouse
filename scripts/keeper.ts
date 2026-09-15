@@ -12,9 +12,11 @@ import {
 } from "viem";
 import { base } from "viem/chains";
 import { randomBytes } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 import { basePublicClient, waitForBlock, rpc } from "./lib/chain.ts";
+import { acquireLock } from "./lib/state-lock.ts";
 
 /**
  * THE KEEPER: keeps a live auction on the board.
@@ -161,11 +163,36 @@ function loadState() {
   if (!existsSync(STATE_FILE)) return { nextRound: 0, active: [] as any[] };
   return JSON.parse(readFileSync(STATE_FILE, "utf8"));
 }
+// WRITE TEMP, THEN RENAME. A plain writeFileSync truncates the file before the new
+// content lands, so a process killed mid-write (a crash, the machine losing power)
+// leaves a half-written, unparseable state file -- and the salt for whatever round was
+// active is gone with it. rename(2)/MoveFileEx are each a single filesystem operation on
+// both POSIX and Windows, so the file on disk is always either the old, complete state or
+// the new, complete state, never something in between. The temp name carries our own PID
+// so two keepers (impossible once the lock below is held, but cheap insurance) never
+// collide on the scratch file.
+const STATE_PATH = fileURLToPath(STATE_FILE);
 function saveState(s: any) {
-  writeFileSync(STATE_FILE, JSON.stringify(s, null, 2));
+  const tmp = `${STATE_PATH}.tmp-${process.pid}`;
+  writeFileSync(tmp, JSON.stringify(s, null, 2));
+  renameSync(tmp, STATE_PATH);
 }
 
 async function main() {
+  // ACQUIRED BEFORE ANYTHING ELSE TOUCHES THE STATE FILE, and before the network
+  // connection even opens -- a second keeper against the same file should be refused
+  // fast, not after it has already dialed a provider. See scripts/lib/state-lock.ts for
+  // why this is safe against two processes starting at once and against a lock left
+  // behind by a keeper that crashed.
+  const lock = acquireLock(STATE_FILE);
+  try {
+    await runKeeper();
+  } finally {
+    lock.release();
+  }
+}
+
+async function runKeeper() {
   const conn = await network.create();
   const DRY_RUN = process.env.DRY_RUN === "1";
 
