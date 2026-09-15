@@ -29,26 +29,28 @@ dust-sized, and the bond on ordinary rounds is 0. Full detail in `CHANGELOG.md`'
 
 ## Open
 
-- [ ] **Demonstration bidders render as strangers.** `TEAM_ADDRESSES`
-      (`subgraph/src/provenance.ts:19`) lists only the maker. The ephemeral bidders
-      `scripts/run-live-fill.ts` generates and funds — winner and rival — are not in it, so
-      they resolve to `UNKNOWN` on the contested round that carries this project's headline
-      claim, with no chip distinguishing them from a real stranger. Nothing is hidden — the
-      funding transactions are on chain — but the asymmetry is real. Not fixable without a
-      subgraph republish and reindex, since `provenance.ts` is mapping code; until then the
-      disclosure is spoken rather than rendered. After the deadline: add both addresses to
-      `TEAM_ADDRESSES`, republish, and they carry a `TEAM` chip like the maker does.
+- [x] **Demonstration bidders render as strangers.** `TEAM_ADDRESSES`
+      (`subgraph/src/provenance.ts`) listed only the maker. The ephemeral bidders
+      `scripts/run-live-fill.ts` generated and funded — winner and rival — resolved to
+      `UNKNOWN` on the contested round that carries this project's headline claim. Their
+      keys never touched the repo (ephemeral, swept, gitignored), so the two addresses were
+      recovered from `site/data/snapshot.js` — built straight from `GlasshouseBook`'s own
+      on-chain logs — and matched by amountIn/amountOut/bps against `run-live-fill.ts`'s own
+      constants. Both are now in `TEAM_ADDRESSES`, with a comment citing the evidence; a
+      subgraph republish and reindex (not done here — v2 handles that) is what makes the
+      `TEAM` chip actually render.
 
-- [ ] **Spacing-scale leftovers.** From the spacing review, none are defects: collapse
-      vertical rhythm to `2/3/4/6/8/12/16` (sixteen distinct steps are currently in use, and
-      section→section spacing is a different value on every route); move `/rounds`'s one
-      primary button out of `.card-foot`, where it sits inside a 13px caption strip; move
-      the wallet bar on `/` into the bid-panel column so "who am I" sits above "place a bid"
-      instead of reading as masthead furniture.
+- [x] **Spacing-scale leftovers.** From the spacing review, none were defects. Checked all
+      three: `/rounds`'s primary button was already out of `.card-foot` (see `OpenNow.tsx`'s
+      own comment); every `mt-`/`mb-`/`gap-y-`/`space-y-` value in `web/app` and
+      `web/components` was already on the `2/3/4/6/8/12/16` scale, apart from icon-baseline
+      nudges (`mt-0.5`, `mt-1.5`) that are optical alignment, not vertical rhythm, and were
+      left alone; the wallet bar on `/` now sits in the bid-panel column, above `<BidPanel>`,
+      instead of under the `h1` on every state of the page.
 
-- [ ] **`.nowrap-token` is a dead primitive.** Declared in `web/app/globals.css` with zero
-      call sites anywhere in `web/`. Either remove it or use it for whatever it was reserved
-      for.
+- [x] **`.nowrap-token` is a dead primitive.** Declared in `web/app/globals.css` with zero
+      call sites anywhere in `web/`. Removed; `th`, `.tnum` and `.chip` still carry the
+      exemption it sat alongside.
 
 - [ ] **`web/lib/bid.js` and `web/lib/chain.js` to TypeScript.** 1,400 lines of wallet and
       signing code, nearly all of it untested (only `decodeAuction` and the poll's call
@@ -56,14 +58,14 @@ dust-sized, and the bond on ordinary rounds is 0. Full detail in `CHANGELOG.md`'
       submission — a type migration there is a large diff with no benefit to a judge and a
       real chance of breaking the one flow that must work live.
 
-- [ ] **The keeper can stall if more than one process runs against the same state file.**
+- [x] **The keeper can stall if more than one process runs against the same state file.**
       `scripts/keeper.ts` reads `.keeper-state.json` (or `.keeper-state.dryrun.json` under
-      `DRY_RUN`) once at start and writes it back after each step, with no lock. Two keeper
-      processes started against the same network race that read/write: both can act on the
-      same `nextRound`, the second hits Aqua's duplicate-strategy revert on a round the
-      first already shipped, and whichever process writes last silently overwrites the
-      other's progress in the cursor. Only one keeper process should ever be pointed at a
-      given network at a time; nothing currently enforces that.
+      `DRY_RUN`) once at start and writes it back after each step. `scripts/lib/state-lock.ts`
+      now takes an exclusive lock (`<state file>.lock`, PID inside) before the state file is
+      ever read: a second keeper against the same file refuses to start, naming the lock file
+      and the PID holding it; a lock left by a dead process is detected via
+      `process.kill(pid, 0)` and safely stolen; the state file itself is now written
+      atomically (temp file + rename). Tested in `test/js/state-lock.test.js`.
 
 - [ ] **`NEXT_PUBLIC_RPC_URL` is unset on the deployed site.** Every visitor reads
       `mainnet.base.org` from their own IP and can be rate limited. Setting it removes that
