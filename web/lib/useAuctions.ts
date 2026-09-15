@@ -1,9 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-// Plain ESM, shared with the Node tests and the advisor. allowJs infers it, so no
-// declaration file -- a .d.ts would be a second place for the shape to drift.
-import { fromChain } from "./chain.js";
+import { fromChain } from "./chain";
 import { phase as computePhase } from "./phase";
 import { simulate, SIM_MS_PER_BLOCK, SIM_WARM_START_MS } from "./simulate";
 
@@ -145,7 +143,7 @@ const BOOK = "0xc4ea91Fe700918220423ac307C6B1c59650FFbfe";
  * WHICH ENDPOINT THIS PAGE READS, in order of who asked.
  *
  * `?rpc=` first, because a visitor pointing this page at their own node is being explicit
- * and must be obeyed exactly -- `chain.js` honours a caller-chosen endpoint and never
+ * and must be obeyed exactly -- `chain.ts` honours a caller-chosen endpoint and never
  * substitutes a pool member for it, precisely so the source chip cannot lie about where a
  * number came from.
  *
@@ -153,7 +151,7 @@ const BOOK = "0xc4ea91Fe700918220423ac307C6B1c59650FFbfe";
  * way to move off Base's public endpoint was to append a query parameter by hand, so the
  * deployed site had no way to be configured at all: every visitor read
  * `https://mainnet.base.org` from their own IP, and that endpoint rate limits (-32016 /
- * HTTP 429). `chain.js` already rotates through a two-member pool and backs off, and both
+ * HTTP 429). `chain.ts` already rotates through a two-member pool and backs off, and both
  * members were answering when this was written -- but they are free endpoints whose terms
  * move, that file says so itself, and "the demo was rate limited" is not a sentence worth
  * risking when the fix is one environment variable.

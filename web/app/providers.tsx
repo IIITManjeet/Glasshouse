@@ -32,7 +32,7 @@ import { type ReactNode, useState } from "react";
  *
  * WHAT THAT DOES NOT MEAN: nothing here writes to mainnet, reads a balance from it, or asks
  * a wallet to switch to it. `placeBid`/`revealBid` call `ensureBaseChain()` before signing
- * (web/lib/bid.js), so every transaction this app produces is a Base transaction whatever
+ * (web/lib/bid.ts), so every transaction this app produces is a Base transaction whatever
  * the wallet happens to be pointed at. Mainnet is a read-only resolver lookup.
  */
 function rpcUrl() {

@@ -7,30 +7,28 @@ import { base } from "wagmi/chains";
 import { useAvailableConnectors } from "@/components/WalletBar";
 import { type Auction } from "@/lib/useAuctions";
 import { Seal, Eye, Wallet, Copy as CopyIcon, Check } from "./Icon";
-// Plain ESM, deliberately untyped: bid.js is the same file the static page and the Node
-// tests load, and adding a .d.ts would create a second place for the shape to drift.
-// `allowJs` lets TypeScript infer it rather than a suppression -- but inference reads
-// `function pendingBid(orderHash, bidder = null)` as "bidder is of type null", which is
-// narrower than the function actually is. The typed surface below is the one place those
-// signatures are stated; the alternative was a cast at every call site.
+// Typed at the source: bid.ts states every signature this panel calls, so there is no
+// block of casts here restating them (there was, while bid.js was untyped ESM).
 import {
-  adoptSecret as adoptSecretJs,
-  bidState as bidStateJs,
-  classifyRevert as classifyRevertJs,
-  configure as configureJs,
-  explainRevert as explainRevertJs,
-  exportSecret as exportSecretJs,
-  hasProvider as hasProviderJs,
-  listBids as listBidsJs,
-  pendingBid as pendingBidJs,
-  placeBid as placeBidJs,
-  revealBid as revealBidJs,
-} from "@/lib/bid.js";
+  adoptSecret,
+  bidState,
+  classifyRevert,
+  configure,
+  explainRevert,
+  exportSecret,
+  hasProvider,
+  listBids,
+  pendingBid,
+  placeBid,
+  revealBid,
+  type BidRecord,
+  type BidState as Derived,
+} from "@/lib/bid";
 
 /*
  * THE BIDDING SURFACE.
  *
- * Everything money-touching in here is bid.js's. This file decides what a person sees and
+ * Everything money-touching in here is bid.ts's. This file decides what a person sees and
  * when; it does not decide what gets signed, what gets stored, or whether a deadline has
  * passed. That separation is the point:
  *
@@ -47,62 +45,16 @@ import {
  *     state, so this panel and the sticky strip below can never disagree about a deadline.
  *
  * wagmi is used for what it is genuinely better at: the account, the chain, and
- * `useWaitForTransactionReceipt` for the hash bid.js hands back.
+ * `useWaitForTransactionReceipt` for the hash bid.ts hands back.
  */
 
-// --- the typed surface of bid.js ------------------------------------------------------
-// Asserted, not re-declared: every signature here is read off the exported function it
-// names, and nothing about behaviour is expressed in this block.
-
-type Bounds = {
-  commitEnd: number;
-  revealEnd: number;
-  exclusiveEnd: number;
-  bestBidder: string | null;
-  reserveBps: number;
-  maxBps: number;
-};
-type OnChainBid = { committed: boolean; commitIdx: number; revealed: boolean } | null;
-type Classified = { kind: string; name: string | null; selector: string | null; raw: string | null };
-
-const adoptSecret = adoptSecretJs as (args: {
-  maker: string;
-  orderHash: string;
-  bidder: string;
-  bps: number;
-  salt: string;
-  revealEnd?: number | null;
-  commitEnd?: number | null;
-}) => BidRecord;
-const bidState = bidStateJs as (args: {
-  auction: Bounds;
-  record?: BidRecord | null;
-  onChain?: OnChainBid;
-  head: number;
-}) => Derived;
-const classifyRevert = classifyRevertJs as (e: unknown) => Classified;
-const configure = configureJs as (next: { rpc?: string; book?: string; explorer?: string }) => unknown;
-const explainRevert = explainRevertJs as (e: unknown) => string;
-const exportSecret = exportSecretJs as (orderHash: string, bidder?: string | null) => string | null;
-const hasProvider = hasProviderJs as () => boolean;
-const listBids = listBidsJs as (bidder?: string | null) => BidRecord[];
-const pendingBid = pendingBidJs as (orderHash: string, bidder?: string | null) => BidRecord | null;
-const placeBid = placeBidJs as (
-  args: { maker: string; orderHash: string; bps: number },
-  options?: { acceptUnstoredSecret?: boolean; skipPreflight?: boolean },
-) => Promise<{ txHash: string; salt: string; bps: number; record: BidRecord }>;
-const revealBid = revealBidJs as (
-  args: { maker: string; orderHash: string; bps?: number | null; salt?: string | null },
-  options?: { skipPreflight?: boolean; gas?: string },
-) => Promise<{ txHash: string; bps: number }>;
-
 // The board's `?rpc=` override (a local Anvil fork of Base -- see app/providers.tsx) has to
-// reach bid.js as well. Its pre-flight `eth_call`, its `auctions()` read and its `bids()`
+// reach bid.ts as well. Its pre-flight `eth_call`, its `auctions()` read and its `bids()`
 // read all go through `cfg.rpc`; pointing those at mainnet while the wallet signs on a fork
 // would simulate against a chain the transaction never touches, which is worse than not
 // simulating at all. Done at module scope rather than in an effect so it is true before the
 // first render, and guarded because the static export evaluates this file in Node too.
-// The Book address is bid.js's own default and is deliberately not duplicated here.
+// The Book address is bid.ts's own default and is deliberately not duplicated here.
 const RPC_OVERRIDE =
   typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("rpc");
 if (RPC_OVERRIDE) configure({ rpc: RPC_OVERRIDE });
@@ -196,35 +148,6 @@ function useMounted() {
   return mounted;
 }
 
-type BidRecord = {
-  orderHash: string;
-  maker: string;
-  bidder: string;
-  bps: number;
-  salt: string;
-  commitEnd: number | null;
-  revealEnd: number | null;
-  exclusiveEnd: number | null;
-  reserveBps?: number;
-  maxBps?: number;
-  txHash: string | null;
-  revealTx: string | null;
-  source: string;
-  state: string;
-};
-
-type Derived = {
-  phase: string;
-  state: string;
-  canCommit: boolean;
-  canReveal: boolean;
-  committed: boolean;
-  revealed: boolean;
-  blocksToCommitEnd: number;
-  blocksToRevealEnd: number;
-  urgent: boolean;
-  lastCall: boolean;
-};
 
 /**
  * The wallet's own row, taken from the board's poll rather than a second RPC round trip.
@@ -263,7 +186,7 @@ function boundsFromRecord(r: BidRecord) {
 /** One sentence, plus the raw material a bug report needs, and never a bare selector. */
 function describe(e: unknown) {
   const sentence = explainRevert(e);
-  const c = classifyRevert(e) as { name: string | null; selector: string | null; raw: string | null };
+  const c = classifyRevert(e);
   const err = e as { code?: unknown; revert?: { name?: string } } | null;
   const code = typeof err?.code === "string" ? err.code : null;
   return {
@@ -442,7 +365,7 @@ function RevealButton({
     setStage("wallet");
     try {
       // At one or two blocks left a 1.5 s simulation costs a block, and the simulation is
-      // worth less than the block: bid.js sends anyway on anything it cannot decode, so the
+      // worth less than the block: bid.ts sends anyway on anything it cannot decode, so the
       // only thing skipping it loses is a decoded error we would show after the fact.
       const res = await revealBid(
         { maker: record.maker, orderHash: record.orderHash },
@@ -682,7 +605,7 @@ function BidForm({
     setSecretReady(false);
     setStage("checking");
 
-    // The ladder's second rung is driven by a FACT, not a timer. bid.js writes the secret
+    // The ladder's second rung is driven by a FACT, not a timer. bid.ts writes the secret
     // and reads it back before it constructs any transaction, so the moment a record appears
     // the salt is durable and the only thing left is the pre-flight and the wallet prompt.
     // Polling for it lets the label say something true ("secret saved") instead of guessing
@@ -705,7 +628,7 @@ function BidForm({
       const d = describe(e);
       setStage("idle");
       setErr({ sentence: d.sentence, detail: d.detail });
-      // STORAGE_BLOCKED means nothing was sent and nothing was escrowed -- bid.js refused.
+      // STORAGE_BLOCKED means nothing was sent and nothing was escrowed -- bid.ts refused.
       // It is surfaced as-is and NOT paired with a "copy this, then send anyway" button:
       // a retry mints a fresh salt, so any secret shown beside such a button would not be
       // the one that ended up committed. The only honest fix is to allow site storage.
@@ -964,14 +887,14 @@ export function BidPanel({
 
   // A RECORD IS NOT A BID.
   //
-  // bid.js writes the secret BEFORE opening the wallet, deliberately -- a secret that
+  // bid.ts writes the secret BEFORE opening the wallet, deliberately -- a secret that
   // exists only after confirmation is a secret you lose by closing the tab. But that means
   // a record also exists after the user presses Cancel, and after a commit that reverts.
   // Branching on `record` alone showed those users "Sealed - reveal opens at block N",
   // unmounted the form, and left them unable to bid at all in a round they have nothing in.
   //
   // So a record only counts as a bid once the chain agrees (st.committed) or it at least
-  // reached the chain (txHash). Everything else is a dead secret, and bid.js will happily
+  // reached the chain (txHash). Everything else is a dead secret, and bid.ts will happily
   // let them try again.
   const reachedChain = Boolean(record && (record as { txHash?: string | null }).txHash);
   const haveBid = st.committed || (record != null && reachedChain);
@@ -1057,7 +980,7 @@ export function BidPanel({
           ) : null}
           {/* Our head is a poll old, so the reveal window can already be open while this
               still says it is not. The primary control stays honest about what we know; this
-              secondary one costs a click and gas if it is early (bid.js sends through
+              secondary one costs a click and gas if it is early (bid.ts sends through
               RevealNotOpen rather than aborting) and saves the bid if we are the stale one. */}
           {st.blocksToCommitEnd <= 3 && !notMine ? (
             <details className="mt-2">

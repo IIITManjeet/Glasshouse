@@ -4,9 +4,7 @@ import { useEffect, useState } from "react";
 import { useAccount, useConnect, useWaitForTransactionReceipt } from "wagmi";
 import { useAvailableConnectors } from "@/components/WalletBar";
 import { Wallet } from "./Icon";
-// Plain ESM, deliberately untyped: bid.js is the same file the static page and the Node
-// tests load, and a .d.ts would be a second place for the shape to drift.
-import { openRound as openRoundJs, explainRevert as explainRevertJs } from "@/lib/bid.js";
+import { openRound, explainRevert, type OpenRoundResult } from "@/lib/bid";
 
 /**
  * OPEN A ROUND FROM THE WEBSITE.
@@ -20,30 +18,17 @@ import { openRound as openRoundJs, explainRevert as explainRevertJs } from "@/li
  *
  * WHAT IT DOES NOT DO, SAID BEFORE THE WALLET OPENS AND NOT AFTER. `openRound` calls
  * `open()` and nothing else. It ships no SwapVM order to Aqua, approves no token and moves
- * no funds, so NOTHING OPENED HERE CAN BE FILLED -- `bid.js` returns `unfillable: true`
+ * no funds, so NOTHING OPENED HERE CAN BE FILLED -- `bid.ts` returns `unfillable: true`
  * unconditionally for exactly that reason, and its own comment records that making the flag
  * conditional on who chose the hash would have been a flattering lie. The auction is real in
  * every other respect: real sealed commits, a real reveal window, real second-price
  * clearing, a real receipt.
  *
  * The sentence below is rendered ALWAYS, above the control, before any prompt exists. That
- * is the same ordering rule the bid secret follows in bid.js -- the thing a person needs in
+ * is the same ordering rule the bid secret follows in bid.ts -- the thing a person needs in
  * order to decide is on screen before the decision, never in a toast afterwards.
  */
 
-type OpenResult = {
-  txHash: string;
-  maker: string;
-  orderHash: string;
-  unfillable: boolean;
-  generatedHash: boolean;
-};
-
-const openRound = openRoundJs as (
-  args?: Record<string, unknown>,
-  options?: Record<string, unknown>,
-) => Promise<OpenResult>;
-const explainRevert = explainRevertJs as (e: unknown) => string;
 
 // A Basescan link is only true on mainnet. On a fork the hash exists and the explorer has
 // never heard of it, so the hash is shown as plain text rather than as a link that 404s.
@@ -67,7 +52,7 @@ export function OpenRound({
   const [mounted, setMounted] = useState(false);
   const [stage, setStage] = useState<"idle" | "wallet" | "sent">("idle");
   const [tx, setTx] = useState<string | null>(null);
-  const [opened, setOpened] = useState<OpenResult | null>(null);
+  const [opened, setOpened] = useState<OpenRoundResult | null>(null);
   const [note, setNote] = useState<string | null>(null);
 
   const { isConnected } = useAccount();

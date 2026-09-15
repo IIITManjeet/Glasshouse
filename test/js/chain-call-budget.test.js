@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { fromChain } from "../../web/lib/chain.js";
+import { fromChain } from "../../web/lib/chain.ts";
 
 /**
  * HOW MANY RPC CALLS ONE POLL COSTS, WHICH NOTHING USED TO MEASURE.

@@ -2,12 +2,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-import { decodeAuction } from "../../web/lib/chain.js";
+import { decodeAuction } from "../../web/lib/chain.ts";
 
 /**
  * THE TWO DATA PATHS MUST PRODUCE THE SAME SHAPE.
  *
- * The page reads auctions either from the chain (`web/lib/chain.js`) or from the
+ * The page reads auctions either from the chain (`web/lib/chain.ts`) or from the
  * checked-in snapshot (`scripts/make-snapshot.mjs`). Nothing forced them to agree, and
  * they did not: the chain path carried `round` but no `maker`, the snapshot carried
  * `maker` but no `round`.

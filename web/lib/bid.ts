@@ -22,11 +22,18 @@
 //   * revealBid never consults our own clock. Only the chain decides whether a reveal is
 //     late (ui-flow.md section 6.5, cta-patterns.md section 4.8).
 //
-// NO LIBRARIES. Plain ESM, EIP-1193 over window.ethereum, fetch for RPC, calldata packed
-// by hand. Same rules as site/chain.js, and the same rule about selectors: EVERY selector
-// below was computed with `cast sig` from the signature in subgraph/abis/GlasshouseBook.json,
-// never guessed, and each carries its signature in a comment. (Cross-check: this file's
-// SEL_AUCTIONS agrees with the one chain.js:21 has been using in production.)
+// NO LIBRARIES. EIP-1193 over window.ethereum, fetch for RPC, calldata packed by hand.
+// Same rules as chain.ts, and the same rule about selectors: EVERY selector below was
+// computed with `cast sig` from the signature in subgraph/abis/GlasshouseBook.json, never
+// guessed, and each carries its signature in a comment. (Cross-check: this file's
+// SEL_AUCTIONS agrees with the one chain.ts has been using in production.) test/js/bid.test.js
+// re-encodes every call this file sends from that ABI and compares the bytes.
+//
+// TYPED, AND STILL NOT A LIBRARY. This was plain ESM until 2026-09, and every component that
+// imported it restated its signatures in a block of casts. The types now live here, once.
+// Only erasable syntax is used, so `node --test` loads this file directly. The one untyped
+// boundary is the wallet itself (`window.ethereum` and whatever it throws), and it is kept
+// to `provider()`, `request()` and the error walkers below.
 //
 // KECCAK. There is none in the browser without a library, so the commitment is not
 // computed here -- it is read from the contract's own `commitmentFor` (:111-113) by
@@ -37,24 +44,30 @@
 //
 // NO DOM. Not one line. The caller owns the DOM; this module owns the money.
 
-import { phase } from "./phase";
-import { decodeAuction, chainHead } from "./chain.js";
+import { phase, type Blockish, type Phase, type PhaseInput } from "./phase.ts";
+import { decodeAuction, chainHead, AUCTION_WORD, type DecodedAuction } from "./chain.ts";
 
 // --- configuration -----------------------------------------------------------------
 
 export const BASE_CHAIN_ID = 8453;
 export const BASE_CHAIN_ID_HEX = "0x2105";
 
-const DEFAULTS = {
+export type BidConfig = {
+  book: string;
+  rpc: string;
+  explorer: string;
+};
+
+const DEFAULTS: BidConfig = {
   book: "0xc4ea91Fe700918220423ac307C6B1c59650FFbfe",
   rpc: "https://mainnet.base.org",
   explorer: "https://basescan.org",
 };
 
-let cfg = { ...DEFAULTS };
+let cfg: BidConfig = { ...DEFAULTS };
 
 /** Override the Book address or the read RPC (tests, a fork, a second deployment). */
-export function configure(next = {}) {
+export function configure(next: Partial<BidConfig> = {}): BidConfig {
   cfg = { ...cfg, ...next };
   return { ...cfg };
 }
@@ -86,13 +99,48 @@ const MAX_UINT24 = 16777215;
 
 // --- typed errors ------------------------------------------------------------------
 
+/** Every `code` a BidError can carry. The caller switches on these for button state. */
+export type BidErrorCode =
+  | "BAD_ARGUMENT"
+  | "BAD_BPS"
+  | "NO_CSPRNG"
+  | "NO_PROVIDER"
+  | "COMMITMENT_UNAVAILABLE"
+  | "COMMITMENT_MISMATCH"
+  | "USER_REJECTED"
+  | "REQUEST_PENDING"
+  | "CONNECT_FAILED"
+  | "NOT_CONNECTED"
+  | "CHAIN_SWITCH_REJECTED"
+  | "CHAIN_SWITCH_FAILED"
+  | "CHAIN_ADD_REJECTED"
+  | "CHAIN_ADD_FAILED"
+  | "WRONG_CHAIN"
+  | "STORAGE_BLOCKED"
+  | "ALREADY_OPENED"
+  | "ALREADY_SETTLED"
+  | "PREFLIGHT_REVERT"
+  | "SEND_FAILED"
+  | "ROUND_NOT_OPEN"
+  | "BID_OUT_OF_RANGE"
+  | "CHAIN_UNREADABLE"
+  | "ALREADY_SEALED"
+  | "NO_SECRET"
+  | "MAKER_MISMATCH";
+
 /**
  * Every throw from this module is a BidError with a stable `code`, so the caller can
  * switch on the code for the button state and use `explainRevert(e)` for the sentence.
  * `cause` keeps the original provider error; nothing is swallowed.
  */
 export class BidError extends Error {
-  constructor(code, message, extra = {}) {
+  // `declare`, not a field: a real class field would be initialised to undefined on every
+  // instance, and `extra` is copied on with Object.assign exactly as it always was.
+  declare code: BidErrorCode;
+  /** Whatever the throw site attached: `cause`, `record`, `revert`, `bps`, ... */
+  [extra: string]: unknown;
+
+  constructor(code: BidErrorCode, message: string, extra: Record<string, unknown> = {}) {
     super(message);
     this.name = "BidError";
     this.code = code;
@@ -100,30 +148,30 @@ export class BidError extends Error {
   }
 }
 
-const fail = (code, message, extra) => {
+function fail(code: BidErrorCode, message: string, extra?: Record<string, unknown>): never {
   throw new BidError(code, message, extra);
-};
+}
 
 // --- hex helpers -------------------------------------------------------------------
-// Deliberately duplicated from chain.js rather than exported from it: chain.js is the
+// Deliberately duplicated from chain.ts rather than exported from it: chain.ts is the
 // read path and this is the write path, and a shared mutable surface between them buys
 // nothing. They are four lines.
 
-const strip = (h) => String(h).replace(/^0x/, "");
-const pad32 = (h) => strip(h).toLowerCase().padStart(64, "0");
-const word = (data, i) => strip(data).slice(i * 64, (i + 1) * 64);
-const asInt = (w) => Number(BigInt("0x" + w));
-const isZeroWord = (w) => /^0+$/.test(w);
+const strip = (h: unknown): string => String(h).replace(/^0x/, "");
+const pad32 = (h: unknown): string => strip(h).toLowerCase().padStart(64, "0");
+const word = (data: unknown, i: number): string => strip(data).slice(i * 64, (i + 1) * 64);
+const asInt = (w: string): number => Number(BigInt("0x" + w));
+const isZeroWord = (w: string): boolean => /^0+$/.test(w);
 
-const isAddress = (a) => typeof a === "string" && /^0x[0-9a-fA-F]{40}$/.test(a);
-const isBytes32 = (h) => typeof h === "string" && /^0x[0-9a-fA-F]{64}$/.test(h);
+const isAddress = (a: unknown): a is string => typeof a === "string" && /^0x[0-9a-fA-F]{40}$/.test(a);
+const isBytes32 = (h: unknown): h is string => typeof h === "string" && /^0x[0-9a-fA-F]{64}$/.test(h);
 
-function requireAddress(v, what) {
+function requireAddress(v: unknown, what: string): string {
   if (!isAddress(v)) fail("BAD_ARGUMENT", `${what} must be a 20-byte address, got ${v}`);
   return v.toLowerCase();
 }
 
-function requireBytes32(v, what) {
+function requireBytes32(v: unknown, what: string): string {
   if (!isBytes32(v)) fail("BAD_ARGUMENT", `${what} must be a 32-byte hex string, got ${v}`);
   return v.toLowerCase();
 }
@@ -139,8 +187,8 @@ function requireBytes32(v, what) {
  * throws rather than degrading. A weak salt in a sealed-bid auction is not a degraded
  * feature, it is a broken one.
  */
-export function randomSalt() {
-  const c = globalThis.crypto;
+export function randomSalt(): string {
+  const c = (globalThis as { crypto?: Partial<Crypto> }).crypto;
   if (!c || typeof c.getRandomValues !== "function") {
     fail(
       "NO_CSPRNG",
@@ -157,47 +205,68 @@ export function randomSalt() {
 // --- the provider ------------------------------------------------------------------
 // EIP-6963 multi-provider discovery is cut (ui-flow.md section 10: needs a library and a
 // build). window.ethereum only; a visitor with two extensions gets whichever one won.
+//
+// THE UNTYPED BOUNDARY. An injected wallet is whatever the extension says it is. The
+// shape below is EIP-1193's minimum, and the result of every request is cast to what
+// the method is specified to return -- here, in one place, rather than at each call.
 
-function provider() {
-  const p = globalThis.ethereum;
+type Eip1193Provider = {
+  request(args: { method: string; params?: readonly unknown[] }): Promise<unknown>;
+};
+
+const injected = (): unknown => (globalThis as { ethereum?: unknown }).ethereum;
+
+function provider(): Eip1193Provider {
+  const p = injected() as Partial<Eip1193Provider> | null | undefined;
   if (!p || typeof p.request !== "function") {
     fail(
       "NO_PROVIDER",
       "No browser wallet found. Bidding needs a wallet extension on Base; everything else on this page works without one."
     );
   }
-  return p;
+  return p as Eip1193Provider;
 }
 
-export function hasProvider() {
-  const p = globalThis.ethereum;
+export function hasProvider(): boolean {
+  const p = injected() as Partial<Eip1193Provider> | null | undefined;
   return !!(p && typeof p.request === "function");
 }
+
+/** What each wallet method this file calls resolves to, per its EIP. */
+type WalletResult = {
+  eth_requestAccounts: string[];
+  eth_accounts: string[];
+  eth_chainId: string;
+  eth_call: string;
+  eth_sendTransaction: string;
+  wallet_switchEthereumChain: null;
+  wallet_addEthereumChain: null;
+};
 
 /**
  * EIP-1193 request. The provider's error is deliberately NOT wrapped: revert decoding
  * needs the original `data` field, which every wrapper in this ecosystem puts somewhere
  * different. classifyRevert digs it back out.
  */
-function request(method, params = []) {
-  return provider().request({ method, params });
+function request<M extends keyof WalletResult>(method: M, params: readonly unknown[] = []): Promise<WalletResult[M]> {
+  return provider().request({ method, params }) as Promise<WalletResult[M]>;
 }
 
 /** Promise with a deadline. Resolves to `fallback` rather than rejecting on timeout. */
-function withBudget(promise, ms, fallback) {
-  let timer;
+function withBudget<T, F>(promise: Promise<T>, ms: number, fallback: F): Promise<T | F> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
   return Promise.race([
     promise.then(
       (v) => {
         clearTimeout(timer);
         return v;
       },
-      (e) => {
+      (e: unknown) => {
         clearTimeout(timer);
         throw e;
       }
     ),
-    new Promise((resolve) => {
+    new Promise<F>((resolve) => {
       timer = setTimeout(() => resolve(fallback), ms);
     }),
   ]);
@@ -205,47 +274,64 @@ function withBudget(promise, ms, fallback) {
 
 // --- reads -------------------------------------------------------------------------
 
-/** eth_call over plain fetch, against the public RPC. Mirrors chain.js's transport. */
-async function callViaRpc(to, data, at = "latest") {
+/** An eth_call failure from the read RPC, carrying the JSON-RPC error's code and data. */
+type RpcError = Error & { code?: unknown; data?: unknown };
+
+/** eth_call over plain fetch, against the public RPC. Mirrors chain.ts's transport. */
+async function callViaRpc(to: string, data: string, at = "latest"): Promise<string> {
   const res = await fetch(cfg.rpc, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_call", params: [{ to, data }, at] }),
   });
-  const body = await res.json();
+  const body = (await res.json()) as { result?: string; error?: { code?: unknown; message?: string; data?: unknown } };
   if (body.error) {
-    const e = new Error(body.error.message || "eth_call failed");
+    const e: RpcError = new Error(body.error.message || "eth_call failed");
     e.code = body.error.code;
     e.data = body.error.data;
     throw e;
   }
-  return body.result;
+  return body.result as string;
 }
 
 /** eth_call through the wallet's own node -- the node that will judge the transaction. */
-async function callViaWallet(to, data, from) {
+async function callViaWallet(to: string, data: string, from?: string): Promise<string> {
   const params = from ? { to, data, from } : { to, data };
   return request("eth_call", [params, "latest"]);
 }
 
+/** `readAuction`'s answer: chain.ts's decoded struct plus the token the bond moves in. */
+export type BookAuction = DecodedAuction & { tokenIn: string };
+
 /**
- * The auction struct, decoded by chain.js's decoder so the read path and the write path
+ * The auction struct, decoded by chain.ts's decoder so the read path and the write path
  * can never disagree about field order. Returns null for a round that was never opened.
  *
- * Two fields are added here that chain.js omits because the board does not draw them:
- * `bond` (word 7) and `tokenIn` (word 1). The write path needs both -- the bond is what
- * commit() escrows (:171-172) and the token is what a failed transfer names.
+ * Two fields are set here on top of the decoder's: `tokenIn` (word 1), which chain.ts omits
+ * because the board does not draw it, and `bond` (word 7), which chain.ts has since learned
+ * to decode too and which is re-read here to the same value. The write path needs both --
+ * the bond is what commit() escrows (:171-172) and the token is what a failed transfer names.
  */
-export async function readAuction(maker, orderHash) {
+export async function readAuction(maker: string, orderHash: string): Promise<BookAuction | null> {
   const m = requireAddress(maker, "maker");
   const h = requireBytes32(orderHash, "orderHash");
   const data = await callViaRpc(cfg.book, SEL_AUCTIONS + pad32(m) + pad32(h));
   const a = decodeAuction(data);
   if (!a) return null;
-  a.tokenIn = "0x" + word(data, 1).slice(24);
-  a.bond = BigInt("0x" + word(data, 7)).toString(); // uint128; a string, never a Number
-  return a;
+  return Object.assign(a, {
+    tokenIn: "0x" + word(data, AUCTION_WORD.tokenIn).slice(24),
+    bond: BigInt("0x" + word(data, AUCTION_WORD.bond)).toString(), // uint128; a string, never a Number
+  });
 }
+
+/** This wallet's row in `bids(maker, orderHash, bidder)`. */
+export type OwnBid = {
+  committed: boolean;
+  commitment: string;
+  commitIdx: number;
+  revealed: boolean;
+  bondClaimed: boolean;
+};
 
 /**
  * This wallet's own Bid row (:348). The reconciliation primitive: ui-flow.md section 6.3
@@ -256,7 +342,7 @@ export async function readAuction(maker, orderHash) {
  * Struct Bid is four static fields, so four flat words:
  *   0 commitment   1 commitIdx   2 revealed   3 bondClaimed
  */
-export async function readOwnBid(maker, orderHash, bidder) {
+export async function readOwnBid(maker: string, orderHash: string, bidder: string): Promise<OwnBid | null> {
   const m = requireAddress(maker, "maker");
   const h = requireBytes32(orderHash, "orderHash");
   const b = requireAddress(bidder, "bidder");
@@ -272,6 +358,9 @@ export async function readOwnBid(maker, orderHash, bidder) {
   };
 }
 
+/** Which node(s) the commitment was read from. */
+export type CommitmentSource = "both" | "rpc" | "wallet";
+
 /**
  * The commitment, from the contract, from two nodes.
  *
@@ -286,7 +375,11 @@ export async function readOwnBid(maker, orderHash, bidder) {
  * page already runs on, and refusing here would mean a visitor behind a flaky RPC cannot
  * bid at all.
  */
-async function fetchCommitment(bidder, bps, salt) {
+async function fetchCommitment(
+  bidder: string,
+  bps: number,
+  salt: string,
+): Promise<{ commitment: string; confirmedBy: CommitmentSource }> {
   const data = SEL_COMMITMENT_FOR + pad32(bidder) + pad32(bps.toString(16)) + pad32(salt);
 
   const [viaRpc, viaWallet] = await Promise.allSettled([
@@ -294,7 +387,9 @@ async function fetchCommitment(bidder, bps, salt) {
     callViaWallet(cfg.book, data, bidder),
   ]);
 
-  const ok = (r) => r.status === "fulfilled" && isBytes32(r.value) && !isZeroWord(strip(r.value));
+  const ok = (r: PromiseSettledResult<unknown>): r is PromiseFulfilledResult<string> =>
+    r.status === "fulfilled" && isBytes32(r.value) && !isZeroWord(strip(r.value));
+  const reasonOf = (r: PromiseSettledResult<unknown>): unknown => (r.status === "rejected" ? r.reason : undefined);
   const a = ok(viaRpc) ? viaRpc.value.toLowerCase() : null;
   const b = ok(viaWallet) ? viaWallet.value.toLowerCase() : null;
 
@@ -306,7 +401,7 @@ async function fetchCommitment(bidder, bps, salt) {
     fail(
       "COMMITMENT_UNAVAILABLE",
       "Could not read the commitment from the Book, so nothing was sent. Check your connection to Base and try again.",
-      { cause: viaRpc.reason || viaWallet.reason }
+      { cause: reasonOf(viaRpc) || reasonOf(viaWallet) }
     );
   }
   if (a && b && a !== b) {
@@ -316,26 +411,33 @@ async function fetchCommitment(bidder, bps, salt) {
       { fromRpc: a, fromWallet: b }
     );
   }
-  return { commitment: a || b, confirmedBy: a && b ? "both" : a ? "rpc" : "wallet" };
+  return { commitment: (a || b) as string, confirmedBy: a && b ? "both" : a ? "rpc" : "wallet" };
 }
 
 // --- connection --------------------------------------------------------------------
 
-let connected = null; // the address this module last saw authorised; used only as a default
+let connected: string | null = null; // the address this module last saw authorised; used only as a default
+
+/** A wallet connection as this module reports it. */
+export type Connection = { address: string; chainId: number; onBase: boolean };
 
 /**
  * Prompts. Call it from a click and nowhere else -- every surveyed wallet UI treats an
  * unprompted eth_requestAccounts as hostile (ux-pattern-research.md section 5).
  */
-export async function connect() {
+export async function connect(): Promise<Connection> {
   if (!hasProvider()) provider(); // throws NO_PROVIDER with the right sentence
-  let accounts;
+  let accounts: string[];
   try {
     accounts = await request("eth_requestAccounts");
   } catch (e) {
     const c = classifyRevert(e);
     if (c.kind === "user-rejected") fail("USER_REJECTED", c.sentence, { cause: e });
-    if (c.kind === "request-pending") fail("REQUEST_PENDING", c.sentence, { cause: e });
+    // NEVER TRUE AS WRITTEN: classifyRevert reports a pending request as kind "wallet",
+    // name "RequestPending", so this branch is unreachable and a pending request arrives
+    // as CONNECT_FAILED (with the right sentence). Kept byte-for-byte through the
+    // TypeScript migration, which is what surfaced it; the cast is what lets it compile.
+    if ((c.kind as string) === "request-pending") fail("REQUEST_PENDING", c.sentence, { cause: e });
     fail("CONNECT_FAILED", c.sentence, { cause: e });
   }
   if (!accounts || accounts.length === 0) {
@@ -352,7 +454,7 @@ export async function connect() {
  * rather than throwing when there is no wallet or no authorisation -- a page that works
  * without a wallet should not have to catch an exception to find that out.
  */
-export async function restoreConnection() {
+export async function restoreConnection(): Promise<Connection | null> {
   if (!hasProvider()) return null;
   try {
     const accounts = await request("eth_accounts");
@@ -367,17 +469,17 @@ export async function restoreConnection() {
   }
 }
 
-export async function currentChainId() {
+export async function currentChainId(): Promise<number> {
   const hex = await request("eth_chainId");
   return Number(BigInt(hex));
 }
 
 /** Forget the account locally. EIP-1193 has no disconnect; the wallet stays connected. */
-export function forgetConnection() {
+export function forgetConnection(): void {
   connected = null;
 }
 
-export function connectedAddress() {
+export function connectedAddress(): string | null {
   return connected;
 }
 
@@ -391,7 +493,7 @@ export function connectedAddress() {
  * chain where SOMETHING lives at this address, it would be worse. So we re-read
  * eth_chainId until it agrees, and give up rather than guess.
  */
-export async function ensureBaseChain() {
+export async function ensureBaseChain(): Promise<{ chainId: number; switched: boolean }> {
   const current = await currentChainId();
   if (current === BASE_CHAIN_ID) return { chainId: BASE_CHAIN_ID, switched: false };
 
@@ -401,7 +503,8 @@ export async function ensureBaseChain() {
     const code = digCode(e);
     // 4902: the wallet does not know this chain. Some wallets report it as -32603 with
     // "Unrecognized chain ID" in the message instead, so both are treated as "add it".
-    const unknownChain = code === 4902 || /unrecognized chain|add.*chain|chain.*not.*added/i.test(String(e && e.message));
+    const unknownChain =
+      code === 4902 || /unrecognized chain|add.*chain|chain.*not.*added/i.test(String(e && (e as { message?: unknown }).message));
     if (!unknownChain) {
       const c = classifyRevert(e);
       if (c.kind === "user-rejected") {
@@ -458,6 +561,45 @@ export async function ensureBaseChain() {
 const KEY_PREFIX = "glasshouse:bid:";
 const RECORD_VERSION = 1;
 
+/** Where a stored secret is in its life. Written by placeBid, adoptSecret and revealBid. */
+export type BidRecordState = "secret-written" | "sealing" | "dead" | "sealed" | "revealing" | "revealed";
+
+/**
+ * One sealed bid's secret and context, exactly as it sits in localStorage.
+ *
+ * A record READ back is only as trustworthy as the storage it came from: it is parsed JSON
+ * that this module wrote, or that something else wrote under the same key. The type is
+ * what this module writes, not a guarantee about what it reads.
+ */
+export type BidRecord = {
+  v: number;
+  orderHash: string;
+  maker: string;
+  bidder: string;
+  bps: number;
+  salt: string;
+  commitment: string | null;
+  /** Absent on a typed-in secret, which never read a commitment. */
+  commitmentConfirmedBy?: CommitmentSource;
+  commitEnd: number | null;
+  revealEnd: number | null;
+  exclusiveEnd: number | null;
+  bond: string | null;
+  tokenIn?: string | null;
+  reserveBps?: number;
+  maxBps?: number;
+  /** A BLOCK: the head when the record was written. */
+  committedAt: number | null;
+  /** Wall clock, for pruning. */
+  committedAtMs: number;
+  txHash: string | null;
+  revealTx: string | null;
+  source: "generated" | "typed";
+  state: BidRecordState;
+  lastError?: string;
+  storedLocally?: boolean;
+};
+
 // ui-flow.md section 6.1 deletes a record 24 h after exclusiveEnd. exclusiveEnd is minutes
 // after the commit, so measuring from the commit is the same deadline give or take, and
 // works when the block clock is unavailable. 26 h rather than 24 so the drift is always in
@@ -465,11 +607,12 @@ const RECORD_VERSION = 1;
 // deleted one leaves the visitor with a missing bid and no sentence.
 const PRUNE_AFTER_MS = 26 * 60 * 60 * 1000;
 
-const recordKey = (orderHash, bidder) => `${KEY_PREFIX}${String(orderHash).toLowerCase()}:${String(bidder).toLowerCase()}`;
+const recordKey = (orderHash: unknown, bidder: unknown): string =>
+  `${KEY_PREFIX}${String(orderHash).toLowerCase()}:${String(bidder).toLowerCase()}`;
 
-function storage() {
+function storage(): Storage | null {
   try {
-    const s = globalThis.localStorage;
+    const s = (globalThis as { localStorage?: Storage }).localStorage;
     // Presence is not availability: Safari in private mode and a browser set to block
     // site data both throw on the first write, not on the property access.
     if (!s) return null;
@@ -479,14 +622,14 @@ function storage() {
   }
 }
 
-function readRecordAt(key) {
+function readRecordAt(key: string): BidRecord | null {
   const s = storage();
   if (!s) return null;
   try {
     const raw = s.getItem(key);
     if (!raw) return null;
-    const rec = JSON.parse(raw);
-    return rec && typeof rec === "object" ? rec : null;
+    const rec: unknown = JSON.parse(raw);
+    return rec && typeof rec === "object" ? (rec as BidRecord) : null;
   } catch {
     // A record we cannot parse is a record we cannot reveal from. Report it as absent so
     // the caller shows "no sealed bid in this browser" and offers Enter secret, rather
@@ -500,7 +643,7 @@ function readRecordAt(key) {
  * a browser in a storage-partitioned iframe), and a silent loss here is exactly the
  * failure this whole file exists to prevent. Returns true only if the bytes are there.
  */
-function writeRecord(rec) {
+function writeRecord(rec: BidRecord): boolean {
   const s = storage();
   if (!s) return false;
   const key = recordKey(rec.orderHash, rec.bidder);
@@ -513,10 +656,10 @@ function writeRecord(rec) {
   return !!(back && back.salt === rec.salt && back.bps === rec.bps && back.bidder === rec.bidder);
 }
 
-function allKeys() {
+function allKeys(): string[] {
   const s = storage();
   if (!s) return [];
-  const out = [];
+  const out: string[] = [];
   try {
     for (let i = 0; i < s.length; i++) {
       const k = s.key(i);
@@ -528,15 +671,17 @@ function allKeys() {
   return out;
 }
 
+const present = (r: BidRecord | null): r is BidRecord => Boolean(r);
+
 /** Drop records old enough that nothing can be done with them. Never touches a young one. */
-function prune(now = Date.now()) {
+function prune(now = Date.now()): number {
   const s = storage();
   if (!s) return 0;
   let dropped = 0;
   for (const k of allKeys()) {
     const rec = readRecordAt(k);
     const at = rec && Number(rec.committedAtMs);
-    if (rec && Number.isFinite(at) && now - at > PRUNE_AFTER_MS) {
+    if (rec && Number.isFinite(at) && now - (at as number) > PRUNE_AFTER_MS) {
       try {
         s.removeItem(k);
         dropped++;
@@ -561,8 +706,7 @@ function prune(now = Date.now()) {
  * always carries `bidder`, so the caller must compare it before arming a Reveal button:
  * revealing from the wrong account is a guaranteed NoCommitment revert (:190).
  */
-/** @param {string} orderHash @param {string|null} [bidder] */
-export function pendingBid(orderHash, bidder = null) {
+export function pendingBid(orderHash: string | null | undefined, bidder: string | null = null): BidRecord | null {
   prune();
   const h = String(orderHash || "").toLowerCase();
   if (!isBytes32(h)) return null;
@@ -577,18 +721,17 @@ export function pendingBid(orderHash, bidder = null) {
   const mine = allKeys()
     .filter((k) => k.startsWith(`${KEY_PREFIX}${h}:`))
     .map(readRecordAt)
-    .filter(Boolean);
+    .filter(present);
   return mine.length === 1 ? mine[0] : null;
 }
 
 /** Every live record in this browser, newest first. The sticky strip's input. */
-/** @param {string|null} [bidder] */
-export function listBids(bidder = null) {
+export function listBids(bidder: string | null = null): BidRecord[] {
   prune();
   const who = bidder ? String(bidder).toLowerCase() : null;
   return allKeys()
     .map(readRecordAt)
-    .filter(Boolean)
+    .filter(present)
     .filter((r) => !who || r.bidder === who)
     .sort((a, b) => (b.committedAtMs || 0) - (a.committedAtMs || 0));
 }
@@ -599,8 +742,7 @@ export function listBids(bidder = null) {
  * "forget" that reaches across accounts would be a way to destroy a bid the visitor still
  * needs to reveal.
  */
-/** @param {string} orderHash @param {string|null} [bidder] */
-export function forgetBid(orderHash, bidder = null) {
+export function forgetBid(orderHash: string, bidder: string | null = null): boolean {
   const s = storage();
   if (!s) return false;
   const rec = pendingBid(orderHash, bidder);
@@ -614,8 +756,7 @@ export function forgetBid(orderHash, bidder = null) {
 }
 
 /** What `Copy bid secret` copies. Enough to reveal from any other browser. */
-/** @param {string} orderHash @param {string|null} [bidder] */
-export function exportSecret(orderHash, bidder = null) {
+export function exportSecret(orderHash: string, bidder: string | null = null): string | null {
   const r = pendingBid(orderHash, bidder);
   if (!r) return null;
   return JSON.stringify(
@@ -630,8 +771,24 @@ export function exportSecret(orderHash, bidder = null) {
  * in from another browser. Not validated here -- validation is the contract's, at reveal,
  * as BadReveal (:192). Marked `typed` so the UI can say where it came from.
  */
-export function adoptSecret({ maker, orderHash, bidder, bps, salt, revealEnd = null, commitEnd = null }) {
-  const rec = {
+export function adoptSecret({
+  maker,
+  orderHash,
+  bidder,
+  bps,
+  salt,
+  revealEnd = null,
+  commitEnd = null,
+}: {
+  maker: string;
+  orderHash: string;
+  bidder: string;
+  bps: number;
+  salt: string;
+  revealEnd?: number | null;
+  commitEnd?: number | null;
+}): BidRecord {
+  const rec: BidRecord = {
     v: RECORD_VERSION,
     orderHash: requireBytes32(orderHash, "orderHash"),
     maker: requireAddress(maker, "maker"),
@@ -656,7 +813,7 @@ export function adoptSecret({ maker, orderHash, bidder, bps, salt, revealEnd = n
   return rec;
 }
 
-function requireBps(bps) {
+function requireBps(bps: unknown): number {
   if (typeof bps !== "number" || !Number.isInteger(bps) || bps < 0 || bps > MAX_UINT24) {
     fail("BAD_BPS", `A bid must be a whole number of basis points between 0 and ${MAX_UINT24}.`, { bps });
   }
@@ -687,7 +844,7 @@ function requireBps(bps) {
  * removes a second window where a signature could exist without a stored secret.
  *
  * options:
- *   auction              - a decoded auction from chain.js, to skip one eth_call
+ *   auction              - a decoded auction from chain.ts, to skip one eth_call
  *   acceptUnstoredSecret - proceed even though storage is blocked. Only pass this after
  *                          the visitor has demonstrably copied the secret; the default is
  *                          to refuse, because an unstored salt is an unrevealable bid.
@@ -719,7 +876,39 @@ export const OPEN_DEFAULTS = Object.freeze({
   bond: 0,
 });
 
-const padNum = (n) => pad32(BigInt(n).toString(16));
+/** A whole number as ABI calldata: anything `BigInt()` accepts. */
+type Uintish = number | bigint | string;
+
+const padNum = (n: Uintish): string => pad32(BigInt(n).toString(16));
+
+/** Arguments to `open()`. Every one is optional; OPEN_DEFAULTS and a random hash fill in. */
+export type OpenRoundArgs = {
+  orderHash?: string;
+  router?: string;
+  tokenIn?: string;
+  commitBlocks?: number;
+  revealBlocks?: number;
+  exclusiveBlocks?: number;
+  reserveBps?: number;
+  maxBps?: number;
+  bond?: Uintish;
+};
+
+/** Options every write accepts. `gas` is a hex quantity overriding the explicit limit. */
+export type WriteOptions = { skipPreflight?: boolean; gas?: string };
+
+export type OpenRoundResult = {
+  txHash: string;
+  maker: string;
+  orderHash: string;
+  reserveBps: number;
+  maxBps: number;
+  commitBlocks: number;
+  revealBlocks: number;
+  exclusiveBlocks: number;
+  unfillable: true;
+  generatedHash: boolean;
+};
 
 /**
  * OPEN A ROUND, FROM THE BROWSER, AS YOURSELF.
@@ -749,7 +938,7 @@ const padNum = (n) => pad32(BigInt(n).toString(16));
  * keeper's remaining steps and they need a funded maker. This is `open()` and nothing else,
  * which is why it is forty lines and not four hundred.
  */
-export async function openRound(args = {}, options = {}) {
+export async function openRound(args: OpenRoundArgs = {}, options: WriteOptions = {}): Promise<OpenRoundResult> {
   const {
     orderHash = randomSalt(),
     router = ROUTER,
@@ -768,11 +957,12 @@ export async function openRound(args = {}, options = {}) {
 
   // The contract's own requires, checked here so the failure is a sentence rather than a
   // reverted transaction the visitor has already paid for. GlasshouseBook.sol:134-135.
-  for (const [name, v] of [
+  const windows: [string, number][] = [
     ["commitBlocks", commitBlocks],
     ["revealBlocks", revealBlocks],
     ["exclusiveBlocks", exclusiveBlocks],
-  ]) {
+  ];
+  for (const [name, v] of windows) {
     if (!Number.isInteger(v) || v <= 0) {
       fail("BAD_ARGUMENT", `${name} must be a positive whole number of blocks, got ${v}`);
     }
@@ -787,7 +977,7 @@ export async function openRound(args = {}, options = {}) {
   // THE MAKER IS WHOEVER IS CONNECTED. Not a parameter: `open()` keys the auction by
   // msg.sender, so passing a maker would let a caller believe they had opened a round for
   // somebody else. The chain-id guard is the same one every write in this file goes
-  // through -- bid.js re-reads eth_chainId at the moment it writes rather than trusting a
+  // through -- bid.ts re-reads eth_chainId at the moment it writes rather than trusting a
   // wallet's switch to have taken effect.
   const account = await requireConnectedOnBase();
 
@@ -820,7 +1010,7 @@ export async function openRound(args = {}, options = {}) {
     if (revert) fail("PREFLIGHT_REVERT", revert.sentence, { revert });
   }
 
-  let txHash;
+  let txHash: string;
   try {
     txHash = await request("eth_sendTransaction", [
       { from: account, to: cfg.book, data, gas: options.gas || OPEN_GAS },
@@ -852,6 +1042,8 @@ export async function openRound(args = {}, options = {}) {
   };
 }
 
+export type SettleRoundResult = { txHash: string; maker: string; orderHash: string; settledBy: string };
+
 /**
  * SETTLE A ROUND, FROM THE BROWSER, AS ANYONE.
  *
@@ -874,7 +1066,10 @@ export async function openRound(args = {}, options = {}) {
  * behalf. `settle()` takes the maker as an argument because it settles somebody else's
  * auction by design.
  */
-export async function settleRound({ maker, orderHash }, options = {}) {
+export async function settleRound(
+  { maker, orderHash }: { maker: string; orderHash: string },
+  options: WriteOptions & { auction?: { settled?: boolean } | null } = {},
+): Promise<SettleRoundResult> {
   const m = requireAddress(maker, "maker");
   const h = requireBytes32(orderHash, "orderHash");
 
@@ -900,7 +1095,7 @@ export async function settleRound({ maker, orderHash }, options = {}) {
     if (revert) fail("PREFLIGHT_REVERT", revert.sentence, { revert });
   }
 
-  let txHash;
+  let txHash: string;
   try {
     txHash = await request("eth_sendTransaction", [
       { from: account, to: cfg.book, data, gas: options.gas || SETTLE_GAS },
@@ -913,7 +1108,32 @@ export async function settleRound({ maker, orderHash }, options = {}) {
   return { txHash, maker: m, orderHash: h, settledBy: account };
 }
 
-export async function placeBid({ maker, orderHash, bps }, options = {}) {
+/**
+ * The round as placeBid needs it: the range the reveal enforces and the boundaries the
+ * record copies. `readAuction` returns one; so does the board's `Auction`.
+ */
+export type BidAuction = {
+  commitEnd: number;
+  revealEnd: number;
+  exclusiveEnd: number;
+  reserveBps: number;
+  maxBps: number;
+  bond?: string | number | bigint | null;
+  tokenIn?: string | null;
+};
+
+export type PlaceBidOptions = {
+  auction?: BidAuction | null;
+  acceptUnstoredSecret?: boolean;
+  skipPreflight?: boolean;
+};
+
+export type PlaceBidResult = { txHash: string; salt: string; bps: number; commitment: string; record: BidRecord };
+
+export async function placeBid(
+  { maker, orderHash, bps }: { maker: string; orderHash: string; bps: number },
+  options: PlaceBidOptions = {},
+): Promise<PlaceBidResult> {
   const m = requireAddress(maker, "maker");
   const h = requireBytes32(orderHash, "orderHash");
   const value = requireBps(bps);
@@ -925,7 +1145,7 @@ export async function placeBid({ maker, orderHash, bps }, options = {}) {
   // outside [reserveBps, maxBps] therefore commits cleanly and can never be opened: the
   // bid is void and, with bond > 0, the bond is the maker's. The contract cannot protect
   // the bidder here, so the page must.
-  const auction = options.auction || (await readAuction(m, h));
+  const auction: BidAuction | null = options.auction || (await readAuction(m, h));
   if (!auction) {
     fail("ROUND_NOT_OPEN", "That round is not open on the Book yet. Wait for the next round on the board.");
   }
@@ -985,7 +1205,7 @@ export async function placeBid({ maker, orderHash, bps }, options = {}) {
   const headAtWrite = await headPromise;
 
   // --- step 3: the record, BEFORE the wallet ------------------------------------------
-  const record = {
+  const record: BidRecord = {
     v: RECORD_VERSION,
     orderHash: h,
     maker: m,
@@ -1041,7 +1261,7 @@ export async function placeBid({ maker, orderHash, bps }, options = {}) {
   }
 
   // --- step 5: send -------------------------------------------------------------------
-  let txHash;
+  let txHash: string;
   try {
     txHash = await request("eth_sendTransaction", [{ from: account, to: cfg.book, data }]);
   } catch (e) {
@@ -1097,7 +1317,15 @@ export async function placeBid({ maker, orderHash, bps }, options = {}) {
  *                   1.5 s of simulation is a block.
  *   gas           - override REVEAL_GAS
  */
-export async function revealBid({ maker, orderHash, bps = null, salt = null }, options = {}) {
+export async function revealBid(
+  {
+    maker,
+    orderHash,
+    bps = null,
+    salt = null,
+  }: { maker: string; orderHash: string; bps?: number | null; salt?: string | null },
+  options: WriteOptions = {},
+): Promise<{ txHash: string; bps: number }> {
   const m = requireAddress(maker, "maker");
   const h = requireBytes32(orderHash, "orderHash");
   const account = await requireConnectedOnBase();
@@ -1136,7 +1364,7 @@ export async function revealBid({ maker, orderHash, bps = null, salt = null }, o
     }
   }
 
-  let txHash;
+  let txHash: string;
   try {
     txHash = await request("eth_sendTransaction", [
       { from: account, to: cfg.book, data, gas: options.gas || REVEAL_GAS },
@@ -1163,8 +1391,8 @@ export async function revealBid({ maker, orderHash, bps = null, salt = null }, o
  * Returns null when the call succeeds, when it times out, or when the failure is not a
  * revert we can read -- every one of those means "we learned nothing, proceed".
  */
-async function preflight(tx, budgetMs) {
-  const attempt = (async () => {
+async function preflight(tx: { from: string; to: string; data: string }, budgetMs: number): Promise<Classified | null> {
+  const attempt = (async (): Promise<Classified | null> => {
     try {
       await callViaWallet(tx.to, tx.data, tx.from);
       return null;
@@ -1182,7 +1410,7 @@ async function preflight(tx, budgetMs) {
   }
 }
 
-async function requireConnectedOnBase() {
+async function requireConnectedOnBase(): Promise<string> {
   const accounts = await request("eth_accounts");
   if (!accounts || accounts.length === 0) {
     fail("NOT_CONNECTED", "Connect a wallet first.");
@@ -1201,16 +1429,41 @@ async function requireConnectedOnBase() {
 
 // --- derived state -----------------------------------------------------------------
 
+/** What a bid card and the sticky strip show. */
+export type BidUiState = "none" | "revealed" | "sealed" | "reveal-due" | "missed" | "sealing" | "secret-written";
+
+export type BidState = {
+  phase: Phase;
+  state: BidUiState;
+  canCommit: boolean;
+  canReveal: boolean;
+  committed: boolean;
+  revealed: boolean;
+  blocksToCommitEnd: number;
+  blocksToRevealEnd: number;
+  urgent: boolean;
+  lastCall: boolean;
+};
+
 /**
  * One place that turns (auction, record, on-chain bid, head) into what the button should
  * be. Exported because it is the part worth unit-testing without a DOM, and because the
  * card and the sticky strip must never disagree -- ui-flow.md acceptance 4.
  *
- * `phase` comes from site/phase.js and is not re-derived here.
+ * `phase` comes from lib/phase.ts and is not re-derived here.
  * `canReveal` is the contract's own predicate (:185-186), nothing softer.
  */
-/** @param {{auction: any, record?: any, onChain?: any, head: number}} args */
-export function bidState({ auction, record = null, onChain = null, head }) {
+export function bidState({
+  auction,
+  record = null,
+  onChain = null,
+  head,
+}: {
+  auction: PhaseInput;
+  record?: { txHash?: string | null } | null;
+  onChain?: { committed?: boolean; revealed?: boolean } | null;
+  head: Blockish;
+}): BidState {
   const p = phase(auction, head);
   const n = Number(head);
   const revealEnd = Number(auction.revealEnd);
@@ -1223,7 +1476,7 @@ export function bidState({ auction, record = null, onChain = null, head }) {
   const canCommit = n <= commitEnd && !committed;
   const canReveal = n > commitEnd && n <= revealEnd && committed && !revealed;
 
-  let state;
+  let state: BidUiState;
   if (!record && !committed) state = "none";
   else if (revealed) state = "revealed";
   else if (committed && p === "commit") state = "sealed";
@@ -1257,7 +1510,14 @@ export function bidState({ auction, record = null, onChain = null, head }) {
 // OpenZeppelin ERC20 errors at the end are not the Book's, but SafeERC20 bubbles a token's
 // own revert data through commit(), so they reach the page and need a sentence too.
 
-const BOOK_ERRORS = {
+type BookErrorEntry = {
+  name: string;
+  sentence: string;
+  /** Receives the decoded arguments: uints as decimal strings, addresses as 0x hex. */
+  decode?: (args: string[]) => string;
+};
+
+const BOOK_ERRORS: Readonly<Record<string, BookErrorEntry | undefined>> = {
   // --- GlasshouseBook.sol:85-100 ---
   "0x1da42b26": {
     // AlreadyOpened()
@@ -1379,7 +1639,7 @@ const BOOK_ERRORS = {
 const SEL_ERROR_STRING = "0x08c379a0"; // Error(string)
 const SEL_PANIC = "0x4e487b71"; // Panic(uint256)
 
-const PANIC_REASONS = {
+const PANIC_REASONS: Readonly<Record<number, string | undefined>> = {
   0x01: "an assertion in the contract failed",
   0x11: "an arithmetic operation overflowed",
   0x12: "the contract divided by zero",
@@ -1388,6 +1648,9 @@ const PANIC_REASONS = {
   0x41: "the contract ran out of memory",
 };
 
+/** An error-shaped object from a wallet, a wrapper or a JSON-RPC body: any key, any depth. */
+type ErrorGraph = Record<string, unknown>;
+
 /**
  * Providers bury revert data at different depths: MetaMask puts it at `e.data`, some at
  * `e.data.data`, some at `e.data.originalError.data`, ethers-shaped wrappers at
@@ -1395,13 +1658,13 @@ const PANIC_REASONS = {
  * shapes that keep changing, walk the object for the first thing that looks like ABI
  * revert data.
  */
-function digData(e, depth = 0) {
+function digData(e: unknown, depth = 0): string | null {
   if (e == null || depth > 6) return null;
   if (typeof e === "string") return looksLikeRevertData(e.trim()) ? e.trim().toLowerCase() : null;
   if (typeof e !== "object") return null;
   for (const k of ["data", "originalError", "error", "cause", "info", "value", "body", "details"]) {
     if (k in e) {
-      const found = digData(e[k], depth + 1);
+      const found = digData((e as ErrorGraph)[k], depth + 1);
       if (found) return found;
     }
   }
@@ -1414,58 +1677,60 @@ function digData(e, depth = 0) {
  * transaction hash (64) or an address (40) sitting in some wallet's `data` field from
  * being read as a selector and reported as an unrecognised contract error.
  */
-function looksLikeRevertData(s) {
+function looksLikeRevertData(s: unknown): s is string {
   if (typeof s !== "string" || !/^0x[0-9a-fA-F]*$/.test(s)) return false;
   const len = s.length - 2;
   return len >= 8 && (len - 8) % 64 === 0;
 }
 
 /** The first numeric or string EIP-1193 code in the object graph. */
-function digCode(e, depth = 0) {
+function digCode(e: unknown, depth = 0): number | string | null {
   if (e == null || typeof e !== "object" || depth > 6) return null;
-  if (typeof e.code === "number") return e.code;
-  if (typeof e.code === "string" && e.code) return e.code;
+  const o = e as ErrorGraph;
+  if (typeof o.code === "number") return o.code;
+  if (typeof o.code === "string" && o.code) return o.code;
   for (const k of ["error", "cause", "info", "data", "originalError"]) {
-    if (k in e) {
-      const found = digCode(e[k], depth + 1);
+    if (k in o) {
+      const found = digCode(o[k], depth + 1);
       if (found != null) return found;
     }
   }
   return null;
 }
 
-function messageOf(e) {
+function messageOf(e: unknown): string {
   if (e == null) return "";
   if (typeof e === "string") return e;
-  const parts = [];
-  const walk = (x, d) => {
+  const parts: string[] = [];
+  const walk = (x: unknown, d: number): void => {
     if (x == null || d > 4) return;
     if (typeof x === "string") return void parts.push(x);
     if (typeof x !== "object") return;
-    if (typeof x.message === "string") parts.push(x.message);
-    if (typeof x.reason === "string") parts.push(x.reason);
-    for (const k of ["error", "cause", "info", "data", "originalError"]) if (k in x) walk(x[k], d + 1);
+    const o = x as ErrorGraph;
+    if (typeof o.message === "string") parts.push(o.message);
+    if (typeof o.reason === "string") parts.push(o.reason);
+    for (const k of ["error", "cause", "info", "data", "originalError"]) if (k in o) walk(o[k], d + 1);
   };
   walk(e, 0);
   return parts.join(" | ");
 }
 
-function scanMessageForRevertData(msg) {
+function scanMessageForRevertData(msg: string): string | null {
   if (!msg) return null;
   const candidates = String(msg).match(/0x[0-9a-fA-F]+/g) || [];
   for (const c of candidates) if (looksLikeRevertData(c)) return c.toLowerCase();
   return null;
 }
 
-function decodeUint(dataWords, i) {
+function decodeUint(dataWords: string, i: number): string {
   return BigInt("0x" + word(dataWords, i)).toString();
 }
 
-function decodeAddressArg(dataWords, i) {
+function decodeAddressArg(dataWords: string, i: number): string {
   return "0x" + word(dataWords, i).slice(24);
 }
 
-function decodeErrorString(data) {
+function decodeErrorString(data: string): string | null {
   try {
     const body = strip(data).slice(8);
     const len = Number(BigInt("0x" + body.slice(64, 128)));
@@ -1479,12 +1744,7 @@ function decodeErrorString(data) {
 }
 
 /**
- * Full classification: kind, error name, decoded arguments, the sentence, and the raw
- * data. `explainRevert` is this function's `sentence`; the rest is here because the
- * caller needs the kind to pick a colour and the name to pick a button state, and
- * re-parsing the message to get them back would be worse.
- *
- * kind is one of:
+ * What `classifyRevert` can say an error was:
  *   contract       a decoded custom error from the Book (or a token, through it)
  *   revert-string  require(msg) / Panic
  *   user-rejected  4001 and its variants
@@ -1492,7 +1752,29 @@ function decodeErrorString(data) {
  *   network        the RPC did not answer
  *   unknown        nothing recognisable; the raw message is carried through
  */
-export function classifyRevert(errorLike) {
+export type RevertKind = "contract" | "revert-string" | "user-rejected" | "wallet" | "network" | "unknown";
+
+export type Classified = {
+  kind: RevertKind;
+  /** The decoded error or condition name; null when nothing was recognised. */
+  name: string | null;
+  selector: string | null;
+  /** Decoded arguments: uints as decimal strings (a Panic code as a number), addresses as hex. */
+  args: (string | number)[];
+  sentence: string;
+  raw: string | null;
+  message: string;
+};
+
+/**
+ * Full classification: kind, error name, decoded arguments, the sentence, and the raw
+ * data. `explainRevert` is this function's `sentence`; the rest is here because the
+ * caller needs the kind to pick a colour and the name to pick a button state, and
+ * re-parsing the message to get them back would be worse.
+ *
+ * kind is one of the RevertKind values above.
+ */
+export function classifyRevert(errorLike: unknown): Classified {
   const code = digCode(errorLike);
   const msg = messageOf(errorLike);
   // Some nodes put the revert bytes only in the message ("execution reverted: 0x1164ebab",
@@ -1507,7 +1789,7 @@ export function classifyRevert(errorLike) {
     const body = strip(data).slice(8);
     const entry = BOOK_ERRORS[selector];
     if (entry) {
-      let args = [];
+      let args: string[] = [];
       if (entry.name === "BidOutOfRange") args = [0, 1, 2].map((i) => decodeUint(body, i));
       else if (entry.name === "SafeERC20FailedOperation" || entry.name === "ERC20InvalidApprover" || entry.name === "ERC20InvalidSpender") {
         args = [decodeAddressArg(body, 0)];
@@ -1618,7 +1900,7 @@ export function classifyRevert(errorLike) {
  * goes through classifyRevert. Use classifyRevert directly when the caller needs the kind
  * or the error name as well.
  */
-export function explainRevert(errorLike) {
+export function explainRevert(errorLike: unknown): string {
   if (errorLike instanceof BidError && errorLike.message) return errorLike.message;
   return classifyRevert(errorLike).sentence;
 }

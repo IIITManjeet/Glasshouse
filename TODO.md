@@ -52,12 +52,6 @@ dust-sized, and the bond on ordinary rounds is 0. Full detail in `CHANGELOG.md`'
       call sites anywhere in `web/`. Removed; `th`, `.tnum` and `.chip` still carry the
       exemption it sat alongside.
 
-- [ ] **`web/lib/bid.js` and `web/lib/chain.js` to TypeScript.** 1,400 lines of wallet and
-      signing code, nearly all of it untested (only `decodeAuction` and the poll's call
-      budget are covered), on the path every bid takes. Deliberately not done before
-      submission — a type migration there is a large diff with no benefit to a judge and a
-      real chance of breaking the one flow that must work live.
-
 - [x] **The keeper can stall if more than one process runs against the same state file.**
       `scripts/keeper.ts` reads `.keeper-state.json` (or `.keeper-state.dryrun.json` under
       `DRY_RUN`) once at start and writes it back after each step. `scripts/lib/state-lock.ts`
@@ -69,7 +63,7 @@ dust-sized, and the bond on ordinary rounds is 0. Full detail in `CHANGELOG.md`'
 
 - [ ] **`NEXT_PUBLIC_RPC_URL` is unset on the deployed site.** Every visitor reads
       `mainnet.base.org` from their own IP and can be rate limited. Setting it removes that
-      risk but also disables `web/lib/chain.js`'s fallback pool, since a caller-chosen
+      risk but also disables `web/lib/chain.ts`'s fallback pool, since a caller-chosen
       endpoint is honoured exactly rather than substituted. See `DEPLOY.md`.
 
 - [ ] **`DECISIONS.md` still has blank `[ ] In your words` lines.** Deliberately left for

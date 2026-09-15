@@ -18,20 +18,59 @@
 //
 // EVERY SELECTOR AND TOPIC HERE WAS TAKEN FROM THE COMPILED ABI, never guessed. A guessed
 // event signature is what previously made a completed fill look like a failed one.
+// test/js/chain.test.js re-derives each of them from subgraph/abis/GlasshouseBook.json, so a
+// changed ABI fails a test rather than a fill.
+//
+// TYPED, AND STILL NO LIBRARIES. This was plain ESM until 2026-09; it became TypeScript so
+// the shape the board, the round page and the bid path all consume is stated once, here,
+// rather than asserted with a cast at each importer. Only erasable syntax is used, so Node
+// runs this file directly under `node --test` with no build step.
 
 const SEL_AUCTIONS = "0xee5bcb62"; // auctions(address,bytes32)
-const TOPIC_COMMITTED = "0x15bac7ec2595728439a169878c5d66df17234ecc558f7ff84ca42bd372ff182c";
-const TOPIC_REVEALED = "0xe91f377a8690b8f3432ec7784cc702c2bc3d063fb2ac87290dd5ce249198ed32";
+const TOPIC_COMMITTED = "0x15bac7ec2595728439a169878c5d66df17234ecc558f7ff84ca42bd372ff182c"; // BidCommitted(address,bytes32,address,uint40)
+const TOPIC_REVEALED = "0xe91f377a8690b8f3432ec7784cc702c2bc3d063fb2ac87290dd5ce249198ed32"; // BidRevealed(address,bytes32,address,uint24,uint128)
 
 // The keeper's commit window, needed only to bound the log scan for bid cards. If it is
 // wrong the scan is merely wider or narrower, never incorrect.
 const COMMIT_WINDOW = 60;
 
-const pad = (hex) => hex.replace(/^0x/, "").padStart(64, "0");
-const word = (data, i) => data.slice(2 + i * 64, 2 + (i + 1) * 64);
-const asInt = (w) => Number(BigInt("0x" + w));
-const asAddr = (w) => "0x" + w.slice(24);
-const isZero = (w) => /^0+$/.test(w);
+/**
+ * The Auction struct's components, in ABI order -- `auctions(address,bytes32)`'s single tuple
+ * output in subgraph/abis/GlasshouseBook.json. Every word index below is read off this tuple
+ * by name, so the order is written down exactly once.
+ */
+const AUCTION_FIELDS = [
+  "router",
+  "tokenIn",
+  "commitEnd",
+  "revealEnd",
+  "exclusiveBlocks",
+  "reserveBps",
+  "maxBps",
+  "bond",
+  "best",
+  "bestBps",
+  "bestCommitIdx",
+  "secondBps",
+  "commitCount",
+  "filledBy",
+  "settled",
+  "winnerForfeited",
+] as const;
+
+/** One component name of the on-chain Auction struct. */
+export type AuctionStructField = (typeof AUCTION_FIELDS)[number];
+
+/** The word each struct component occupies in the flat return data. */
+export const AUCTION_WORD = Object.fromEntries(AUCTION_FIELDS.map((f, i) => [f, i])) as Readonly<
+  Record<AuctionStructField, number>
+>;
+
+const pad = (hex: string): string => hex.replace(/^0x/, "").padStart(64, "0");
+const word = (data: string, i: number): string => data.slice(2 + i * 64, 2 + (i + 1) * 64);
+const asInt = (w: string): number => Number(BigInt("0x" + w));
+const asAddr = (w: string): string => "0x" + w.slice(24);
+const isZero = (w: string): boolean => /^0+$/.test(w);
 
 /**
  * BACKING OFF WAS NOT ENOUGH, BECAUSE THE LIMIT IS NOT TRANSIENT.
@@ -71,27 +110,56 @@ const DEFAULT_RPC = "https://mainnet.base.org";
 //
 // Two survivors. Worth re-testing before a demo rather than trusted indefinitely: these
 // are free endpoints and their terms move.
-const POOL = [DEFAULT_RPC, "https://base.gateway.tenderly.co"];
+const POOL: readonly string[] = [DEFAULT_RPC, "https://base.gateway.tenderly.co"];
 
 let preferred = 0;
 
-const isLimit = (msg) => /rate limit|-32016|429|too many|capacity|limit exceeded/i.test(msg);
+const isLimit = (msg: string): boolean => /rate limit|-32016|429|too many|capacity|limit exceeded/i.test(msg);
 
-async function call(rpc, method, params, tries = 4) {
+/** The message of whatever a failed request threw. Everything `once` throws is an Error. */
+const messageOf = (e: unknown): string => String((e as { message?: unknown }).message ?? e);
+
+/** The three JSON-RPC methods this file sends, and what each one's `result` is. */
+type RpcResult = {
+  eth_blockNumber: string | null;
+  eth_call: string;
+  eth_getLogs: RpcLog[];
+};
+type RpcMethod = keyof RpcResult;
+
+/** A log as eth_getLogs returns it -- only the fields read here. */
+export type RpcLog = {
+  topics: string[];
+  data: string;
+  blockNumber: string;
+  transactionHash?: string | null;
+};
+
+type RpcBody<M extends RpcMethod> = {
+  result?: RpcResult[M];
+  error?: { code?: number; message?: string; data?: unknown };
+};
+
+async function call<M extends RpcMethod>(
+  rpc: string,
+  method: M,
+  params: readonly unknown[],
+  tries = 4,
+): Promise<RpcResult[M]> {
   // A caller-chosen endpoint is honoured exactly: retry it, never substitute it.
   if (rpc !== DEFAULT_RPC) {
     for (let attempt = 1; ; attempt++) {
       try {
         return await once(rpc, method, params);
       } catch (e) {
-        const msg = String(e.message ?? e);
+        const msg = messageOf(e);
         if (attempt >= tries || !isLimit(msg)) throw e;
         await new Promise((r) => setTimeout(r, 400 * 2 ** (attempt - 1)));
       }
     }
   }
 
-  let lastError = null;
+  let lastError: unknown = null;
   for (let hop = 0; hop < POOL.length; hop++) {
     const idx = (preferred + hop) % POOL.length;
     const url = POOL[idx];
@@ -101,7 +169,7 @@ async function call(rpc, method, params, tries = 4) {
       return out;
     } catch (e) {
       lastError = e;
-      const msg = String(e.message ?? e);
+      const msg = messageOf(e);
       // A rate limit or a dead host means try the next one. Anything else is the CHAIN
       // answering with a real error -- a reverted eth_call, a bad parameter -- and asking
       // a different node the same malformed question would only waste time and return the
@@ -114,21 +182,42 @@ async function call(rpc, method, params, tries = 4) {
   throw lastError ?? new Error(`${method}: every Base endpoint failed`);
 }
 
-async function once(rpc, method, params) {
+async function once<M extends RpcMethod>(rpc: string, method: M, params: readonly unknown[]): Promise<RpcResult[M]> {
   const res = await fetch(rpc, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
   });
-  const body = await res.json();
+  // The one untyped boundary in this file: whatever the endpoint sent back.
+  const body = (await res.json()) as RpcBody<M>;
   if (body.error) throw new Error(`${method}: ${body.error.message}`);
-  return body.result;
+  return body.result as RpcResult[M];
 }
 
-export async function chainHead(rpc) {
+export async function chainHead(rpc: string): Promise<number | null> {
   const r = await call(rpc, "eth_blockNumber", []);
   return r ? Number(BigInt(r)) : null;
 }
+
+/** What `decodeAuction` returns: the struct's fields, named for the page, never the key. */
+export type DecodedAuction = {
+  commitEnd: number;
+  revealEnd: number;
+  /** Derived: the struct stores exclusiveBLOCKS, and this is `revealEnd + exclusiveBlocks`. */
+  exclusiveEnd: number;
+  reserveBps: number;
+  maxBps: number;
+  /** A uint128, so a decimal string rather than a Number. */
+  bond: string;
+  bestBidder: string | null;
+  bestBps: number;
+  secondBps: number;
+  committedCount: number;
+  filledBy: string | null;
+  filled: boolean;
+  settled: boolean;
+  winnerForfeited: boolean;
+};
 
 /**
  * The Auction struct is sixteen fields and every one is a static type, so the return
@@ -142,33 +231,44 @@ export async function chainHead(rpc) {
  *
  * Note it carries exclusiveBLOCKS, not an end block, so the end is derived here.
  */
-export function decodeAuction(data) {
+export function decodeAuction(data: string | null | undefined): DecodedAuction | null {
   if (!data || data === "0x") return null;
-  const commitEnd = asInt(word(data, 2));
+  const W = AUCTION_WORD;
+  const commitEnd = asInt(word(data, W.commitEnd));
   if (commitEnd === 0) return null; // this round was never opened
-  const revealEnd = asInt(word(data, 3));
-  const best = word(data, 8);
-  const filled = word(data, 13);
+  const revealEnd = asInt(word(data, W.revealEnd));
+  const best = word(data, W.best);
+  const filled = word(data, W.filledBy);
   return {
     commitEnd,
     revealEnd,
-    exclusiveEnd: revealEnd + asInt(word(data, 4)),
-    reserveBps: asInt(word(data, 5)),
-    maxBps: asInt(word(data, 6)),
+    exclusiveEnd: revealEnd + asInt(word(data, W.exclusiveBlocks)),
+    reserveBps: asInt(word(data, W.reserveBps)),
+    maxBps: asInt(word(data, W.maxBps)),
     // Word 7. Needed because the UI must not claim a bond is forfeitable on a round whose
     // bond is zero -- which is every round the keeper opens (scripts/keeper.ts:58). A
     // string, not a number: it is a uint128 and can exceed Number.MAX_SAFE_INTEGER.
-    bond: BigInt("0x" + word(data, 7)).toString(),
+    bond: BigInt("0x" + word(data, W.bond)).toString(),
     bestBidder: isZero(best) ? null : asAddr(best),
-    bestBps: asInt(word(data, 9)),
-    secondBps: asInt(word(data, 11)),
-    committedCount: asInt(word(data, 12)),
+    bestBps: asInt(word(data, W.bestBps)),
+    secondBps: asInt(word(data, W.secondBps)),
+    committedCount: asInt(word(data, W.commitCount)),
     filledBy: isZero(filled) ? null : asAddr(filled),
     filled: !isZero(filled),
-    settled: asInt(word(data, 14)) === 1,
-    winnerForfeited: asInt(word(data, 15)) === 1,
+    settled: asInt(word(data, W.settled)) === 1,
+    winnerForfeited: asInt(word(data, W.winnerForfeited)) === 1,
   };
 }
+
+/** One bidder on one round, as the logs describe them. */
+export type ChainBid = {
+  bidder: string;
+  commitIdx: number;
+  committedAtBlock: number;
+  bps: number | null;
+  commitTx: string | null;
+  revealTx: string | null;
+};
 
 /**
  * Bid cards need the bidders, and only the logs carry those -- `bids()` takes an address,
@@ -178,14 +278,20 @@ export function decodeAuction(data) {
  * cap Base's public endpoint enforces. Ordering is by first sighting, which reproduces
  * commitIdx because the contract assigns it in commit order.
  */
-export async function bidsFor(rpc, book, orderHash, fromBlock, toBlock) {
+export async function bidsFor(
+  rpc: string,
+  book: string,
+  orderHash: string,
+  fromBlock: number,
+  toBlock: number,
+): Promise<ChainBid[]> {
   const logs = await call(rpc, "eth_getLogs", [{
     address: book,
     fromBlock: "0x" + Math.max(0, fromBlock).toString(16),
     toBlock: "0x" + toBlock.toString(16),
     topics: [null, null, orderHash],
   }]);
-  const byBidder = new Map();
+  const byBidder = new Map<string, ChainBid>();
   for (const l of logs) {
     if (!l.topics[3]) continue;
     const bidder = "0x" + l.topics[3].slice(26);
@@ -218,7 +324,13 @@ export async function bidsFor(rpc, book, orderHash, fromBlock, toBlock) {
 }
 
 /** Has this round been opened? One eth_call, pinned to a block. */
-async function isOpened(rpc, book, maker, orderHash, at) {
+async function isOpened(
+  rpc: string,
+  book: string,
+  maker: string,
+  orderHash: string,
+  at: string,
+): Promise<DecodedAuction | null> {
   const data = await call(rpc, "eth_call", [
     { to: book, data: SEL_AUCTIONS + pad(maker) + pad(orderHash) },
     at,
@@ -227,8 +339,14 @@ async function isOpened(rpc, book, maker, orderHash, at) {
 }
 
 const CURSOR_KEY = "glasshouse:lastRound";
-const readCursor = () => { try { return Number(localStorage.getItem(CURSOR_KEY)) || 0; } catch { return 0; } };
-const writeCursor = (n) => { try { localStorage.setItem(CURSOR_KEY, String(n)); } catch { /* blocked storage */ } };
+const readCursor = (): number => { try { return Number(localStorage.getItem(CURSOR_KEY)) || 0; } catch { return 0; } };
+const writeCursor = (n: number): void => { try { localStorage.setItem(CURSOR_KEY, String(n)); } catch { /* blocked storage */ } };
+
+/** One precomputed round: its index in config/rounds.json and the order hash it opens. */
+export type ManifestRound = { round: number; orderHash: string };
+
+/** `window.GLASSHOUSE_ROUNDS`: the keeper's maker and every order hash it will open. */
+export type RoundManifest = { maker: string; rounds: ManifestRound[] };
 
 /**
  * Find the newest round the keeper has opened, without asking about all 300.
@@ -256,7 +374,7 @@ const writeCursor = (n) => { try { localStorage.setItem(CURSOR_KEY, String(n)); 
  * is 0 either way -- and it does not need to. Both mean "start at round 0", and asking
  * whether round 0 is open costs one call, which is what the empty chain used to cost.
  */
-async function newestOpenedRound(rpc, book, manifest, at) {
+async function newestOpenedRound(rpc: string, book: string, manifest: RoundManifest, at: string): Promise<number> {
   const rounds = manifest.rounds;
   const cursor = Math.min(readCursor(), rounds.length - 1);
 
@@ -281,11 +399,37 @@ async function newestOpenedRound(rpc, book, manifest, at) {
   return lo;
 }
 
+/** A round as the board draws it: the decoded struct plus what only the caller knows. */
+export type ChainAuction = DecodedAuction & {
+  orderHash: string;
+  maker: string;
+  round: number;
+  openedAtBlock: number;
+  clearingBps: number | null;
+  /** Always null here: only the subgraph's replay can answer it. */
+  settlementMatchesDerivation: null;
+  bids: ChainBid[];
+  /** null when the log scan failed: "not read", which is not "nobody revealed". */
+  revealedCount: number | null;
+};
+
+export type ChainBoard = { source: "chain"; head: number; auctions: ChainAuction[] };
+
 /**
  * The most recently opened rounds, newest first, all pinned to one head block so the
  * board describes a single instant rather than a smear across several.
  */
-export async function fromChain({ rpc, book, manifest, limit = 3 }) {
+export async function fromChain({
+  rpc,
+  book,
+  manifest,
+  limit = 3,
+}: {
+  rpc: string;
+  book: string;
+  manifest: RoundManifest | null | undefined;
+  limit?: number;
+}): Promise<ChainBoard | null> {
   if (!manifest || !manifest.rounds || manifest.rounds.length === 0) return null;
   const head = await chainHead(rpc);
   if (head === null) return null;
@@ -294,26 +438,32 @@ export async function fromChain({ rpc, book, manifest, limit = 3 }) {
   const newest = await newestOpenedRound(rpc, book, manifest, at);
   if (newest < 0) return null; // the keeper has not opened anything yet
 
-  const out = [];
+  const out: ChainAuction[] = [];
   for (let i = newest; i >= 0 && out.length < limit; i--) {
     const r = manifest.rounds[i];
-    const a = await isOpened(rpc, book, manifest.maker, r.orderHash, at);
-    if (!a) continue;
-    a.orderHash = r.orderHash;
-    // The maker is NOT in the Auction struct -- it is half of the mapping key, so the
-    // struct never repeats it. Without it BidPanel would call placeBid({maker: undefined})
-    // and build a commitment against the wrong auction key: a bid that can never be
-    // revealed. It comes from the manifest, which is where the hash came from.
-    a.maker = manifest.maker;
-    a.round = r.round;
-    a.openedAtBlock = a.commitEnd - COMMIT_WINDOW;
-    a.clearingBps = a.bestBidder ? Math.max(a.secondBps, a.reserveBps) : null;
-    // The chain cannot answer this: it is the subgraph's independent replay. Null, not
-    // false -- "not checked" and "checked and disagreed" are very different claims.
-    a.settlementMatchesDerivation = null;
+    const decoded = await isOpened(rpc, book, manifest.maker, r.orderHash, at);
+    if (!decoded) continue;
+    const openedAtBlock = decoded.commitEnd - COMMIT_WINDOW;
+    const a = {
+      ...decoded,
+      orderHash: r.orderHash,
+      // The maker is NOT in the Auction struct -- it is half of the mapping key, so the
+      // struct never repeats it. Without it BidPanel would call placeBid({maker: undefined})
+      // and build a commitment against the wrong auction key: a bid that can never be
+      // revealed. It comes from the manifest, which is where the hash came from.
+      maker: manifest.maker,
+      round: r.round,
+      openedAtBlock,
+      clearingBps: decoded.bestBidder ? Math.max(decoded.secondBps, decoded.reserveBps) : null,
+      // The chain cannot answer this: it is the subgraph's independent replay. Null, not
+      // false -- "not checked" and "checked and disagreed" are very different claims.
+      settlementMatchesDerivation: null,
+    };
+    let bids: ChainBid[];
+    let revealedCount: number | null;
     try {
-      a.bids = await bidsFor(rpc, book, r.orderHash, a.openedAtBlock, Math.min(head, a.exclusiveEnd + 5));
-      a.revealedCount = a.bids.filter((b) => b.bps !== null).length;
+      bids = await bidsFor(rpc, book, r.orderHash, openedAtBlock, Math.min(head, decoded.exclusiveEnd + 5));
+      revealedCount = bids.filter((b) => b.bps !== null).length;
     } catch {
       // NULL, NOT ZERO. `revealedCount = 0` says "nobody opened a bid on this round",
       // which is a claim about bidders; what actually happened is that the log scan
@@ -325,10 +475,10 @@ export async function fromChain({ rpc, book, manifest, limit = 3 }) {
       // It matters more now that reads can move between endpoints: a log scan is the
       // likeliest call to fail, and the wrong answer here would accuse every bidder on
       // the round of not showing up.
-      a.bids = [];
-      a.revealedCount = null;
+      bids = [];
+      revealedCount = null;
     }
-    out.push(a);
+    out.push({ ...a, bids, revealedCount });
   }
   return out.length === 0 ? null : { source: "chain", head, auctions: out };
 }
