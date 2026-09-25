@@ -20,6 +20,11 @@
         "bondedRun": "sized by the rule above, our own accounts only",
         "headlineRun": 0
     },
+    "tlock": {
+        "description": "Timelock sealed bids, per auction and on by default in every client (D-v2-6). The network, mirrors and the margin M per parameter set live in the drand file; web/lib/tlock.ts pins the same network constants and test/js/tlock.test.js holds them equal.",
+        "drand": "config/drand.json",
+        "defaultOn": true
+    },
     "basis": {
         "exclusiveBlocks": "docs/design/window-sizing.md - simulated, not chosen",
         "reserveBps": "covers 44 bps of staleness risk over the lockup at 200% annual volatility",

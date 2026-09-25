@@ -1,0 +1,35 @@
+{
+    "network": "quicknet",
+    "chainHash": "52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971",
+    "genesisTime": 1692803367,
+    "period": 3,
+    "publicKey": "83cf0f2896adee7eb8b5f01fcad3912212c437e0073e911fb90022d3e760183c8c4b450b6a0a6c3ac6a5776a2d1064510d1fec758c921cc22b0e17e63aaf4bcb5ed66304de9cf809bd274ca73bab4af5a6e9c76a4bc09e76eae8991ef5ece45a",
+    "groupHash": "f477d5c89f21a17c863a7f937c6a6d15859414d2be09cd448d4279af331c5d3e",
+    "schemeID": "bls-unchained-g1-rfc9380",
+    "beaconID": "quicknet",
+    "mirrors": [
+        "https://api.drand.sh",
+        "https://api2.drand.sh",
+        "https://api3.drand.sh",
+        "https://drand.cloudflare.com"
+    ],
+    "threshold": {
+        "t": 12,
+        "n": 22,
+        "status": "documented, not live-verified",
+        "source": "https://docs.drand.love/blog/2023/10/16/quicknet-is-live/ - 'current threshold is 12 out of 22 nodes, it should increase as the League of Entropy onboards new members'. The same post says the League runs 'currently 23 nodes'.",
+        "whyNotLive": "No public drand endpoint serves the group file. /info and /v2/chains/<hash>/info (checked 2026-09-26) carry the key, period, genesis and groupHash but not t or n; /<hash>/group returns 403; the v2 router lists only health, info and rounds. `drand show group` reads a LOCAL node's group file, so it needs an operator. The figure is the network's own statement at launch and may have changed at a later resharing, which keeps the public key and chain hash."
+    },
+    "margins": {
+        "rule": "tlockRound = roundAt(T + M), T = timestamp(commitEnd + 1). docs/design/v2.md section 4.3.",
+        "humanDemo": { "M": 30, "roundsOfMargin": 10, "revealWindowSeconds": 120, "secondsLeftToReveal": 90 },
+        "advocated": { "M": 12, "roundsOfMargin": 4, "revealWindowSeconds": 60, "secondsLeftToReveal": 48 },
+        "note": "roundAt(T + M) is published at or before T + M, up to period - 1 = 2 s earlier (timestamps are whole seconds), so the effective margin is between M - 2 and M seconds."
+    },
+    "verified": {
+        "date": "2026-09-26",
+        "how": "GET <mirror>/<chainHash>/info on all four mirrors returned identical public_key, period, genesis_time, hash, groupHash, schemeID and beaconID. The chain hash is sha256(uint32_be(period) || int64_be(genesisTime) || publicKey || groupHash || beaconID); test/js/tlock.test.js recomputes it from the fields above.",
+        "roundCheck": "GET https://api.drand.sh/<chainHash>/public/latest returned round 32520078 at wall clock 1790363598; floor((1790363598 - 1692803367) / 3) + 1 = 32520078.",
+        "ibe": "The IBE tags (H1 = RFC 9380 G1 DST 'BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_', H2/H3/H4 = sha256 prefixes 'IBE-H2'/'IBE-H3'/'IBE-H4') are proved by the interop vectors in test/js/vectors/tlock-js.json against tlock-js 0.9.0."
+    }
+}
