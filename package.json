@@ -19,6 +19,8 @@
     "@1inch/solidity-utils": "6.9.10",
     "@1inch/swap-vm": "github:1inch/swap-vm#08089a1",
     "@modelcontextprotocol/sdk": "^1.30.0",
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
     "@openzeppelin/contracts": "5.4.0",
     "forge-std": "github:foundry-rs/forge-std#v1.11.0"
   },
