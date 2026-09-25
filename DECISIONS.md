@@ -212,6 +212,27 @@ including a real fill through the official Aqua.
 
 ---
 
+## 15. v2 design decisions: the recommendations, all nine — 26 Sep
+
+**Decided:** accept every recommendation in `docs/design/v2.md` §12 for D-v2-1 to D-v2-9.
+
+- **D-v2-1** One invite root per Book, fixed at creation. A new list means a new room.
+- **D-v2-2** The root gates `open`/`enqueue` as well as `commit`.
+- **D-v2-3** If the maker defaults, forfeits from bidders who didn't reveal go to the winner, not the maker.
+- **D-v2-4** Once a maker default is flagged inside the window, it can't be undone.
+- **D-v2-5** Next rounds open through `openNext` with a tip, plus a `settleAndOpenNext`
+  convenience. `settle` itself is unchanged.
+- **D-v2-6** Timelock is chosen per auction at `open`, and every client turns it on by default.
+- **D-v2-7** The maker bond is paid in `tokenIn`.
+- **D-v2-8** No on-chain drand signature check. The option goes in the FAQ.
+- **D-v2-9** The v1 Book is indexed as the legacy room in the v2 subgraph.
+
+D-v2-10 (TypeScript migration first) was already done, merged in `d6d0155`. D-v2-11 (when
+to deploy to mainnet) and D-v2-12 (default batch size, bond and tip) stay open until
+Phase 2.
+
+**Why:** [ ]
+
 ## What the video has to carry
 
 Between two and four minutes, human-narrated. Anything outside that window is an automatic
