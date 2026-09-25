@@ -14,6 +14,8 @@ import { LimitSwap } from "@1inch/swap-vm/src/instructions/LimitSwap.sol";
 import { GlasshouseAuction } from "../src/instructions/GlasshouseAuction.sol";
 import { GlasshouseAuctionLib } from "../src/lib/GlasshouseAuctionLib.sol";
 import { GlasshouseBook } from "../src/book/GlasshouseBook.sol";
+import { GlasshouseBookV2 } from "../src/book/GlasshouseBookV2.sol";
+import { OpenParams } from "../src/interfaces/IGlasshouseBookV2.sol";
 import { GlasshouseTestRouter } from "./helpers/GlasshouseTestRouter.sol";
 
 /// @title GlasshouseVMTest
@@ -346,6 +348,99 @@ contract GlasshouseVMTest is Test {
         (, uint256 last,) = router.quote(order, SWAP_AMOUNT, takerData);
 
         assertEq(first, last, "price drifted inside the exclusive window");
+    }
+
+    /// @dev The gate does not know which Book it is reading, and must not care. The same
+    ///      auction, run once on the v1 Book and once on a v2 Book with v1-shaped
+    ///      arguments, prices identically at every phase: blocked while bidding, the
+    ///      second price inside the window, the outsider excluded, base price after.
+    function test_GatePricesIdenticallyAgainstAV2Book() public {
+        GlasshouseBookV2 bookV2 = new GlasshouseBookV2(bytes32(0), address(0));
+        GlasshouseBook bookV1 = book;
+
+        // One order per Book: the Book address is part of the program, so of the hash.
+        ISwapVM.Order memory orderV1 = _order(PROGRAM_MAX_BPS, true);
+        book = GlasshouseBook(address(bookV2)); // only `_program` reads it, as an address
+        ISwapVM.Order memory orderV2 = _order(PROGRAM_MAX_BPS, true);
+        book = bookV1;
+        bytes32 hashV1 = router.hash(orderV1);
+        bytes32 hashV2 = router.hash(orderV2);
+        assertTrue(hashV1 != hashV2, "orders must differ by Book");
+
+        // Drive both auctions identically.
+        (uint40 commitEnd, uint40 revealEnd) = _openAuction(hashV1);
+        OpenParams memory p = OpenParams({
+            router: address(router),
+            commitBlocks: COMMIT_BLOCKS,
+            revealBlocks: REVEAL_BLOCKS,
+            tokenIn: address(tokenB),
+            exclusiveBlocks: EXCLUSIVE_BLOCKS,
+            reserveBps: RESERVE_BPS,
+            maxBps: BOOK_MAX_BPS,
+            bond: 0,
+            makerBond: 0,
+            offerToken: address(0),
+            tlockRound: 0,
+            minOffer: 0
+        });
+        vm.prank(maker);
+        bookV2.open(hashV2, p, new bytes32[](0));
+
+        _bid(hashV1, winner, 400);
+        _bid(hashV1, outsider, 250);
+        vm.prank(winner);
+        bookV2.commit(maker, hashV2, keccak256(abi.encodePacked(winner, uint24(400), bytes32("s"))), "", new bytes32[](0));
+        vm.prank(outsider);
+        bookV2.commit(maker, hashV2, keccak256(abi.encodePacked(outsider, uint24(250), bytes32("s"))), "", new bytes32[](0));
+
+        bytes memory winnerV1 = _takerData(orderV1, winner);
+        bytes memory winnerV2 = _takerData(orderV2, winner);
+        bytes memory outsiderV2 = _takerData(orderV2, outsider);
+
+        // Bidding: both refuse.
+        vm.prank(winner);
+        vm.expectRevert(GlasshouseAuctionLib.GlasshouseAuctionInProgress.selector);
+        router.quote(orderV2, SWAP_AMOUNT, winnerV2);
+
+        vm.roll(commitEnd + 1);
+        _revealBid(hashV1, winner, 400);
+        _revealBid(hashV1, outsider, 250);
+        vm.prank(address(0x57A2)); // a stranger opens the winner's bid on v2
+        bookV2.revealFor(maker, hashV2, winner, 400, bytes32("s"));
+        vm.prank(outsider);
+        bookV2.reveal(maker, hashV2, 250, bytes32("s"));
+
+        // Window: same second price, same exclusion.
+        vm.roll(revealEnd + 1);
+        vm.prank(winner);
+        (uint256 inV1, uint256 outV1,) = router.quote(orderV1, SWAP_AMOUNT, winnerV1);
+        vm.prank(winner);
+        (uint256 inV2, uint256 outV2,) = router.quote(orderV2, SWAP_AMOUNT, winnerV2);
+        assertEq(inV2, inV1, "amountIn differs between Books");
+        assertEq(outV2, outV1, "amountOut differs between Books");
+        assertEq(outV2, _improvedOut(250), "v2 window price is not the second bid");
+
+        vm.prank(outsider);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                GlasshouseAuctionLib.GlasshouseExclusiveWindow.selector, winner, bookV2.outcome(maker, hashV2).exclusiveUntil
+            )
+        );
+        router.quote(orderV2, SWAP_AMOUNT, outsiderV2);
+
+        // The fill is recorded through the v2 Book's hook exactly as through v1's.
+        vm.prank(winner);
+        router.swap(orderV2, SWAP_AMOUNT, winnerV2);
+        assertEq(bookV2.auctions(maker, hashV2).filledBy, winner, "v2 hook recorded the filler");
+
+        // After the window: base price on both.
+        vm.roll(revealEnd + EXCLUSIVE_BLOCKS + 1);
+        vm.prank(winner);
+        (, uint256 baseV1,) = router.quote(orderV1, SWAP_AMOUNT, winnerV1);
+        vm.prank(winner);
+        (, uint256 baseV2,) = router.quote(orderV2, SWAP_AMOUNT, winnerV2);
+        assertEq(baseV2, baseV1, "base price differs between Books");
+        assertEq(baseV2, _basePriceOut(), "base price");
     }
 
     /// @dev The instruction cannot emit -- LOG reverts under STATICCALL -- so the fill is

@@ -16,9 +16,12 @@ import { LimitSwap } from "@1inch/swap-vm/src/instructions/LimitSwap.sol";
 import { GlasshouseAuction } from "../../src/instructions/GlasshouseAuction.sol";
 import { GlasshouseAuctionLib } from "../../src/lib/GlasshouseAuctionLib.sol";
 import { GlasshouseBook } from "../../src/book/GlasshouseBook.sol";
+import { GlasshouseBookV2 } from "../../src/book/GlasshouseBookV2.sol";
+import { IGlasshouseBook } from "../../src/interfaces/IGlasshouseBook.sol";
+import { OpenParams } from "../../src/interfaces/IGlasshouseBookV2.sol";
 import { GlasshouseTestRouter } from "../helpers/GlasshouseTestRouter.sol";
 
-/// @title GlasshouseInvariants
+/// @title GlasshouseInvariantsBase
 /// @notice The seven invariants 1inch judges strategies against, applied to opcode 0x2e.
 ///
 /// @dev Uses upstream's own `CoreInvariants` harness rather than a reimplementation, so
@@ -36,9 +39,14 @@ import { GlasshouseTestRouter } from "../helpers/GlasshouseTestRouter.sol";
 ///
 /// @dev The taker throughout is `address(this)`, because `CoreInvariants._executeSwap`
 ///      calls the router directly. So the test contract has to win its own auction.
-contract GlasshouseInvariants is Test, CoreInvariants {
+///
+/// @dev Parameterised over the Book: {GlasshouseInvariants} runs it against v1 and
+///      {GlasshouseInvariantsV2} against v2. The gate reads only `IGlasshouseBook.outcome`,
+///      so it does not know which Book it is talking to and must not care
+///      (`docs/design/v2.md` §3.9). Only opening, committing and revealing differ.
+abstract contract GlasshouseInvariantsBase is Test, CoreInvariants {
     GlasshouseTestRouter internal swapVM;
-    GlasshouseBook internal book;
+    address internal book;
     TokenMock internal tokenA;
     TokenMock internal tokenB;
 
@@ -65,7 +73,7 @@ contract GlasshouseInvariants is Test, CoreInvariants {
         maker = vm.addr(MAKER_PK);
         rival = vm.addr(0x2222);
 
-        book = new GlasshouseBook();
+        book = _deployBook();
         swapVM = new GlasshouseTestRouter(address(0), address(0), address(this), "SwapVM", "1.0.0");
 
         tokenA = new TokenMock("Token I", "TKI");
@@ -103,7 +111,7 @@ contract GlasshouseInvariants is Test, CoreInvariants {
     function _program() internal view returns (bytes memory) {
         return bytes.concat(
             StaticBalances.build(BALANCE_A, BALANCE_B),
-            GlasshouseAuction.build(address(book), MAX_BPS),
+            GlasshouseAuction.build(book, MAX_BPS),
             LimitSwap.build(address(tokenA), address(tokenB))
         );
     }
@@ -172,31 +180,28 @@ contract GlasshouseInvariants is Test, CoreInvariants {
     ///      drives. The rival exists so the clearing price is a real second price rather
     ///      than the reserve.
     function _winAuction(bytes32 orderHash) internal {
-        vm.prank(maker);
-        book.open(
-            orderHash,
-            address(swapVM),
-            address(tokenA),
-            COMMIT_BLOCKS,
-            REVEAL_BLOCKS,
-            EXCLUSIVE_BLOCKS,
-            RESERVE_BPS,
-            MAX_BPS,
-            0
-        );
-        GlasshouseBook.Auction memory a = book.auctions(maker, orderHash);
-        revealEnd = a.revealEnd;
+        uint40 commitEnd;
+        (commitEnd, revealEnd) = _openAuction(orderHash);
 
-        book.commit(maker, orderHash, book.commitmentFor(address(this), WINNING_BID, bytes32("s")));
-        bytes32 rivalCommitment = book.commitmentFor(rival, RIVAL_BID, bytes32("s"));
-        vm.prank(rival);
-        book.commit(maker, orderHash, rivalCommitment);
+        _commit(address(this), orderHash, keccak256(abi.encodePacked(address(this), WINNING_BID, bytes32("s"))));
+        _commit(rival, orderHash, keccak256(abi.encodePacked(rival, RIVAL_BID, bytes32("s"))));
 
-        vm.roll(a.commitEnd + 1);
-        book.reveal(maker, orderHash, WINNING_BID, bytes32("s"));
-        vm.prank(rival);
-        book.reveal(maker, orderHash, RIVAL_BID, bytes32("s"));
+        vm.roll(commitEnd + 1);
+        _reveal(address(this), orderHash, WINNING_BID, bytes32("s"));
+        _reveal(rival, orderHash, RIVAL_BID, bytes32("s"));
     }
+
+    // --- the Book-specific part ------------------------------------------------
+
+    function _deployBook() internal virtual returns (address);
+
+    /// @dev Opens as `maker`, unbonded, with the deployed parameters.
+    function _openAuction(bytes32 orderHash) internal virtual returns (uint40 commitEnd, uint40 revealEnd_);
+
+    /// @dev Commits from `who`; `address(this)` needs no prank.
+    function _commit(address who, bytes32 orderHash, bytes32 commitment) internal virtual;
+
+    function _reveal(address who, bytes32 orderHash, uint24 bps, bytes32 salt) internal virtual;
 
     function _config(ISwapVM.Order memory order) internal view returns (InvariantConfig memory config) {
         config = _getDefaultConfig();
@@ -244,7 +249,7 @@ contract GlasshouseInvariants is Test, CoreInvariants {
         _winAuction(swapVM.hash(order));
         vm.roll(revealEnd + 1);
 
-        assertEq(book.outcome(maker, swapVM.hash(order)).clearingBps, RIVAL_BID, "clearing is the second bid");
+        assertEq(IGlasshouseBook(book).outcome(maker, swapVM.hash(order)).clearingBps, RIVAL_BID, "clearing is the second bid");
 
         assertAllInvariantsWithConfig(swapVM, order, address(tokenA), address(tokenB), _config(order));
     }
@@ -296,5 +301,82 @@ contract GlasshouseInvariants is Test, CoreInvariants {
         uint256 expected = baseOut * 10_000 / (10_000 + uint256(RIVAL_BID));
         assertApproxEqAbs(improvedOut, expected, 1, "improvement is not exactly the clearing price");
         assertLt(improvedOut, baseOut, "improvement must move price toward the maker");
+    }
+}
+
+/// @title GlasshouseInvariants
+/// @notice The seven upstream invariants over the gate, against the v1 Book deployed on
+///         Base.
+contract GlasshouseInvariants is GlasshouseInvariantsBase {
+    function _deployBook() internal override returns (address) {
+        return address(new GlasshouseBook());
+    }
+
+    function _openAuction(bytes32 orderHash) internal override returns (uint40, uint40) {
+        vm.prank(maker);
+        GlasshouseBook(book).open(
+            orderHash, address(swapVM), address(tokenA), COMMIT_BLOCKS, REVEAL_BLOCKS, EXCLUSIVE_BLOCKS, RESERVE_BPS, MAX_BPS, 0
+        );
+        GlasshouseBook.Auction memory a = GlasshouseBook(book).auctions(maker, orderHash);
+        return (a.commitEnd, a.revealEnd);
+    }
+
+    function _commit(address who, bytes32 orderHash, bytes32 commitment) internal override {
+        if (who != address(this)) vm.prank(who);
+        GlasshouseBook(book).commit(maker, orderHash, commitment);
+    }
+
+    function _reveal(address who, bytes32 orderHash, uint24 bps, bytes32 salt) internal override {
+        if (who != address(this)) vm.prank(who);
+        GlasshouseBook(book).reveal(maker, orderHash, bps, salt);
+    }
+}
+
+/// @title GlasshouseInvariantsV2
+/// @notice The same seven invariants, the same program, the same router, against the v2
+///         Book opened with v1-shaped arguments. If the gate priced differently here, the
+///         v2 Book would have changed `outcome()`, which I-1 says it must not.
+contract GlasshouseInvariantsV2 is GlasshouseInvariantsBase {
+    bytes32[] internal noProof;
+
+    function _deployBook() internal override returns (address) {
+        return address(new GlasshouseBookV2(bytes32(0), address(0)));
+    }
+
+    function _openAuction(bytes32 orderHash) internal override returns (uint40, uint40) {
+        OpenParams memory p = OpenParams({
+            router: address(swapVM),
+            commitBlocks: COMMIT_BLOCKS,
+            revealBlocks: REVEAL_BLOCKS,
+            tokenIn: address(tokenA),
+            exclusiveBlocks: EXCLUSIVE_BLOCKS,
+            reserveBps: RESERVE_BPS,
+            maxBps: MAX_BPS,
+            bond: 0,
+            makerBond: 0,
+            offerToken: address(0),
+            tlockRound: 0,
+            minOffer: 0
+        });
+        vm.prank(maker);
+        GlasshouseBookV2(book).open(orderHash, p, noProof);
+        GlasshouseBookV2.Auction memory a = GlasshouseBookV2(book).auctions(maker, orderHash);
+        return (a.commitEnd, a.revealEnd);
+    }
+
+    function _commit(address who, bytes32 orderHash, bytes32 commitment) internal override {
+        if (who != address(this)) vm.prank(who);
+        GlasshouseBookV2(book).commit(maker, orderHash, commitment, "", noProof);
+    }
+
+    /// @dev The rival's bid is opened by a stranger through `revealFor`, which must make
+    ///      no difference to anything the gate sees.
+    function _reveal(address who, bytes32 orderHash, uint24 bps, bytes32 salt) internal override {
+        if (who == address(this)) {
+            GlasshouseBookV2(book).reveal(maker, orderHash, bps, salt);
+        } else {
+            vm.prank(address(0x57A2));
+            GlasshouseBookV2(book).revealFor(maker, orderHash, who, bps, salt);
+        }
     }
 }
