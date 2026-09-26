@@ -2022,40 +2022,49 @@ contract GlasshouseBookV2Test is BookV2Fixture {
 /// @dev What is pinned, and why not the whole bytecode. Under `via_ir`, solc's output for
 ///      a contract depends on the AST ids of every file in the same compilation job, not
 ///      only on the contract's own sources: adding the v2 files to Forge's single job
-///      moves the router's executable code (21,108 -> 21,168 bytes) with its sources,
-///      settings and metadata hash all unchanged. A pinned full-bytecode hash in Forge
-///      would therefore fail on any new file anywhere. The metadata hash in the CBOR
-///      tail is what is stable: it is the IPFS digest of the metadata JSON, which carries
-///      keccak256 of every source file the router compiles from plus the compiler
-///      settings. Change one byte of the router's source closure, or the optimizer, and
-///      it moves.
+///      moves the router's executable code (21,108 -> 21,168 bytes) with its sources and
+///      settings unchanged. A pinned full-bytecode hash in Forge would therefore fail on
+///      any new file anywhere.
 ///
-/// @dev Two values, because the metadata hashes source bytes and this repo is checked
-///      out with `core.autocrlf` on some machines: LF sources (the committed bytes, and
-///      the main checkout) and CRLF sources (a Windows worktree). Both were measured at
-///      `1c3eeca`, before Phase 1.
+/// @dev Nor the metadata hash in the CBOR tail, which this test first pinned. The
+///      metadata JSON carries Forge's auto-detected remappings, and some of those are
+///      absolute paths (the checkout folder, `D:/ethonline/node_modules/...`), so the
+///      digest moved with the checkout's folder: it passed in the worktree it was
+///      measured in and failed in the main checkout with identical sources.
+///
+/// @dev So the test reads the router's metadata from Forge's artifact and pins what the
+///      metadata hash was standing in for: keccak256 of every file in the router's
+///      source closure (69 files, `src/` and `node_modules/` alike, in the artifact's
+///      order), plus the compiler version, optimizer runs, `viaIR` and EVM version.
+///      Change one byte of any source, or one setting, and it moves; move the checkout
+///      and it does not.
 ///
 /// @dev The executable bytecode itself is checked against the router live on Base out
 ///      of band, with the build Ignition deploys from; see `docs/design/v2.md`,
 ///      "Implementation notes (Phase 1)".
 contract GlasshouseRouterUntouchedTest is Test {
-    bytes32 internal constant METADATA_DIGEST_LF = 0x7d5c0bdf507f82c93bbf19d4d166ccd8dd15ff73fa561f78fccb72dcad32acae;
-    bytes32 internal constant METADATA_DIGEST_CRLF = 0x342fde74fee719701acf9bd7b69e84c04e2fb63b9e86abcb4c211c038e4a2a44;
+    string internal constant ARTIFACT = "/artifacts/GlasshouseRouter.sol/GlasshouseRouter.json";
+
+    bytes32 internal constant SOURCES_DIGEST = 0xab199c42e9fbc626fc8ebdbac563268f6a4a3a37d15bc34a14270d3911b5ee71;
+    uint256 internal constant SOURCE_COUNT = 69;
 
     function test_RouterSourcesAndSettingsAreUnchanged() public view {
-        bytes memory code = vm.getDeployedCode("GlasshouseRouter.sol:GlasshouseRouter");
-        uint256 n = code.length;
+        string memory json = vm.readFile(string.concat(vm.projectRoot(), ARTIFACT));
 
-        // CBOR tail: a2 64 "ipfs" 58 22 1220 <32-byte digest> 64 "solc" 43 <version> 0033
-        assertEq(uint8(code[n - 2]), 0x00, "cbor length hi");
-        assertEq(uint8(code[n - 1]), 0x33, "cbor length lo");
-        assertEq(uint8(code[n - 53]), 0xa2, "cbor map");
-        assertEq(uint8(code[n - 45]), 0x12, "sha2-256 multihash");
-
-        bytes32 digest;
-        assembly ("memory-safe") {
-            digest := mload(add(add(code, 0x20), sub(n, 43)))
+        string[] memory paths = vm.parseJsonKeys(json, ".metadata.sources");
+        assertEq(paths.length, SOURCE_COUNT, "router source closure changed size");
+        bytes memory packed;
+        for (uint256 i; i < paths.length; ++i) {
+            packed = abi.encodePacked(
+                packed, vm.parseJsonBytes32(json, string.concat(".metadata.sources['", paths[i], "'].keccak256"))
+            );
         }
-        assertTrue(digest == METADATA_DIGEST_LF || digest == METADATA_DIGEST_CRLF, "router sources or settings changed");
+        assertEq(keccak256(packed), SOURCES_DIGEST, "router sources changed");
+
+        assertEq(vm.parseJsonString(json, ".metadata.compiler.version"), "0.8.30+commit.73712a01", "compiler");
+        assertEq(vm.parseJsonUint(json, ".metadata.settings.optimizer.runs"), 700, "optimizer runs");
+        assertTrue(vm.parseJsonBool(json, ".metadata.settings.optimizer.enabled"), "optimizer");
+        assertTrue(vm.parseJsonBool(json, ".metadata.settings.viaIR"), "viaIR");
+        assertEq(vm.parseJsonString(json, ".metadata.settings.evmVersion"), "osaka", "evm version");
     }
 }

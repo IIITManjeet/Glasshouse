@@ -8,8 +8,12 @@ test           = "test"
 
 # Narrow on purpose: the ONLY writable path is ./config, which is where
 # test/fork/GenerateRounds.t.sol writes the keeper's round table. Tests otherwise have
-# no filesystem access at all, which is the default and worth keeping.
-fs_permissions = [{ access = "read-write", path = "./config" }]
+# no filesystem access at all, which is the default and worth keeping. The one read is
+# the router's own artifact, for the I-10 pin in test/GlasshouseBookV2.t.sol.
+fs_permissions = [
+    { access = "read-write", path = "./config" },
+    { access = "read", path = "./artifacts/GlasshouseRouter.sol" },
+]
 
 [fmt]
 single_line_statement_blocks = "multi"
