@@ -1,0 +1,107 @@
+{
+  "generatedBy": "test/js/vectors/generate-tlock-vectors.mjs",
+  "command": "npm install --no-save tlock-js@0.9.0 && node test/js/vectors/generate-tlock-vectors.mjs",
+  "generatedAt": "2026-09-25",
+  "tlockJs": "0.9.0",
+  "tlockJsNobleCurves": "1.9.7",
+  "source": "https://api.drand.sh/52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971/public/<round>",
+  "chainHash": "52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971",
+  "signatures": {
+    "1000000": "83ad29e4c409f9470fc2ef02f90214df49e02b441a1a241a82d622d9f608ef98fd8b11a029f1bee9d9e83b45088abe72",
+    "1000001": "a5bd91e5e2d8c0bf51bffdfad87eef34348fd9c0b2df2bee39db90bdef7e1399b1a77bb2fe98b24d84c0936a306c4218"
+  },
+  "fromTlockJs": [
+    {
+      "round": 1000000,
+      "plaintext": "0000000000000000000000000000000000000000000000000000000000000000",
+      "ciphertext": "a82944609d994e2d4c973f741cff7177cc0d79df0fede6dfda3951092d6ebc378281834e1f7107d850531ab73dd94b890433669882c550f6f11d34c8418be75a1c5a80ff1d44a50290885b113a12516bf63740c0c1c904c105b9c019cf050b0b7859e26e5f978476ccd25c788755c26c908b2b106a5d9994f939f2516ba4283ff0a46d1241d1b464eda19ff206905daff0748e0b29d2eee75de6418d51eca406"
+    },
+    {
+      "round": 1000000,
+      "plaintext": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "ciphertext": "9288dda904dd5b92f418d0cdd18d37f72b9d9e005ea89fd2b4c0dc75ab42fddf800e260c73357f045243df1ed76ef7fa141aedda139e860c0479b401bb475641b508a27f5d5c154794fa81a1cb47c4a9a304e52dde2c80fcaac1d9868f6f366b5c329f775298010af9e0312b132f2e40e859fcd256d48cf186b36640371f0a0d9cd1c761dc543a374526e79bf75104d0c5be1017a2bd34a2ac9b82286df14480"
+    },
+    {
+      "round": 1000000,
+      "plaintext": "0000fa7e55c4f27d495aac4051ea888e5a4d69476a142b8200d583c9ee758624",
+      "ciphertext": "827b567f7ab962107793bbdbaa718afeeb75632f54878722bc942790e1e76e8e3b14353132842bb1cce973944cd68d2e090bf1db711cb9142d5470d37567203002c85ba1ee36aed9075f2d11a839b49b7e5e3337ae6c300d8164b78913d1ddb3fd5a9ff9a626e9c75014e52e61506d595c01731d2e2b970f0b2bc5b9eb889e203f06b308abdbffbc3726050d5007e85be4e407f6a879c36106f6de291579aa82"
+    },
+    {
+      "round": 1000000,
+      "plaintext": "77f4a6d6ac8273dac0878240e3a597f6bc88b12109bc6b3fee0b89b6b90e8042",
+      "ciphertext": "9994573b8d002dd9429e6ddd237f9aaff7f129dfe3970391a6686d4f15849f32d610778675e093d4a4ffa50073459c2e103b0404337e03d30e33783e1757800b537e23917e7e8c2b194389828529e48404719afbbfc3cd5ac8fd45e4bda9a39ebe463c4dd974cf1afadf86b56f39ff842e3b3102ee775a1a6fbd7d6b5bf0c93433e13b9ffb0879f14452a0e70f513630d9726d29f72b90c4171a85633f9af2ea"
+    }
+  ],
+  "toTlockJs": [
+    {
+      "round": 1000000,
+      "plaintext": "0000000000000000000000000000000000000000000000000000000000000000",
+      "sigma": "0c9a62e529cacc64c77b2c934b222538a1ebdaadcc25ff6d42b9dac8ac3a60f0",
+      "ciphertext": "915033bd78c730f6fc656d34d68de84f4f1e1206578c0f8ca97afe0d4388540b80f238214ed4af255fd8a7927f914adf0d5eb714aaf61d265df75a82b245705b16a0fb712f7574f6932d08a476c75493b3e0003780bdfcb39d4faf3ca911df0937b919939cd21faade5776f9ba75f96c1dcea6094c1da6ff55d1bac5aade844604a28dc933c4e46fc403b7b1310dbc42fbd5055fc3034dd859e6b213bfcf920f",
+      "openedByTlockJs": true
+    },
+    {
+      "round": 1000000,
+      "plaintext": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "sigma": "3961e23045fd2339491e3c4b572812a0da41ed994e8a7e77e5d0fc65ceeadb20",
+      "ciphertext": "8d45b620ddc8afba11da036a8d5576923d78a5037d3285a54b9536de1ae90179eb1e0b1c4649f7698617c43c186a33d70979efced59a7a5d14d1bca2ce78fc79d4912b5cf15f0a91efdba6795844518ffbc24687124d29b37761b3aa5542e1d63f321743117af4dd3e1cc072c0ba159de6d256ad9a0c5bdebbf467fc1e0d89861ee95fb414ef84e9fea77783432675fe893a84820e9f63c64c9186db3b000cb6",
+      "openedByTlockJs": true
+    },
+    {
+      "round": 1000000,
+      "plaintext": "0000fa7e55c4f27d495aac4051ea888e5a4d69476a142b8200d583c9ee758624",
+      "sigma": "54d1f932635327d58da69e68f5a95e6e28a06944e0c3cf14e303e59a02a8ff52",
+      "ciphertext": "903c451abda2c32cb06be557db54bc1cd0a8d512f539d2296b663e23bba9902ec66dd9bc5c96d97ce74bf4c77302f721092657a0326b7585a6962221b31a55e5ab069b504596469b0ac9dd100c4bc522874ac7580087370e57eaf58e104117b0aa4675cb1ee9f0dbf309cf474efe2bcecc45131dfb0f8d406699df0fea9604f4e164c586f51d2725993ef7a58c8790ff4480dcc0d12bab4ffa0eadd8669f8db9",
+      "openedByTlockJs": true
+    },
+    {
+      "round": 1000000,
+      "plaintext": "77f4a6d6ac8273dac0878240e3a597f6bc88b12109bc6b3fee0b89b6b90e8042",
+      "sigma": "c539d0f0931a3afa9849c91f0fa8c2388ca1214dbfbd1afd6fa3e13ac2c57eaa",
+      "ciphertext": "8f0970d8623879b3bb85c012260ff31c0258ffe28d4d01636d52b85fcdb391de4101e3d3224e007646f7d3f247c130740a49a344f58ec32ac9fe91e976cbcf264a6645be43027685dc5cfe4d86b8e00b94876a542f76695627e57f5ad6e5b5ef624dd910127900846dc1c5ab674b27db58c7d6580a73173c2762f899d226de4ca9ad8e5ca4574867e7392231da822ec350725b355edde496dac61bb0370ee221",
+      "openedByTlockJs": true
+    }
+  ],
+  "rounds": [
+    {
+      "timestamp": 1692803367,
+      "round": 1,
+      "roundTime": 1692803367
+    },
+    {
+      "timestamp": 1692803369,
+      "round": 1,
+      "roundTime": 1692803367
+    },
+    {
+      "timestamp": 1692803370,
+      "round": 2,
+      "roundTime": 1692803370
+    },
+    {
+      "timestamp": 1789481397,
+      "round": 32226011,
+      "roundTime": 1789481397
+    },
+    {
+      "timestamp": 1790000000,
+      "round": 32398878,
+      "roundTime": 1789999998
+    },
+    {
+      "timestamp": 1790000001,
+      "round": 32398879,
+      "roundTime": 1790000001
+    },
+    {
+      "timestamp": 1790000002,
+      "round": 32398879,
+      "roundTime": 1790000001
+    },
+    {
+      "timestamp": 2000000000,
+      "round": 102398878,
+      "roundTime": 1999999998
+    }
+  ]
+}
