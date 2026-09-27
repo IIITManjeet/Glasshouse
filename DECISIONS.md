@@ -227,9 +227,15 @@ including a real fill through the official Aqua.
 - **D-v2-8** No on-chain drand signature check. The option goes in the FAQ.
 - **D-v2-9** The v1 Book is indexed as the legacy room in the v2 subgraph.
 
-D-v2-10 (TypeScript migration first) was already done, merged in `d6d0155`. D-v2-11 (when
-to deploy to mainnet) and D-v2-12 (default batch size, bond and tip) stay open until
-Phase 2.
+D-v2-10 (TypeScript migration first) was already done, merged in `d6d0155`. The last two,
+decided 27 Sep, also follow the recommendations:
+
+- **D-v2-11** The v2 Book and factory go to Base mainnet only after the fork rehearsal log
+  has been read, and only on explicit instruction.
+- **D-v2-12** `K = 12`. The public room's maker bond is sized to about three rounds of a
+  bidder's gas at Base prices. `tip = 0` while the house keeper runs, and a small tip once
+  it is meant to run unattended. The figures go into `config/auction.json` with their
+  basis.
 
 **Why:** [ ]
 
